@@ -1,0 +1,11 @@
+{
+  "name": "@cry/watcher",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --experimental-sqlite src/index.js",
+    "dev": "node --experimental-sqlite --watch src/index.js"
+  },
+  "dependencies": {}
+}

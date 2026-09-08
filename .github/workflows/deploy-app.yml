@@ -1,0 +1,61 @@
+name: deploy-app
+
+# Ana yığın EVDEKİ makinede çalışıyor; oraya buluttan SSH ile girilemez
+# (ev tarafında hiçbir port açık değil, tünel tek yönlü kuruluyor). Bu yüzden
+# dağıtımı PC'nin KENDİSİNE kurulu bir self-hosted runner yapar: iş kuyruktan
+# çekilir, makinenin dışarı açılması gerekmez.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "apps/watcher/**"
+      - "docs/**"
+      - "**/*.md"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-app
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # PC'ye kurulacak runner etiketi
+    runs-on: [self-hosted, windows, cry-pc]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ortam dosyası yerinde mi
+        shell: bash
+        run: |
+          set -e
+          # .env repoda DEĞİL (depo public). Yoksa deploy başlamaz — yarım
+          # ayağa kalkan bir yığın, çalışıyor sanılır.
+          test -f .env || { echo "HATA: .env yok"; exit 1; }
+
+      - name: Derle ve ayağa kaldır
+        shell: bash
+        run: |
+          set -e
+          docker compose build
+          docker compose up -d
+          docker image prune -f
+
+      - name: Migration
+        shell: bash
+        run: |
+          set -e
+          docker compose run --rm web npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
+
+      - name: Sağlık kontrolü
+        shell: bash
+        run: |
+          set -e
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:1337/saglik > /dev/null; then
+              echo "✓ uygulama ayakta"; exit 0
+            fi
+            sleep 2
+          done
+          echo "HATA: /saglik 60 saniyede cevap vermedi"
+          docker compose logs --tail 50 web
+          exit 1

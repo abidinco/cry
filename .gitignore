@@ -1,0 +1,31 @@
+node_modules/
+.next/
+dist/
+build/
+out/
+
+# sırlar — public repo, hiçbiri commit'e girmez
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+wg*.conf
+
+# veri
+*.dump
+*.sqlite
+*.sqlite3
+data/
+pgdata/
+
+# araçlar
+.DS_Store
+Thumbs.db
+*.log
+.turbo/
+coverage/
+.vscode/
+.idea/
+*.tsbuildinfo
+next-env.d.ts

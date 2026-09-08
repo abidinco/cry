@@ -1,0 +1,463 @@
+// cry — veri modeli
+//
+// İki tasarım kuralı bütün şemaya yayılıyor:
+//
+// 1. TUTAR ham tam sayıdır (String olarak taşınan bigint). Float bir adli
+//    raporda tutarı sessizce kaydırır; ondalığa çevirme gösterim sınırında.
+// 2. Her ETİKET ve her ÇIKARIM kaynağını, güven skorunu ve doğrulama tarihini
+//    taşır. Doğrulanmamış bir etiket rapora ya hiç girmez ya da açıkça
+//    "doğrulanmamış" ibaresiyle girer.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/**
+ * ---------------- Kullanıcılar, roller, denetim ----------------
+ */
+
+model Role {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique // "admin", "analist"
+  name        String
+  // İleride yeni rol tanımlanabilsin diye yetkiler veri; koda gömülmüyor.
+  permissions Json     @default("[]")
+  createdAt   DateTime @default(now())
+  users       User[]
+
+  @@map("roles")
+}
+
+model User {
+  id                 Int       @id @default(autoincrement())
+  username           String    @unique
+  passwordHash       String
+  displayName        String?
+  roleId             Int
+  role               Role      @relation(fields: [roleId], references: [id])
+  // Seed ile üretilen ilk şifre kullanılmaya devam edemez.
+  mustChangePassword Boolean   @default(true)
+  active             Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  lastLoginAt        DateTime?
+
+  cases     Case[]
+  labels    Label[]    @relation("LabelCreator")
+  approvals Label[]    @relation("LabelApprover")
+  auditLogs AuditLog[]
+
+  @@map("users")
+}
+
+/// Kim, ne zaman, hangi adresi sorguladı. Admin'e görünür.
+model AuditLog {
+  id        BigInt   @id @default(autoincrement())
+  userId    Int?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String // search|trace|report|label.create|login
+  target    String?
+  meta      Json     @default("{}")
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+  @@map("audit_logs")
+}
+
+/**
+ * ---------------- Zincir verisi: vaka odaklı artımlı indeks ----------------
+ */
+
+model Asset {
+  id       Int     @id @default(autoincrement())
+  chain    String
+  /// Token'da sözleşme adresi; native varlıkta BOŞ DİZE.
+  ///
+  /// Neden null değil: Postgres'te NULL != NULL, yani nullable bir kolonla
+  /// kurulan tekillik kısıtı native varlığı HİÇ korumaz — her tur yeni bir
+  /// TRX satırı açılır ve hareketler farklı varlıklara dağılır.
+  contract String  @default("")
+  symbol   String
+  decimals Int
+  name     String?
+
+  transfers Transfer[]
+  prices    PriceDaily[]
+
+  @@unique([chain, contract])
+  @@index([chain, symbol])
+  @@map("assets")
+}
+
+model Address {
+  id      BigInt @id @default(autoincrement())
+  chain   String
+  /// Kanonik yazım: TRON base58, EVM küçük harf. Aynı cüzdan iki satır olmaz.
+  address String
+
+  firstSeen  DateTime?
+  lastSeen   DateTime?
+  balanceRaw String?
+  isContract Boolean?  @default(false)
+
+  /// Artımlı indeksin belleği: bir daha bu noktadan önceye sorulmaz.
+  indexedThroughBlock Int?
+  indexedThroughTs    DateTime?
+  indexCursor         String?
+  lastIndexedAt       DateTime?
+  /// "boş" ile "bakılmadı" ayrı sorulardır.
+  indexState          String    @default("bilinmiyor") // bilinmiyor|kismi|tam
+
+  /// TRON: bu hesabı kim aktive etti (aynı kişi kümelemesinin dayanağı).
+  activatedByAddress String?
+  activatedAt        DateTime?
+  activationTxHash   String?
+
+  labels       Label[]
+  watches      Watch[]
+  outTransfers Transfer[] @relation("TransferFrom")
+  inTransfers  Transfer[] @relation("TransferTo")
+
+  @@unique([chain, address])
+  @@index([chain, activatedByAddress])
+  @@map("addresses")
+}
+
+/// Değer hareketinin atomu. Motorun gördüğü tek şey budur.
+model Transfer {
+  id          BigInt   @id @default(autoincrement())
+  chain       String
+  txHash      String
+  /// Aynı tx içindeki sıra — bir tx birden çok hareket taşıyabilir.
+  index       Int
+  blockNumber Int?
+  ts          DateTime
+
+  fromAddressId BigInt?
+  fromAddress   Address? @relation("TransferFrom", fields: [fromAddressId], references: [id])
+  toAddressId   BigInt?
+  toAddress     Address? @relation("TransferTo", fields: [toAddressId], references: [id])
+
+  assetId   Int
+  asset     Asset   @relation(fields: [assetId], references: [id])
+  /// Ham tam sayı. Numeric değil String: 2^63 üstü token tutarları var.
+  amountRaw String
+  kind      String // native|token|internal|utxo
+  success   Boolean @default(true)
+  feeRaw    String?
+  raw       Json?
+
+  createdAt DateTime @default(now())
+
+  @@unique([chain, txHash, index])
+  @@index([fromAddressId, ts])
+  @@index([toAddressId, ts])
+  @@index([chain, ts])
+  @@map("transfers")
+}
+
+/// Formattan çözülemeyen girdilerin yoklama sonucu.
+model ProbeCache {
+  id       BigInt   @id @default(autoincrement())
+  input    String   @unique
+  kind     String // address|tx
+  result   Json
+  probedAt DateTime @default(now())
+
+  @@map("probe_cache")
+}
+
+/**
+ * ---------------- Etiketler ve borsa tespiti ----------------
+ */
+
+model Label {
+  id        Int     @id @default(autoincrement())
+  chain     String
+  addressId BigInt
+  address   Address @relation(fields: [addressId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String?
+  category    String // exchange_hot|exchange_deposit|mixer|sanction|bridge|contract|kullanici|diger
+  /// Kategori exchange_* ise dolu: "Binance", "BtcTurk"…
+  exchange    String?
+
+  /// Etiket NEREDEN geldi: tronscan|ofac|acik_kaynak|kesif|kullanici
+  source     String
+  sourceUrl  String?
+  /// 0..1. Keşif motorunun ürettiği etikette hesaplanmış değer durur.
+  confidence Float     @default(0)
+  /// Doğrulanmamış etiket rapora "doğrulanmamış" ibaresiyle girer.
+  verifiedAt DateTime?
+  verifiedBy String?
+
+  visibility   String    @default("private") // private|public
+  /// Public etiket admin onayı ister; başlangıçta hepsi onaydan geçer.
+  approvedAt   DateTime?
+  approvedById Int?
+  approvedBy   User?     @relation("LabelApprover", fields: [approvedById], references: [id])
+
+  createdById Int?
+  createdBy   User?    @relation("LabelCreator", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  evidence    Json     @default("{}")
+
+  @@index([addressId])
+  @@index([category, exchange])
+  @@map("labels")
+}
+
+/// Deposit sezgiselinin çıktısı: A → D, D → bilinen borsa hot wallet'ı.
+model DepositCandidate {
+  id               BigInt    @id @default(autoincrement())
+  chain            String
+  depositAddress   String
+  hotWalletAddress String
+  exchange         String?
+  /// Kaç süpürme, toplam tutar, ilk/son tarih — kanıt burada.
+  evidence         Json      @default("{}")
+  confidence       Float     @default(0)
+  status           String    @default("aday") // aday|onaylandi|reddedildi
+  reviewedById     Int?
+  reviewedAt       DateTime?
+  detectedAt       DateTime  @default(now())
+
+  @@unique([chain, depositAddress, hotWalletAddress])
+  @@index([exchange, status])
+  @@map("deposit_candidates")
+}
+
+/**
+ * ---------------- Vakalar ----------------
+ */
+
+model Case {
+  id          Int       @id @default(autoincrement())
+  slug        String    @unique
+  title       String
+  description String?
+  ownerId     Int
+  owner       User      @relation(fields: [ownerId], references: [id])
+  /// Varsayılan private; public yapmak admin onayı ister.
+  visibility  String    @default("private")
+  approvedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  notes     CaseNote[]
+  queries   CaseQuery[]
+  traceRuns TraceRun[]
+  reports   Report[]
+  watches   Watch[]
+
+  @@map("cases")
+}
+
+model CaseNote {
+  id        Int      @id @default(autoincrement())
+  caseId    Int
+  case      Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  body      String
+  authorId  Int?
+  createdAt DateTime @default(now())
+
+  @@index([caseId, createdAt])
+  @@map("case_notes")
+}
+
+/// Vaka içi arama geçmişi — ileri/geri gezinme çubuğunu bu besler.
+model CaseQuery {
+  id        BigInt   @id @default(autoincrement())
+  caseId    Int
+  case      Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  rawInput  String
+  /// detectNetwork() çıktısı — "neden TRON dedin" cevabı burada durur.
+  detection Json
+  chain     String?
+  resolved  String?
+  createdAt DateTime @default(now())
+
+  @@index([caseId, createdAt])
+  @@map("case_queries")
+}
+
+/**
+ * ---------------- Takip koşusu ve dondurulmuş graf ----------------
+ */
+
+model TraceRun {
+  id     BigInt @id @default(autoincrement())
+  caseId Int
+  case   Case   @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  chain       String
+  rootAddress String
+  direction   String @default("ileri") // ileri|geri
+  /// Seçilen kural rapora METODOLOJİ olarak yazılır.
+  taintRule   String // fifo|orantisal|zaman_pencereli
+  params      Json   @default("{}") // hop bütçesi, min tutar, dallanma eşiği…
+
+  status     String    @default("kuyrukta") // kuyrukta|calisiyor|bitti|durduruldu|hata
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  /// Neden durdu: butce|dallanma|esik|terminal|dugum_siniri
+  stopReason String?
+  stats      Json      @default("{}")
+
+  nodes   TraceNode[]
+  edges   TraceEdge[]
+  reports Report[]
+
+  @@index([caseId, startedAt])
+  @@map("trace_runs")
+}
+
+model TraceNode {
+  id         BigInt   @id @default(autoincrement())
+  traceRunId BigInt
+  traceRun   TraceRun @relation(fields: [traceRunId], references: [id], onDelete: Cascade)
+
+  chain          String
+  address        String
+  hop            Int
+  /// Bu düğüme atfedilen pay (0..1) — seçilen taint kuralının çıktısı.
+  taintShare     Float   @default(0)
+  amountRaw      String?
+  isTerminal     Boolean @default(false)
+  terminalReason String?
+  /// Düğüm anındaki etiket görüntüsü — rapor donduğunda değişmemeli.
+  labelSnapshot  Json    @default("{}")
+
+  @@unique([traceRunId, chain, address])
+  @@index([traceRunId, hop])
+  @@map("trace_nodes")
+}
+
+model TraceEdge {
+  id         BigInt   @id @default(autoincrement())
+  traceRunId BigInt
+  traceRun   TraceRun @relation(fields: [traceRunId], references: [id], onDelete: Cascade)
+
+  chain         String
+  txHash        String
+  txIndex       Int
+  fromAddress   String
+  toAddress     String
+  assetSymbol   String
+  assetContract String?
+  decimals      Int
+  amountRaw     String
+  ts            DateTime
+  hop           Int
+  taintShare    Float    @default(0)
+
+  @@index([traceRunId, hop])
+  @@index([traceRunId, ts])
+  @@map("trace_edges")
+}
+
+/// Kanıt bütünlüğü: rapor alındığında graf DONDURULUR ve saklanır.
+model Report {
+  id         BigInt    @id @default(autoincrement())
+  caseId     Int
+  case       Case      @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  traceRunId BigInt?
+  traceRun   TraceRun? @relation(fields: [traceRunId], references: [id])
+
+  title    String
+  /// Dondurulmuş graf + kullanılan fiyatlar + metodoloji. Yeniden üretilebilir.
+  snapshot Json
+  columns  Json   @default("[]")
+  /// PDF'e basılan SHA-256 özeti.
+  sha256   String
+
+  createdById Int?
+  createdAt   DateTime @default(now())
+
+  @@index([caseId, createdAt])
+  @@map("reports")
+}
+
+/**
+ * ---------------- Fiyat ve kur ----------------
+ */
+
+/// Günlük kapanış yeterli; saniye hassasiyeti ücretli ve gerekmiyor.
+model PriceDaily {
+  id        BigInt   @id @default(autoincrement())
+  assetId   Int
+  asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  date      DateTime @db.Date
+  usd       Decimal  @db.Decimal(38, 12)
+  source    String
+  /// Kullanıcı elle girdiyse rapor bunu ayırt etmeli.
+  manual    Boolean  @default(false)
+  fetchedAt DateTime @default(now())
+
+  @@unique([assetId, date])
+  @@map("prices_daily")
+}
+
+/// USD/TRY — TCMB'nin ücretsiz XML servisi; resmi kur raporda daha sağlam.
+model FxRateDaily {
+  date      DateTime @id @db.Date
+  usdTry    Decimal  @db.Decimal(18, 6)
+  source    String   @default("tcmb")
+  fetchedAt DateTime @default(now())
+
+  @@map("fx_rates_daily")
+}
+
+/**
+ * ---------------- İzleme ve uyarılar ----------------
+ */
+
+/// Takip listesi. 7/24 izleme Hetzner'da SQLite ile döner; bu tablo ANA
+/// kayıttır, sunucudaki servis buradan senkronlanır.
+model Watch {
+  id        Int     @id @default(autoincrement())
+  chain     String
+  addressId BigInt
+  address   Address @relation(fields: [addressId], references: [id], onDelete: Cascade)
+  caseId    Int?
+  case      Case?   @relation(fields: [caseId], references: [id], onDelete: SetNull)
+
+  label          String?
+  active         Boolean   @default(true)
+  /// Servisin en son gördüğü işlem — aynı hareket iki kez bildirilmesin.
+  lastSeenTxHash String?
+  lastCheckedAt  DateTime?
+  createdById    Int?
+  createdAt      DateTime  @default(now())
+
+  alerts Alert[]
+
+  @@unique([chain, addressId])
+  @@map("watches")
+}
+
+model Alert {
+  id      BigInt @id @default(autoincrement())
+  watchId Int
+  watch   Watch  @relation(fields: [watchId], references: [id], onDelete: Cascade)
+
+  txHash      String
+  ts          DateTime
+  amountRaw   String?
+  assetSymbol String?
+  direction   String? // gelen|giden
+  sentAt      DateTime?
+  channel     String    @default("telegram")
+  createdAt   DateTime  @default(now())
+
+  @@unique([watchId, txHash])
+  @@index([watchId, createdAt])
+  @@map("alerts")
+}

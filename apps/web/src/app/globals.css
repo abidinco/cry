@@ -1,0 +1,56 @@
+:root {
+  color-scheme: light dark;
+  --zemin: #0f1115;
+  --panel: #171a21;
+  --metin: #e6e8ec;
+  --metin-soluk: #99a0ad;
+  --cizgi: #262b35;
+  --vurgu: #6ea8fe;
+  --uyari: #e0a33e;
+  --hata: #e0603e;
+  --tamam: #4fb286;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--zemin);
+  color: var(--metin);
+  font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+a { color: var(--vurgu); }
+
+.kutu {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--cizgi);
+  border-radius: 10px;
+  padding: 20px;
+}
+
+input, button {
+  font: inherit;
+  border-radius: 8px;
+  border: 1px solid var(--cizgi);
+  padding: 10px 12px;
+  background: #10131a;
+  color: var(--metin);
+}
+
+button {
+  background: var(--vurgu);
+  color: #0b0d12;
+  border: 0;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+.soluk { color: var(--metin-soluk); }

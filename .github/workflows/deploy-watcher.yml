@@ -1,0 +1,55 @@
+name: deploy-watcher
+
+# Hetzner'a giden TEK şey izleme servisidir. Ana uygulama PC'ye kurulu
+# self-hosted runner ile dağıtılır (deploy-app.yml).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/watcher/**"
+      - "deploy/compose.watcher.yml"
+      - ".github/workflows/deploy-watcher.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-watcher
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: SSH anahtarı
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          echo "${{ secrets.HETZNER_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.HETZNER_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Depoyu sunucuya taşı ve ayağa kaldır
+        run: |
+          set -e
+          HEDEF="${{ secrets.HETZNER_USER }}@${{ secrets.HETZNER_HOST }}"
+          ssh "$HEDEF" 'sudo mkdir -p /srv/cry/repo && sudo chown -R $USER /srv/cry'
+          rsync -az --delete \
+            --exclude ".git" --exclude "node_modules" --exclude ".next" \
+            ./ "$HEDEF:/srv/cry/repo/"
+          # Build başarısız olursa ADIM DA başarısız olmalı: sessizce eski
+          # container'ı çalışır bırakan bir deploy, "değişiklik görünmüyor"
+          # diye geri döner (hafıza projesinde yaşandı).
+          ssh "$HEDEF" 'set -e
+            cd /srv/cry/repo/deploy
+            docker compose -f compose.watcher.yml build
+            docker compose -f compose.watcher.yml up -d
+            docker image prune -f'
+
+      - name: Servis gerçekten ayakta mı
+        run: |
+          set -e
+          HEDEF="${{ secrets.HETZNER_USER }}@${{ secrets.HETZNER_HOST }}"
+          sleep 5
+          ssh "$HEDEF" 'test "$(docker inspect -f "{{.State.Running}}" cry-watcher)" = "true"'
+          ssh "$HEDEF" 'docker logs --tail 20 cry-watcher'

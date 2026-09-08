@@ -1,0 +1,18 @@
+# Hetzner'da çalışan TEK servis. Ana yığın (web/worker/db/redis) PC'de.
+# Sunucuda 3,7 GB RAM var ve dört site zaten dönüyor — bu servis bilerek küçük.
+services:
+  watcher:
+    build:
+      context: ..
+      dockerfile: apps/watcher/Dockerfile
+    image: cry-watcher:latest
+    container_name: cry-watcher
+    restart: unless-stopped
+    env_file: /srv/cry/.env
+    volumes:
+      - watcherdata:/data
+    # Bellek sınırı: kaçak bir süreç komşu siteleri OOM'a sürüklemesin.
+    mem_limit: 256m
+
+volumes:
+  watcherdata:

@@ -1,0 +1,29 @@
+{
+  "name": "cry",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Kripto para akış analizi — cry.abidin.dev",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @cry/web",
+    "build": "npm run build --workspaces --if-present",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json && npm run typecheck --workspaces --if-present",
+    "db:generate": "npm run generate --workspace @cry/db",
+    "db:migrate": "npm run migrate --workspace @cry/db",
+    "db:seed": "npm run seed --workspace @cry/db",
+    "up": "docker compose up -d",
+    "down": "docker compose down"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
