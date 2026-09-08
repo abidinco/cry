@@ -4,6 +4,11 @@ name: deploy-app
 # (ev tarafında hiçbir port açık değil, tünel tek yönlü kuruluyor). Bu yüzden
 # dağıtımı PC'nin KENDİSİNE kurulu bir self-hosted runner yapar: iş kuyruktan
 # çekilir, makinenin dışarı açılması gerekmez.
+#
+# Adımlar PowerShell ile yazıldı, `shell: bash` ile DEĞİL: Windows'ta runner
+# `bash`i PATH'ten çözüyor ve orada ilk sırada WSL'in bash'i duruyor
+# (C:\WINDOWS\system32\bash.EXE). WSL içinde C: sürücüsü /mnt/c altındadır,
+# yani Windows yolları sessizce bulunamaz.
 on:
   push:
     branches: [main]
@@ -17,52 +22,63 @@ concurrency:
   group: deploy-app
   cancel-in-progress: false
 
+defaults:
+  run:
+    shell: powershell
+
 jobs:
   deploy:
-    # PC'ye kurulacak runner etiketi
     runs-on: [self-hosted, windows, cry-pc]
     steps:
       - uses: actions/checkout@v4
 
       - name: Ortam dosyasını yerine koy
-        shell: bash
         env:
-          # Runner deposu KENDİ çalışma klasörüne açıyor; .env orada olamaz
+          # Runner depoyu KENDİ çalışma klasörüne açıyor; .env orada olamaz
           # (depo public, dosya gitignore'da). Makinede sabit bir yerde durur.
-          CRY_ENV_FILE: ${{ vars.CRY_ENV_FILE || '/c/srv/cry/.env' }}
+          CRY_ENV_FILE: ${{ vars.CRY_ENV_FILE || 'C:\srv\cry\.env' }}
         run: |
-          set -e
           # Yoksa deploy BAŞLAMAZ: yarım ayağa kalkan bir yığın çalışıyor sanılır.
-          test -f "$CRY_ENV_FILE" || { echo "HATA: $CRY_ENV_FILE yok"; exit 1; }
-          cp "$CRY_ENV_FILE" .env
-          echo "✓ .env yerine kondu ($(grep -c . .env) satır)"
+          if (-not (Test-Path $env:CRY_ENV_FILE)) {
+            Write-Host "HATA: $($env:CRY_ENV_FILE) yok"
+            exit 1
+          }
+          Copy-Item $env:CRY_ENV_FILE ".env" -Force
+          $satir = (Get-Content ".env" | Where-Object { $_ -ne "" }).Count
+          Write-Host "OK: .env yerine kondu ($satir satir)"
+
+      - name: Docker ayakta mı
+        run: |
+          docker version --format '{{.Server.Version}}'
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "HATA: Docker motoruna ulasilamiyor (Docker Desktop kapali olabilir)"
+            exit 1
+          }
 
       - name: Derle ve ayağa kaldır
-        shell: bash
         run: |
-          set -e
           docker compose build
+          if ($LASTEXITCODE -ne 0) { exit 1 }
           docker compose up -d
+          if ($LASTEXITCODE -ne 0) { exit 1 }
           docker image prune -f
 
       - name: Migration
-        shell: bash
         run: |
-          set -e
           # Migration WORKER imajından koşar: web imajı standalone çıktı
           # taşıyor ve içinde prisma CLI yok.
           docker compose run --rm worker npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
+          if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Sağlık kontrolü
-        shell: bash
         run: |
-          set -e
-          for i in $(seq 1 30); do
-            if curl -sf http://127.0.0.1:1337/saglik > /dev/null; then
-              echo "✓ uygulama ayakta"; exit 0
-            fi
-            sleep 2
-          done
-          echo "HATA: /saglik 60 saniyede cevap vermedi"
+          for ($i = 0; $i -lt 30; $i++) {
+            try {
+              $y = Invoke-WebRequest -Uri "http://127.0.0.1:1337/saglik" -UseBasicParsing -TimeoutSec 5
+              if ($y.StatusCode -eq 200) { Write-Host "OK: uygulama ayakta"; exit 0 }
+            } catch { }
+            Start-Sleep -Seconds 2
+          }
+          Write-Host "HATA: /saglik 60 saniyede cevap vermedi"
           docker compose logs --tail 50 web
           exit 1
