@@ -1,5 +1,12 @@
 # PC'de (Windows + Docker Desktop + WSL2) çalışan ana yığın.
-# Hetzner'a yalnızca apps/watcher gider — bkz. docs/deploy.md
+# Hetzner'a yalnızca apps/watcher gider — bkz. deploy/sunucu-kurulum.md
+
+# Proje adı SABİT: aynı yığın hem elle (bu klasörden) hem de self-hosted
+# runner'ın kendi çalışma klasöründen yönetiliyor. Ad dizinden türetilseydi
+# iki AYRI proje olur, ikisi de aynı container adlarını isterdi ve deploy
+# "container name already in use" ile çakışırdı.
+name: cry
+
 services:
   db:
     image: postgres:17-alpine

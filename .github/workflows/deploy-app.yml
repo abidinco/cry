@@ -24,13 +24,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Ortam dosyası yerinde mi
+      - name: Ortam dosyasını yerine koy
         shell: bash
+        env:
+          # Runner deposu KENDİ çalışma klasörüne açıyor; .env orada olamaz
+          # (depo public, dosya gitignore'da). Makinede sabit bir yerde durur.
+          CRY_ENV_FILE: ${{ vars.CRY_ENV_FILE || '/c/srv/cry/.env' }}
         run: |
           set -e
-          # .env repoda DEĞİL (depo public). Yoksa deploy başlamaz — yarım
-          # ayağa kalkan bir yığın, çalışıyor sanılır.
-          test -f .env || { echo "HATA: .env yok"; exit 1; }
+          # Yoksa deploy BAŞLAMAZ: yarım ayağa kalkan bir yığın çalışıyor sanılır.
+          test -f "$CRY_ENV_FILE" || { echo "HATA: $CRY_ENV_FILE yok"; exit 1; }
+          cp "$CRY_ENV_FILE" .env
+          echo "✓ .env yerine kondu ($(grep -c . .env) satır)"
 
       - name: Derle ve ayağa kaldır
         shell: bash
@@ -44,7 +49,9 @@ jobs:
         shell: bash
         run: |
           set -e
-          docker compose run --rm web npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
+          # Migration WORKER imajından koşar: web imajı standalone çıktı
+          # taşıyor ve içinde prisma CLI yok.
+          docker compose run --rm worker npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
 
       - name: Sağlık kontrolü
         shell: bash
