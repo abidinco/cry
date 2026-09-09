@@ -13,6 +13,11 @@ name: deploy-app
 #    BOM'suz dosyayı ANSI sanıyor. Betik gövdesindeki Türkçe karakterler
 #    bozulup ayrıştırma hatası veriyor: adım hiçbir çıktı üretmeden düşüyor.
 #    Bu yüzden GÖVDELER SAF ASCII; Türkçe yalnızca YAML'in kendi alanlarında.
+# 3. Makinede yürütme ilkesi tanımsız, yani varsayılan `Restricted`. Runner
+#    adımı bir .ps1 dosyasına yazıp nokta-kaynaklıyor; ilke betiği reddedince
+#    süreç ÇIKTI ÜRETMEDEN exit 1 veriyor ve hata "adım başarısız"dan ibaret
+#    görünüyor. Bypass yalnızca bu işin adımlarına veriliyor — makine geneli
+#    bir güvenlik ayarını deploy uğruna değiştirmek doğru olmazdı.
 on:
   push:
     branches: [main]
@@ -28,7 +33,7 @@ concurrency:
 
 defaults:
   run:
-    shell: powershell
+    shell: powershell -NoProfile -ExecutionPolicy Bypass -Command "& '{0}'"
 
 jobs:
   deploy:
