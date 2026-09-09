@@ -1,16 +1,15 @@
-import { cookies } from "next/headers";
-import { OTURUM_CEREZI, oturumCoz } from "@/lib/oturum";
+import { redirect } from "next/navigation";
+import { adminMi, oturumOku } from "@/lib/yetki";
+import UstBar from "@/components/UstBar";
 import AramaKutusu from "./AramaKutusu";
 
 export default async function AnaSayfa() {
-  const oturum = await oturumCoz((await cookies()).get(OTURUM_CEREZI)?.value);
+  const oturum = await oturumOku();
+  if (!oturum) redirect("/giris");
 
   return (
     <main className="kutu">
-      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <h1 style={{ margin: 0, fontSize: 22 }}>cry</h1>
-        <span className="soluk mono">{oturum?.username}</span>
-      </header>
+      <UstBar username={oturum.username} admin={adminMi(oturum)} />
       <p className="soluk">
         Cüzdan adresi, işlem hash&apos;i ya da explorer bağlantısı yapıştır. Hangi ağ olduğu
         formattan çözülür; çözülemeyen durumlar yoklanır.

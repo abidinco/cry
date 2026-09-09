@@ -11,7 +11,16 @@ import { OTURUM_CEREZI, oturumCoz } from "@/lib/oturum";
 // Bu yollar oturum kapısının DIŞINDA; her biri kendi korumasını taşıyor:
 // /giris ile /api/oturum/giris kapının kendisi, /saglik veri döndürmüyor,
 // /api/izleme/liste paylaşılan jetonla korunuyor (servis tarayıcı değil).
-const ACIK_YOLLAR = ["/giris", "/api/oturum/giris", "/saglik", "/api/izleme/liste"];
+export const ACIK_YOLLAR = ["/giris", "/api/oturum/giris", "/saglik", "/api/izleme/liste"];
+
+// Şifre değiştirme zorunluluğu sürerken AÇIK kalan yollar. Kapının kendisi
+// kapalı olursa kullanıcı zorunluluğu yerine getiremez ve hesap kilitlenir —
+// bu tam olarak yaşandı ve testi aşağıda.
+export const SIFRE_KAPISI_DISI = [
+  "/sifre-degistir",
+  "/api/oturum/sifre",
+  "/api/oturum/cikis",
+];
 
 export async function middleware(istek: NextRequest) {
   const yol = istek.nextUrl.pathname;
@@ -28,7 +37,7 @@ export async function middleware(istek: NextRequest) {
   }
 
   // Şifre değiştirmeden başka hiçbir sayfaya gidilemez.
-  if (oturum.mustChangePassword && yol !== "/sifre-degistir") {
+  if (oturum.mustChangePassword && !SIFRE_KAPISI_DISI.includes(yol)) {
     return NextResponse.redirect(new URL("/sifre-degistir", istek.url), 307);
   }
 
