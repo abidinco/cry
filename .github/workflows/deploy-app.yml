@@ -70,6 +70,12 @@ jobs:
           docker compose run --rm worker npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
+      - name: Seed
+        run: |
+          # Idempotent: roller upsert edilir, kullanici zaten varsa dokunulmaz.
+          docker compose run --rm worker npm run seed --workspace @cry/db
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
       - name: Sağlık kontrolü
         run: |
           for ($i = 0; $i -lt 30; $i++) {
