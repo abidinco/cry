@@ -13,7 +13,8 @@
     "@cry/db": "*",
     "bullmq": "^5.34.5",
     "ioredis": "^5.4.2",
-    "@cry/kuyruk": "*"
+    "@cry/kuyruk": "*",
+    "@cry/motor": "*"
   },
   "devDependencies": {
     "tsx": "^4.19.2",

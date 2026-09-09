@@ -18,7 +18,8 @@
     "react-dom": "^19.0.0",
     "@cry/kuyruk": "*",
     "bullmq": "^5.34.5",
-    "ioredis": "^5.4.2"
+    "ioredis": "^5.4.2",
+    "@cry/motor": "*"
   },
   "devDependencies": {
     "@types/react": "^19.0.2",
