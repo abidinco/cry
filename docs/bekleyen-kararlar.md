@@ -18,53 +18,28 @@ Kardeş dosyalar: karar beklemeyen eksikler
 
 ---
 
-## 1. TRON borsa etiketi nereden gelecek
+## 1. TronScan API anahtarı — SENİN yapman gereken tek adım
 
-**Soru:** Arşiv TRON ve `terminal` durma sebebi ateşlenmiyor. Borsa
-etiketini nereden alacağız?
+**Soru:** Karar verildi (2026-09-09: "ikisi birden"). Yapısal keşif yazıldı
+ve çalışıyor; kalan yarısı senin elinde: tronscan.org'dan ücretsiz API
+anahtarı. Ajan hesap açmaz.
 
-**Ölçüm (2026-09-09):** 324 etiket yazıldı (OFAC 320 + 4 aday) ve
-arşivdeki 14.798 adresle kesişim **0**. Ücretsiz TRON etiket kaynağı
-ölçüldü ve kalmadı: TronScan anahtarsız `401`, zincirde `account_name`
-yok. Buna karşılık arşivin kendi yapısal sinyali güçlü:
+**Ölçüm:** Keşif 12 servis cüzdanı adayı üretti ve `terminal_aday` gerçek
+koşuda ateşlendi — yani iz artık doğru yerde duruyor. Ama adayların hiçbiri
+"hangi borsa" sorusunu cevaplamıyor; keşif yapısal olarak cevaplayamaz.
+TronScan tag'leri o kimliği veren tek ücretsiz kaynak (anahtarsız `401`).
 
-```
-adres                                gönderen  alıcı  hareket
-TAUN6FwrnwwmaEqYcckffC7wYmbaS6cBiX         14   2248     6249
-THPvaUhoh2Qn2y9THCZML3H815hhFhn5YC       1096     40     2067
-TXFBqBbqJommqZf7BV8NNYzePh97UmJodJ        335    561     3838
-```
+**Yapılacak:** tronscan.org → hesap → API key → değer `C:\srv\cry\.env`
+ve `/srv/cry/.env` içine `TRONSCAN_API_KEY=` olarak yazılır. Sonrası bende:
+`packages/etiket` içine `tronscan.ts` eklenir, keşif adaylarının kimliği
+kapanır ve doğrulanan etiketler `terminal_aday` yerine `terminal` üretir.
 
-**Yeniden üretim:**
-```bash
-docker exec cry-db psql -U cry -d cry -c "
-with d as (select a.address,
-  count(distinct t.from_address_id) filter (where t.to_address_id=a.id) as gonderen,
-  count(distinct t.to_address_id) filter (where t.from_address_id=a.id) as alici,
-  count(*) as hareket
-  from addresses a join transfers t on t.to_address_id=a.id or t.from_address_id=a.id
-  group by a.address)
-select * from d order by gonderen+alici desc limit 12;"
-```
+**Karar verilmezse:** rapor "para bir borsa ADAYINA girdi" demeye devam
+eder; borsanın adı yazılamaz.
 
-**Seçenekler:**
-1. **TronScan ücretsiz API anahtarı** — tronscan.org üzerinden kayıt
-   gerekiyor ve kaydı SEN açarsın (ajan hesap açmaz). Anahtar gelirse
-   tag'ler doğrudan gelir ve tohumlama `packages/etiket` içine ikinci bir
-   kaynak olarak eklenir.
-2. **Yapısal keşif** (Görev 08'in hafif hâli) — yukarıdaki şekli okuyup
-   "servis cüzdanı adayı" üretir, kullanıcı onaylar. Liste bayatlar, motor
-   bayatlamaz — projenin kendi tercihi bu yönde. Ama şekil bir etiket
-   DEĞİLDİR: aday "Binance mi Paribu mu" sorusunu cevaplamaz, yalnızca
-   "burası bir servis" der.
-3. **İkisi birden** — anahtar kimliği verir, keşif kapsamı verir.
+**Geri alınabilir:** evet, anahtar silinir, etiketler silinir.
 
-**Karar verilmezse:** aracın var olma sebebi olan cümle ("para şu borsaya
-girdi") kurulamaz; her rapor "bütçe bitti" der.
-
-**Geri alınabilir:** evet, etiket silinebilir.
-
-**Karar yeri:** `packages/etiket` + CLAUDE.md → Etiket kaynağı.
+**Karar yeri:** `.env` + `packages/etiket` + CLAUDE.md → Etiket kaynağı.
 
 ---
 

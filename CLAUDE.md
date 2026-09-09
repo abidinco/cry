@@ -121,6 +121,35 @@ adlarını isterdi.
   adresle kesişimi **0**. Yani etiketler doğru, kaynak resmî, kod
   çalışıyor — ve `terminal` durma sebebi hâlâ ateşlenemiyor. Yazılmış
   ama hiçbir kaydın SORMADIĞI etiket, olmayan etikettir.
+- **Yapısal keşif KİMLİK İDDİA ETMEZ.** Arşivin kendi şekli "burası bir
+  servis cüzdanı" der; "burası Binance" DEMEZ — o cevap ancak bir kaynaktan
+  ya da insandan gelir. Başlık bu yüzden "Servis cüzdanı adayı (toplayıcı)".
+  Uygulaması `packages/etiket/src/kesif.ts` (saf) + `kesif-oku.ts` (sorgu).
+- **Şekil sinyali, TARADIĞIMIZ adreslerle karışıyor.** Ölçüldü: arşivdeki
+  6.642 adresin en yüksek karşı taraf sayısı 3 ve hepsi
+  `index_state = "bilinmiyor"` — küçük görünmelerinin sebebi küçük olmaları
+  değil, BAKMAMIŞ olmamız. Bu yüzden ölçüt indeks durumuna göre üç ayrı
+  cevap verir: `tam` bir ÖLÇÜMDÜR, `kismi` bir ALT SINIRDIR ("en az bu
+  kadar" der, "en çok" diyemez — ve alt sınır zaten eşiği aşıyorsa aday
+  geçerlidir, yalnızca güveni düşüktür), `bilinmiyor` hakkında hiçbir şey
+  söylenemez ve o adres "temiz" değil "bakılmadı" diye SAYILIR.
+- **Doğrulanmamış etiket ayrı bir durma sebebi üretir: `terminal_aday`.**
+  Durma sebebi bir İDDİADIR ve doğrudan rapora geçer; "para borsaya girdi"
+  cümlesini doğrulanmamış bir etiketle kurmak, kaynağı olmayan bir hükümdür.
+  İz yine orada DURUR (borsanın iç karıştırması izi anlamsızlaştırır), ama
+  sebep hangi güçte bir iddiaya dayandığını söyler.
+- **Koşunun BAŞLIK durma sebebi, en SIK olan değil en ÖNEMLİ olandır.**
+  Düğüm düzeyinde "borsaya varıldıysa sebep terminal'dir, butce değil"
+  kuralı çoktan yazılıydı; koşu düzeyinde yazılmamıştı ve `enCokDurma` en
+  sık sebebi seçiyordu. Gerçek koşuda ölçüldü: `butce:11, terminal_aday:2,
+  dallanma:2` → başlık **"butce"** çıkıyor ve iki borsa adayına varılmış
+  olması rapordan siliniyordu. `kosuDurmaSebebi` önce terminal'e bakar;
+  dağılımın tamamı `stats.durma` içinde durmaya devam eder. **Bir kural bir
+  yerde uygulanıp kardeşinde unutulabiliyor.**
+- **Ve ölçüt artık gerçekten ATEŞLENİYOR** — bu bir kod incelemesiyle değil
+  gerçek koşuyla doğrulandı: kök `TPJxc7u8…`, 21 düğüm / 33 kenar,
+  `terminal_aday:1`, koşu başlığı `terminal_aday`. "Bir kapının yazılmış
+  olması çalıştığını göstermez."
 - **Aday etiket bir İDDİADIR ve öyle girer** (kullanıcı kararı
   2026-09-09): dört borsa adresi `source: "kullanici"`, `confidence 0.3`,
   `verifiedAt` BOŞ. Adresin biçimi doğrulanmış olması etiketin doğru

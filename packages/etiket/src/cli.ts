@@ -4,6 +4,7 @@
  *   npx tsx packages/etiket/src/cli.ts --kaynak=ofac          (kuru koşu)
  *   npx tsx packages/etiket/src/cli.ts --kaynak=ofac --uygula
  *   npx tsx packages/etiket/src/cli.ts --kaynak=aday --uygula
+ *   npx tsx packages/etiket/src/cli.ts --kaynak=kesif [--esik=50]
  *
  * `--dosya=<yol>` verilirse OFAC listesi ağdan değil o dosyadan okunur —
  * 83 MB'lık belgeyi her denemede yeniden indirmemek için.
@@ -14,6 +15,7 @@
 import { readFile } from "node:fs/promises";
 import { prisma } from "@cry/db";
 import { ADAY_ETIKETLER } from "./aday";
+import { arsivdenAdaylar } from "./kesif-oku";
 import { ofacAyristir, ofacIndir } from "./ofac";
 import type { TohumSonucu } from "./tipler";
 import { etiketleriYaz } from "./yaz";
@@ -27,12 +29,16 @@ async function kaynagiOku(kaynak: string): Promise<TohumSonucu> {
   if (kaynak === "aday") {
     return { etiketler: ADAY_ETIKETLER, atlananlar: [], kaynakSurumu: "elle, 2026-09-09" };
   }
+  if (kaynak === "kesif") {
+    const esik = Number(bayrak("esik") ?? 50);
+    return arsivdenAdaylar({ karsiTarafEsigi: esik, gecisEsigi: esik * 2 });
+  }
   if (kaynak === "ofac") {
     const dosya = bayrak("dosya");
     const xml = dosya ? await readFile(dosya, "utf8") : await ofacIndir();
     return ofacAyristir(xml);
   }
-  throw new Error(`bilinmeyen kaynak: ${kaynak} (ofac|aday)`);
+  throw new Error(`bilinmeyen kaynak: ${kaynak} (ofac|aday|kesif)`);
 }
 
 async function main() {
@@ -56,8 +62,11 @@ async function main() {
   const sebepler = new Map<string, number>();
   for (const a of sonuc.atlananlar) sebepler.set(a.sebep, (sebepler.get(a.sebep) ?? 0) + 1);
   console.log(`atlanan: ${sonuc.atlananlar.length}`);
-  for (const [s, n] of [...sebepler].sort((a, b) => b[1] - a[1])) {
-    console.log(`  ⊘ ${n.toString().padStart(4)} — ${s}`);
+  for (const [sebep, n] of [...sebepler].sort((a, b) => b[1] - a[1])) {
+    // Bir sebebe TEK kayıt düşüyorsa sayı bir şey anlatmaz; kaydın kendisi
+    // anlatır (keşifte "1 — taranmamış" değil, "6.642 adres — taranmamış").
+    const tekil = n === 1 ? sonuc.atlananlar.find((a) => a.sebep === sebep)?.ham : null;
+    console.log(`  ⊘ ${(tekil ?? String(n)).padStart(12)} — ${sebep}`);
   }
 
   // "N kayıt yazılacak" bir doğrulama değildir: örneğe elle bakılır.
@@ -66,6 +75,8 @@ async function main() {
     console.log(
       `  ${e.chain.padEnd(9)} ${e.address}  ${e.category}  ${e.dogrulanmisMi ? "✓doğrulanmış" : "?doğrulanmamış"}  ${e.title}`,
     );
+    // Gerekçe olmadan bir aday onaylanamaz: insan neye baktığını görmeli.
+    if (e.description) console.log(`            ↳ ${e.description}`);
   }
 
   // Arşivde KARŞILIĞI olan etiketler: tohumun bugün işe yarayıp yaramadığı.

@@ -12,6 +12,7 @@ import { prisma } from "@cry/db";
 import {
   dagit,
   durmaSebebi,
+  kosuDurmaSebebi,
   VARSAYILAN_ESIKLER,
   type AtifKurali,
   type DurmaSebebi,
@@ -99,6 +100,7 @@ export async function takipKos(traceRunId: bigint): Promise<{
           cikisSayisi: guncel.cikisSayisi,
           izliTutar: izliToplam,
           borsaMi: guncel.borsaMi,
+          borsaEtiketiDogrulanmisMi: guncel.borsaEtiketiDogrulanmisMi,
           sozlesmeMi: guncel.sozlesmeMi,
           indekslendiMi: guncel.indekslendiMi,
         },
@@ -143,17 +145,12 @@ export async function takipKos(traceRunId: bigint): Promise<{
     data: {
       status: "bitti",
       finishedAt: new Date(),
-      stopReason: enCokDurma(durmaSayaci),
+      stopReason: kosuDurmaSebebi(durmaSayaci),
       stats: { dugum: gorulen.size, kenar: kenarSayisi, durma: durmaSayaci },
     },
   });
 
   return { dugum: gorulen.size, kenar: kenarSayisi, durma: durmaSayaci };
-}
-
-function enCokDurma(sayac: Record<string, number>): string | null {
-  const siralı = Object.entries(sayac).sort((a, b) => b[1] - a[1]);
-  return siralı[0]?.[0] ?? null;
 }
 
 /* ---------------- veri okuma ---------------- */
@@ -188,9 +185,16 @@ async function tohumGirisleri(
 type DugumBilgisi = {
   cikisSayisi: number;
   borsaMi: boolean;
+  borsaEtiketiDogrulanmisMi: boolean;
   sozlesmeMi: boolean;
   indekslendiMi: boolean;
-  etiketler: { title: string; category: string; exchange: string | null }[];
+  etiketler: {
+    title: string;
+    category: string;
+    exchange: string | null;
+    /** Etiket doğrulandı mı — dondurulan görüntüde de durmalı. */
+    dogrulandi: boolean;
+  }[];
 };
 
 async function dugumBilgisi(zincir: string, adres: string): Promise<DugumBilgisi> {
@@ -200,11 +204,20 @@ async function dugumBilgisi(zincir: string, adres: string): Promise<DugumBilgisi
       id: true,
       isContract: true,
       indexState: true,
-      labels: { select: { title: true, category: true, exchange: true } },
+      labels: {
+        select: { title: true, category: true, exchange: true, verifiedAt: true },
+      },
     },
   });
   if (!kayit) {
-    return { cikisSayisi: 0, borsaMi: false, sozlesmeMi: false, indekslendiMi: false, etiketler: [] };
+    return {
+      cikisSayisi: 0,
+      borsaMi: false,
+      borsaEtiketiDogrulanmisMi: false,
+      sozlesmeMi: false,
+      indekslendiMi: false,
+      etiketler: [],
+    };
   }
 
   // Dallanma ölçüsü: kaç FARKLI adrese çıkış yapılmış.
@@ -213,12 +226,22 @@ async function dugumBilgisi(zincir: string, adres: string): Promise<DugumBilgisi
     where: { fromAddressId: kayit.id },
   });
 
+  const borsaEtiketleri = kayit.labels.filter((e) => e.category.startsWith("exchange"));
+
   return {
     cikisSayisi: hedefler.length,
-    borsaMi: kayit.labels.some((e) => e.category.startsWith("exchange")),
+    borsaMi: borsaEtiketleri.length > 0,
+    // Bir tane bile DOĞRULANMIŞ borsa etiketi varsa iddia güçlüdür; hepsi
+    // adaysa durma sebebi bunu söyler.
+    borsaEtiketiDogrulanmisMi: borsaEtiketleri.some((e) => e.verifiedAt !== null),
     sozlesmeMi: kayit.isContract === true,
     indekslendiMi: kayit.indexState !== "bilinmiyor",
-    etiketler: kayit.labels,
+    etiketler: kayit.labels.map((e) => ({
+      title: e.title,
+      category: e.category,
+      exchange: e.exchange,
+      dogrulandi: e.verifiedAt !== null,
+    })),
   };
 }
 

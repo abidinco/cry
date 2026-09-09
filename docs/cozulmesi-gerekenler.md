@@ -17,38 +17,29 @@ fiyat: 0       rapor: 0          deposit adayı: 0
 
 ---
 
-## 1. Etiketler yazıldı ama arşivdeki hiçbir adrese DENK GELMİYOR
+## 1. Etiketlerin KİMLİĞİ yok: "bir servis" biliniyor, "hangi borsa" bilinmiyor
 
-**Ne bozuk:** `labels` tablosu artık boş değil — **324 etiket** var
-(OFAC SDN 320 + kullanıcının 4 aday borsa adresi). Ama arşivdeki 14.798
-adresle kesişimi **sıfır**. Takip motoru etiketi okuyor
-(`packages/motor/src/durma.ts`, `borsaMi` → `terminal`) ve ölçüt hâlâ
-ateşlenemiyor.
+**Ne bozuk:** `labels` tablosunda **336 etiket** var (OFAC 320 + 4 aday +
+12 yapısal keşif adayı) ve ölçüt artık gerçekten ateşleniyor — gerçek
+koşuda `terminal_aday` çıktı. Eksik olan şey artık etiketin VARLIĞI değil
+KİMLİĞİ: keşif "burası bir servis cüzdanı" diyebiliyor, "burası BtcTurk"
+diyemiyor.
 
-**Nasıl görülür:** her tarama yine `butce` / `dugum_siniri` ile biter.
-Rapor "para şu borsaya girdi" demiyor.
+**Nasıl görülür:** rapor "para bir borsa ADAYINA girdi" der, borsanın adını
+vermez. Adli bir yazıda beklenen cümle ikincisidir.
 
 **Ölçüm (2026-09-09):**
 ```bash
-docker exec cry-db psql -U cry -d cry -c "select category,count(*) from labels group by 1;"
-docker exec cry-db psql -U cry -d cry -c "
-  select count(*) from labels l join addresses a on a.id=l.address_id
-  where exists (select 1 from transfers t where t.from_address_id=a.id or t.to_address_id=a.id);"
+docker exec cry-db psql -U cry -d cry -c "select source,category,count(*) from labels group by 1,2;"
+docker exec cry-db psql -U cry -d cry -c "select stop_reason, stats->'durma' from trace_runs order by id desc limit 2;"
 ```
-→ `sanction:320, exchange_hot:4` · kesişim `0`.
+→ `ofac/sanction:320 · kullanici/exchange_hot:4 · kesif/exchange_hot:12`;
+son koşu `terminal_aday`, `{"butce":8,"dallanma":2,"terminal_aday":1}`.
 
-**Neden böyle:** arşiv TRON, ve TRON borsa etiketi veren ücretsiz kaynak
-kalmadı — TronScan anahtarsız `401` döndürüyor, zincirde `account_name`
-yok (ikisi de ölçüldü, bkz. CLAUDE.md → "Etiket kaynağı"). OFAC yaptırım
-listesi resmî ve çalışıyor ama bu dosyadaki paranın gittiği yerler
-yaptırımlı adresler değil, BORSALAR.
-
-**Nerede:** iki yoldan biri gerekiyor ve ikisi de bir karar
-([bekleyen-kararlar](bekleyen-kararlar.md) → TronScan anahtarı / yapısal
-keşif). Arşivin kendi yapısal sinyali hazır duruyor: en yoğun karşı taraf
-`TAUN6FwrnwwmaEqYcckffC7wYmbaS6cBiX` 2.248 farklı adrese gönderiyor,
-`THPvaUhoh2Qn2y9THCZML3H815hhFhn5YC` 1.096 farklı adresten alıyor — bu
-şekil bir servis cüzdanının şeklidir, ama şekil bir ETİKET DEĞİLDİR.
+**Nerede:** kimlik ancak bir kaynaktan gelir — TronScan ücretsiz API
+anahtarı bekleniyor (kullanıcı kaydolacak, 2026-09-09 kararı). Anahtar
+gelince `packages/etiket` içine ikinci bir kaynak olarak eklenir ve
+`source: "tronscan"` etiketleri keşif adaylarının kimliğini kapatır.
 
 ---
 

@@ -11,7 +11,8 @@ export type DurmaSebebi =
   | "dugum_siniri" // düğüm sayısı sınırına ulaşıldı
   | "dallanma" // çıkış sayısı eşiği aştı: borsa ya da mikser
   | "esik" // tutar eşiğin altına düştü
-  | "terminal" // etiketli borsa adresi
+  | "terminal" // DOĞRULANMIŞ borsa etiketi: iz burada tamamlandı
+  | "terminal_aday" // borsa ADAYI: etiket doğrulanmamış, durduk ama iddia zayıf
   | "kontrat" // akıllı sözleşme: iz burada kesiliyor
   | "indekssiz"; // düğüm taranmamış, veri yok
 
@@ -45,6 +46,16 @@ export type DugumDurumu = {
   izliTutar: bigint;
   /** Etiketli borsa adresi mi (hot wallet ya da deposit). */
   borsaMi: boolean;
+  /**
+   * O etiket DOĞRULANMIŞ mı?
+   *
+   * Durma sebebi bir İDDİADIR: "para borsaya girdi" cümlesi rapora
+   * doğrudan geçiyor. Doğrulanmamış bir etiketle kurulan aynı cümle,
+   * kaynağı olmayan bir hükümdür — ve doğrulanmışından ayırt edilemezse
+   * rapor savunulamaz. Durmak yine doğru (borsanın iç karıştırması izi
+   * anlamsızlaştırır), ama sebep AYRI yazılır.
+   */
+  borsaEtiketiDogrulanmisMi?: boolean;
   sozlesmeMi: boolean;
   indekslendiMi: boolean;
 };
@@ -62,8 +73,9 @@ export function durmaSebebi(
   toplamDugum: number,
 ): DurmaSebebi | null {
   // Aracın var olma sebebi: paranın girdiği borsayı bulmak. Oraya varıldıysa
-  // iz TAMAMLANMIŞTIR, kesilmemiş.
-  if (d.borsaMi) return "terminal";
+  // iz TAMAMLANMIŞTIR, kesilmemiş. Etiket doğrulanmamışsa iz yine burada
+  // durur ama sebep bunu söyler.
+  if (d.borsaMi) return d.borsaEtiketiDogrulanmisMi ? "terminal" : "terminal_aday";
   if (!d.indekslendiMi) return "indekssiz";
   if (d.sozlesmeMi) return "kontrat";
   if (d.hop >= esikler.maxHop) return "butce";
@@ -99,4 +111,30 @@ export function hopOnerisi(
   }
   const son = hopBasinaDugum.length;
   return { onerilenHop: son, gerekce: "tarama bütçe sınırında durdu, derinleştirilebilir" };
+}
+
+
+/**
+ * KOŞUNUN başlık durma sebebi.
+ *
+ * Düğüm başına sebep zaten yazılıyor; bu, koşunun tek satırlık cevabıdır ve
+ * o satır rapora çıkar. En SIK sebebi seçmek yanlış: bir tarama 11 düğümde
+ * bütçeye takılıp 2 düğümde borsaya varmışsa asıl bulgu ikincisidir ve
+ * "bütçe bitti" başlığı onu görünmez yapar (ölçüldü 2026-09-09: gerçek
+ * koşuda `butce:11, terminal_aday:2, dallanma:2` → başlık "butce" çıkıyordu).
+ *
+ * Bu, düğüm düzeyinde çoktan yazılmış olan kuralın ("borsaya varıldıysa
+ * sebep terminal'dir, butce değil") KOŞU düzeyindeki karşılığı. Bir kural
+ * bir yerde uygulanıp kardeşinde unutulabiliyor.
+ *
+ * Dağılımın tamamı `stats.durma` içinde durur; başlık onu özetler, silmez.
+ */
+const BASLIK_ONCELIGI: DurmaSebebi[] = ["terminal", "terminal_aday"];
+
+export function kosuDurmaSebebi(sayac: Record<string, number>): string | null {
+  for (const oncelikli of BASLIK_ONCELIGI) {
+    if ((sayac[oncelikli] ?? 0) > 0) return oncelikli;
+  }
+  const sirali = Object.entries(sayac).sort((a, b) => b[1] - a[1]);
+  return sirali[0]?.[0] ?? null;
 }

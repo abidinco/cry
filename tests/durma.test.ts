@@ -18,13 +18,19 @@ describe("durma ölçütleri", () => {
     expect(durmaSebebi(dugum(), VARSAYILAN_ESIKLER, 10)).toBeNull();
   });
 
-  it("borsaya varınca durur ve sebep TERMİNAL olur", () => {
+  it("DOĞRULANMIŞ borsa etiketinde durur ve sebep TERMİNAL olur", () => {
     // Aracın var olma sebebi burası; "bütçe bitti" yazmak bulguyu kaybettirir.
-    expect(durmaSebebi(dugum({ borsaMi: true }), VARSAYILAN_ESIKLER, 10)).toBe("terminal");
+    const d = dugum({ borsaMi: true, borsaEtiketiDogrulanmisMi: true });
+    expect(durmaSebebi(d, VARSAYILAN_ESIKLER, 10)).toBe("terminal");
+  });
+
+  it("doğrulama BİLİNMİYORSA aday sayılır — yokluk bir doğrulama değildir", () => {
+    // Bayrak hiç verilmemiş: güvenli varsayılan zayıf iddiadır.
+    expect(durmaSebebi(dugum({ borsaMi: true }), VARSAYILAN_ESIKLER, 10)).toBe("terminal_aday");
   });
 
   it("borsa sebebi bütçe ve dallanmanın ÖNÜNDE gelir", () => {
-    const d = dugum({ borsaMi: true, hop: 99, cikisSayisi: 9999 });
+    const d = dugum({ borsaMi: true, borsaEtiketiDogrulanmisMi: true, hop: 99, cikisSayisi: 9999 });
     expect(durmaSebebi(d, VARSAYILAN_ESIKLER, 99999)).toBe("terminal");
   });
 
