@@ -67,6 +67,13 @@ export class TronAdapter implements ChainAdapter {
   private readonly baseUrl: string;
   private readonly kapi: RateGate;
   private readonly basliklar: Record<string, string>;
+  /**
+   * İşlem başına kayıt sayacı — TUR BOYUNCA yaşar, sayfa başına DEĞİL.
+   * Bir işlemin kayıtları sayfa sınırında bölünebiliyor; sayfa başına
+   * sıfırlanan sayaç o işlemi ikinci sayfada 0'dan saymaya başlıyor ve aynı
+   * hareket ikinci kez yazılıyordu (ölçüldü). Tur başında sıfırlanır.
+   */
+  private txSayaci = new Map<string, number>();
 
   constructor(opts: TronAdapterOptions = {}) {
     this.baseUrl = (opts.baseUrl ?? TRONGRID).replace(/\/$/, "");
@@ -152,6 +159,9 @@ export class TronAdapter implements ChainAdapter {
     const imlec = imlecCoz(opts.cursor);
     const turler = opts.kinds;
 
+    // İmleç yoksa bu turun İLK sayfasıdır; sayaç oradan başlar.
+    if (!opts.cursor) this.txSayaci.clear();
+
     const nativeIstensin = !turler || turler.includes("native") || turler.includes("internal");
     const tokenIstensin = !turler || turler.includes("token");
     const bos = { items: [] as Transfer[], next: null as string | null };
@@ -188,6 +198,8 @@ export class TronAdapter implements ChainAdapter {
       limit: String(limit),
       order_by: "block_timestamp,asc",
     });
+    // Sıra ÖNEMLİ: süzgeçler fingerprint ile BİRLİKTE gönderilir; kaynak
+    // ikisinin tutarlı olmasını şart koşuyor.
     if (fingerprint && fingerprint !== "bitti") parametreler.set("fingerprint", fingerprint);
     if (opts.fromTs) parametreler.set("min_timestamp", String(Date.parse(opts.fromTs)));
     if (opts.toTs) parametreler.set("max_timestamp", String(Date.parse(opts.toTs)));
@@ -199,10 +211,25 @@ export class TronAdapter implements ChainAdapter {
 
     const yanit = await this.iste<any>(yol, opts.signal);
     const kayitlar = yanit.data ?? [];
+
+    // İNDEKS SAYFA KONUMUNDAN TÜRETİLMEZ. Aynı hareket başka bir turda
+    // başka konuma düşer ve (chain, txHash, index) tekilliği onu göremez —
+    // ölçüldü: 201 mükerrer öbek. Kararlı olan şey, hareketin İŞLEM
+    // İÇİNDEKİ sırasıdır; kaynak TRC20 için log indeksi vermiyor, o yüzden
+    // aynı tx'in kayıtları kendi aralarında sayılır.
+    //
+    // Aynı işlemde BİREBİR AYNI transferin birden çok kez bulunması gerçek
+    // bir durumdur (ölçüldü: bir tx'te 20 özdeş Transfer olayı), o yüzden
+    // içerik tek başına anahtar olamaz — sıra numarası şart.
     const items: Transfer[] =
       tur === "token"
-        ? kayitlar.map((k: any, i: number) => this.trc20Cevir(k, i))
-        : kayitlar.flatMap((k: any, i: number) => this.nativeCevir(k, i));
+        ? kayitlar.map((k: any) => {
+            const tx = String(k.transaction_id);
+            const sira = this.txSayaci.get(tx) ?? 0;
+            this.txSayaci.set(tx, sira + 1);
+            return this.trc20Cevir(k, sira);
+          })
+        : kayitlar.flatMap((k: any) => this.nativeCevir(k));
 
     // Fingerprint sayfa dolduğu sürece anlamlı; kayıt bittiyse akış da bitti.
     const next = kayitlar.length === limit ? (yanit.meta?.fingerprint ?? null) : null;
@@ -233,7 +260,7 @@ export class TronAdapter implements ChainAdapter {
   }
 
   /** Bir TRON tx'i birden çok sözleşme taşıyabilir; her biri ayrı harekettir. */
-  private nativeCevir(k: any, sira: number): Transfer[] {
+  private nativeCevir(k: any): Transfer[] {
     const sozlesmeler = k.raw_data?.contract ?? [];
     const basarili = k.ret?.[0]?.contractRet === "SUCCESS";
     const ucret = k.ret?.[0]?.fee ?? null;
@@ -249,7 +276,8 @@ export class TronAdapter implements ChainAdapter {
         {
           chain: "tron",
           txHash: k.txID,
-          index: sira * 100 + i,
+          // Sözleşmenin işlem içindeki sırası — sayfadan bağımsız, kararlı.
+          index: i,
           blockNumber: k.blockNumber ?? null,
           ts: isoZaman(k.block_timestamp ?? k.raw_data?.timestamp),
           from: adresNormalize(deger.owner_address),
@@ -280,7 +308,7 @@ export class TronAdapter implements ChainAdapter {
     );
     if (!yanit || !yanit.txID) return null;
 
-    const transfers = this.nativeCevir(yanit, 0);
+    const transfers = this.nativeCevir(yanit);
     return {
       chain: "tron",
       hash: yanit.txID,

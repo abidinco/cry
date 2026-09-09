@@ -27,6 +27,15 @@ describe("tutar dönüşümü", () => {
     expect(metindenHama("0.000001", 6)).toBe("1");
   });
 
+  it("zincirde gerçekten görülen uç değeri bozmadan gösterir", () => {
+    // 2^256-1: dolandırıcı token'ların "sonsuz" değeri, canlı veride görüldü.
+    // Number'a çevrilseydi 1.1579208923731618e+53 olur ve rapora öyle düşerdi.
+    const ucDeger = "115792089237316195423570985008687907853269984665640564039457584007913129639935";
+    expect(hamdanMetne(ucDeger, 6)).toBe(
+      "115792089237316195423570985008687907853269984665640564039457584007913129.639935",
+    );
+  });
+
   it("gidiş-dönüş değeri korur", () => {
     for (const ham of ["1", "999", "1000000", "123456789012345678"]) {
       expect(metindenHama(hamdanMetne(ham, 6), 6)).toBe(ham);

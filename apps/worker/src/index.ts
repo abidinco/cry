@@ -6,7 +6,7 @@
  */
 import { Worker, type Job } from "bullmq";
 import IORedis from "ioredis";
-import { KUYRUK, KUYRUK_ONEKI, type IndeksIsi } from "./kuyruklar";
+import { KUYRUK, KUYRUK_ONEKI, type IndeksIsi } from "@cry/kuyruk";
 import { adresIndeksle } from "./indeksle";
 import type { ChainId } from "@cry/chain";
 
@@ -29,7 +29,9 @@ const indeksWorker = new Worker<IndeksIsi>(
     } else {
       console.log(
         `✓ ${chain}:${sonuc.address} — ${sonuc.yeniHareket} yeni hareket, ` +
-          `${sonuc.okunanSayfa} sayfa${sonuc.tamamlandi ? "" : " (devam edecek)"}`,
+          `${sonuc.okunanSayfa} sayfa` +
+          (sonuc.sonTarih ? `, ${sonuc.sonTarih.slice(0, 10)} tarihine kadar` : "") +
+          (sonuc.tamamlandi ? "" : " (devam edecek)"),
       );
     }
     return sonuc;

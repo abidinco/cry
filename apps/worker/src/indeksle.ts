@@ -20,6 +20,8 @@ export type IndeksSonucu = {
   okunanSayfa: number;
   /** Kaynak hız sınırına takıldıysa tur yarıda bitmiş olabilir. */
   tamamlandi: boolean;
+  /** Bu turda görülen en yeni hareketin tarihi — sonraki tur buradan devam. */
+  sonTarih?: string | null;
   atlanmaSebebi?: string;
 };
 
@@ -77,22 +79,37 @@ export async function adresIndeksle(
     }
   }
 
-  let imlec: string | null = kayit.indexCursor ?? null;
+  // İMLEÇ TUR İÇİNDE geçerlidir, TURLAR ARASINDA değil: TronGrid'in
+  // fingerprint'i kısa ömürlü ve süresi dolunca kaynak sessizce BAŞTAN
+  // veriyor — tur 50 sayfa okuyup 200 yeni kayıt yazıyor ve "ilerledik"
+  // sanılıyor. Turlar arası devam, kalıcı olan şeye bağlanır: son yazdığımız
+  // hareketin TARİHİNE.
+  let imlec: string | null = null;
   let sayfa = 0;
   let yeni = 0;
+  let enSonTs: Date | null = kayit.indexedThroughTs ?? null;
   const maxSayfa = opts.maxSayfa ?? 50;
+  const baslangicTs = kayit.indexedThroughTs?.toISOString() ?? null;
 
   while (sayfa < maxSayfa) {
     const { items, nextCursor } = await adaptor.listTransfers(adres, {
       cursor: imlec,
       signal: opts.signal,
-      // Artımlı: en son gördüğümüz andan sonrası. Kaynak imleci taşıyorsa o
-      // yeter; taşımıyorsa zaman damgası kapısı devreye girer.
-      fromTs: imlec ? null : (kayit.indexedThroughTs?.toISOString() ?? null),
+      // Sınır DÂHİL okunur; aynı kayıt ikinci kez yazılmaz (skipDuplicates).
+      // Süzgeç HER SAYFADA tekrarlanır: TronGrid fingerprint'i ilk sorgunun
+      // parametreleriyle eşleşmezse "fingerprint does not match current set
+      // of params" ile 400 döner ve tur ortasında kopar.
+      fromTs: baslangicTs,
     });
     sayfa++;
 
-    if (items.length > 0) yeni += await hareketleriYaz(items);
+    if (items.length > 0) {
+      yeni += await hareketleriYaz(items);
+      for (const h of items) {
+        const t = new Date(h.ts);
+        if (!enSonTs || t > enSonTs) enSonTs = t;
+      }
+    }
 
     imlec = nextCursor;
     if (!nextCursor) break;
@@ -102,14 +119,23 @@ export async function adresIndeksle(
   await prisma.address.update({
     where: { id: kayit.id },
     data: {
-      indexCursor: imlec,
+      // İmleç SAKLANMAZ; sonraki tur tarihten devam eder.
+      indexCursor: null,
       lastIndexedAt: new Date(),
-      indexedThroughTs: tamamlandi ? new Date() : kayit.indexedThroughTs,
+      // "Şu ana kadar indeksledim" değil, "şu tarihe kadar VERİ gördüm".
+      indexedThroughTs: enSonTs,
       indexState: tamamlandi ? "tam" : "kismi",
     },
   });
 
-  return { address: adres, chain, yeniHareket: yeni, okunanSayfa: sayfa, tamamlandi };
+  return {
+    address: adres,
+    chain,
+    yeniHareket: yeni,
+    okunanSayfa: sayfa,
+    tamamlandi,
+    sonTarih: enSonTs?.toISOString() ?? null,
+  };
 }
 
 /** Hareketleri yazar; aynı (chain, txHash, index) ikinci kez yazılmaz. */

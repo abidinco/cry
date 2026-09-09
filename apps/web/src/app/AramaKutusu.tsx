@@ -89,7 +89,18 @@ export default function AramaKutusu() {
             <tbody>
               {sonuc.candidates.map((a, i) => (
                 <tr key={i} style={{ borderTop: "1px solid var(--cizgi)" }}>
-                  <td className="mono">{a.network ?? a.family}</td>
+                  <td className="mono">
+                    {/* Zincir KESİN ise adres sayfasına gidilir; belirsizse
+                        link verilmez — yanlış zincire açılan bir sayfa,
+                        "bu adres burada yok" diye YANLIŞ bir cevap üretir. */}
+                    {a.network && sonuc.kind === "address" && !a.needsProbe ? (
+                      <a href={`/adres/${a.network}/${encodeURIComponent(sonuc.normalized)}`}>
+                        {a.network}
+                      </a>
+                    ) : (
+                      (a.network ?? a.family)
+                    )}
+                  </td>
                   <td className="mono">{a.confidence.toFixed(2)}</td>
                   <td className="soluk">
                     {a.reason}
