@@ -2,13 +2,17 @@ name: deploy-app
 
 # Ana yığın EVDEKİ makinede çalışıyor; oraya buluttan SSH ile girilemez
 # (ev tarafında hiçbir port açık değil, tünel tek yönlü kuruluyor). Bu yüzden
-# dağıtımı PC'nin KENDİSİNE kurulu bir self-hosted runner yapar: iş kuyruktan
-# çekilir, makinenin dışarı açılması gerekmez.
+# dağıtımı PC'nin KENDİSİNE kurulu bir self-hosted runner yapar.
 #
-# Adımlar PowerShell ile yazıldı, `shell: bash` ile DEĞİL: Windows'ta runner
-# `bash`i PATH'ten çözüyor ve orada ilk sırada WSL'in bash'i duruyor
-# (C:\WINDOWS\system32\bash.EXE). WSL içinde C: sürücüsü /mnt/c altındadır,
-# yani Windows yolları sessizce bulunamaz.
+# İki tuzak buraya kadar iki turu yedi, ikisi de betiğin İÇİNDE:
+#
+# 1. `shell: bash` Windows'ta WSL'in bash'ine çözülüyor (C:\WINDOWS\system32\
+#    bash.EXE) ve orada C: sürücüsü /mnt/c altındadır — Windows yolları
+#    sessizce bulunamaz. Bu yüzden PowerShell kullanılıyor.
+# 2. Runner adım betiğini BOM'suz UTF-8 yazıyor, Windows PowerShell 5.1 ise
+#    BOM'suz dosyayı ANSI sanıyor. Betik gövdesindeki Türkçe karakterler
+#    bozulup ayrıştırma hatası veriyor: adım hiçbir çıktı üretmeden düşüyor.
+#    Bu yüzden GÖVDELER SAF ASCII; Türkçe yalnızca YAML'in kendi alanlarında.
 on:
   push:
     branches: [main]
@@ -32,50 +36,54 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Ortam dosyasını yerine koy
+      - name: Tani
         env:
-          # Runner depoyu KENDİ çalışma klasörüne açıyor; .env orada olamaz
-          # (depo public, dosya gitignore'da). İki kaynak var ve sırayla
-          # denenir: makinedeki sabit dosya, sonra CRY_ENV secret'ı.
           CRY_ENV_FILE: ${{ vars.CRY_ENV_FILE || 'C:\srv\cry\.env' }}
           CRY_ENV: ${{ secrets.CRY_ENV }}
         run: |
-          # Tani: hangi kimlikle kosuyoruz ve o kimlik neyi goruyor. Dosyaya
-          # da yazilir, cunku is log'u yuklendikten sonra makinede kalmiyor.
-          $tani = @()
-          $tani += "whoami       : " + (whoami)
-          $tani += "CRY_ENV_FILE : '$($env:CRY_ENV_FILE)'"
-          $tani += "CRY_ENV var  : " + [bool]$env:CRY_ENV
+          $t = @()
+          $t += "whoami       : " + (whoami)
+          $t += "CRY_ENV_FILE : '" + $env:CRY_ENV_FILE + "'"
+          $t += "CRY_ENV dolu : " + [bool]$env:CRY_ENV
           foreach ($y in "C:\srv", "C:\srv\cry", $env:CRY_ENV_FILE) {
-            $tani += "$y -> $(Test-Path -LiteralPath $y)"
+            $t += ($y + " -> " + (Test-Path -LiteralPath $y))
           }
-          $tani += "--- icacls C:\srv ---"
-          $tani += (icacls "C:\srv" 2>&1 | Out-String)
-          $tani | ForEach-Object { Write-Host $_ }
-          $tani | Set-Content "tani.txt" -Encoding UTF8
+          $t += "--- icacls C:\srv ---"
+          $t += (icacls "C:\srv" 2>&1 | Out-String)
+          $t | ForEach-Object { Write-Host $_ }
+          # Is log'u yuklendikten sonra makinede kalmiyor; yerel kopya sart.
+          $t | Set-Content "tani.txt" -Encoding UTF8
 
+      - name: Ortam dosyasi
+        env:
+          CRY_ENV_FILE: ${{ vars.CRY_ENV_FILE || 'C:\srv\cry\.env' }}
+          CRY_ENV: ${{ secrets.CRY_ENV }}
+        run: |
           if (Test-Path -LiteralPath $env:CRY_ENV_FILE) {
             Copy-Item -LiteralPath $env:CRY_ENV_FILE ".env" -Force
             Write-Host "OK: .env dosyadan alindi"
           } elseif ($env:CRY_ENV) {
-            # Secret satirlari CRLF ile gelebilir; Postgres parolasinin sonuna
-            # gorunmez bir karakter yapismasi "sifre yanlis" diye geri doner.
-            ($env:CRY_ENV -replace "`r`n", "`n") | Set-Content ".env" -Encoding ASCII -NoNewline
+            # Secret satirlari CRLF ile gelebilir; parolanin sonuna gorunmez
+            # bir karakter yapismasi "sifre yanlis" diye geri doner.
+            $icerik = $env:CRY_ENV -replace "`r`n", "`n"
+            [IO.File]::WriteAllText((Join-Path $PWD ".env"), $icerik)
             Write-Host "OK: .env secret'tan yazildi"
           } else {
             Write-Host "HATA: ne dosya ne secret bulundu"
             exit 1
           }
+          $satir = (Get-Content ".env" | Where-Object { $_ -ne "" }).Count
+          Write-Host ("satir: " + $satir)
 
-      - name: Docker ayakta mı
+      - name: Docker
         run: |
           docker version --format '{{.Server.Version}}'
           if ($LASTEXITCODE -ne 0) {
-            Write-Host "HATA: Docker motoruna ulasilamiyor (Docker Desktop kapali olabilir)"
+            Write-Host "HATA: Docker motoruna ulasilamiyor"
             exit 1
           }
 
-      - name: Derle ve ayağa kaldır
+      - name: Derle ve ayaga kaldir
         run: |
           docker compose build
           if ($LASTEXITCODE -ne 0) { exit 1 }
@@ -85,18 +93,18 @@ jobs:
 
       - name: Migration
         run: |
-          # Migration WORKER imajından koşar: web imajı standalone çıktı
-          # taşıyor ve içinde prisma CLI yok.
+          # Migration WORKER imajindan kosar: web imaji standalone cikti
+          # tasiyor ve icinde prisma CLI yok.
           docker compose run --rm worker npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Seed
         run: |
-          # Idempotent: roller upsert edilir, kullanici zaten varsa dokunulmaz.
+          # Idempotent: roller upsert edilir, kullanici varsa dokunulmaz.
           docker compose run --rm worker npm run seed --workspace @cry/db
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
-      - name: Sağlık kontrolü
+      - name: Saglik kontrolu
         run: |
           for ($i = 0; $i -lt 30; $i++) {
             try {
