@@ -4,10 +4,15 @@
  * İş adı iki yerde yazılırsa (üreten ve tüketen) biri değişir, öteki sessizce
  * hiçbir iş almaz ve "worker çalışmıyor" gibi görünür.
  */
+// Ad ayracı olarak ":" KULLANILMAZ — BullMQ bunu reddediyor ("Queue name
+// cannot contain :"), çünkü Redis anahtarını kendisi o karakterle kuruyor.
+// Ad alanı ayırmak için kuyruk adı değil `prefix` seçeneği vardır.
+export const KUYRUK_ONEKI = "cry";
+
 export const KUYRUK = {
-  indeks: "cry:adres-indeksle",
-  takip: "cry:takip-kosusu",
-  fiyat: "cry:fiyat-cek",
+  indeks: "adres-indeksle",
+  takip: "takip-kosusu",
+  fiyat: "fiyat-cek",
 } as const;
 
 export type IndeksIsi = {

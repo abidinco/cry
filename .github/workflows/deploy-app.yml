@@ -109,6 +109,24 @@ jobs:
           docker compose run --rm worker npm run seed --workspace @cry/db
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
+      - name: Konteynerler ayakta mi
+        run: |
+          # Saglik ucu yalnizca web'e bakiyor; cokup duran bir worker'la
+          # deploy YESILE DONDU (bir kez yasandi). Her servis ayri sorulur.
+          Start-Sleep -Seconds 10
+          $kotu = @()
+          foreach ($ad in "cry-db", "cry-redis", "cry-web", "cry-worker") {
+            $durum = (docker inspect -f "{{.State.Status}}" $ad 2>$null)
+            $yeniden = (docker inspect -f "{{.RestartCount}}" $ad 2>$null)
+            Write-Host ($ad + " : " + $durum + " (restart: " + $yeniden + ")")
+            if ($durum -ne "running") { $kotu += $ad }
+          }
+          if ($kotu.Count -gt 0) {
+            Write-Host ("HATA: ayakta olmayan servis: " + ($kotu -join ", "))
+            foreach ($ad in $kotu) { docker logs --tail 30 $ad }
+            exit 1
+          }
+
       - name: Saglik kontrolu
         run: |
           for ($i = 0; $i -lt 30; $i++) {

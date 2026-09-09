@@ -6,7 +6,7 @@
  */
 import { Worker, type Job } from "bullmq";
 import IORedis from "ioredis";
-import { KUYRUK, type IndeksIsi } from "./kuyruklar";
+import { KUYRUK, KUYRUK_ONEKI, type IndeksIsi } from "./kuyruklar";
 import { adresIndeksle } from "./indeksle";
 import type { ChainId } from "@cry/chain";
 
@@ -34,7 +34,7 @@ const indeksWorker = new Worker<IndeksIsi>(
     }
     return sonuc;
   },
-  { connection: baglanti, concurrency: ESZAMANLI },
+  { connection: baglanti, concurrency: ESZAMANLI, prefix: KUYRUK_ONEKI },
 );
 
 indeksWorker.on("failed", (is, hata) => {
