@@ -35,17 +35,37 @@ jobs:
       - name: Ortam dosyasını yerine koy
         env:
           # Runner depoyu KENDİ çalışma klasörüne açıyor; .env orada olamaz
-          # (depo public, dosya gitignore'da). Makinede sabit bir yerde durur.
+          # (depo public, dosya gitignore'da). İki kaynak var ve sırayla
+          # denenir: makinedeki sabit dosya, sonra CRY_ENV secret'ı.
           CRY_ENV_FILE: ${{ vars.CRY_ENV_FILE || 'C:\srv\cry\.env' }}
+          CRY_ENV: ${{ secrets.CRY_ENV }}
         run: |
-          # Yoksa deploy BAŞLAMAZ: yarım ayağa kalkan bir yığın çalışıyor sanılır.
-          if (-not (Test-Path $env:CRY_ENV_FILE)) {
-            Write-Host "HATA: $($env:CRY_ENV_FILE) yok"
+          # Tani: hangi kimlikle kosuyoruz ve o kimlik neyi goruyor. Dosyaya
+          # da yazilir, cunku is log'u yuklendikten sonra makinede kalmiyor.
+          $tani = @()
+          $tani += "whoami       : " + (whoami)
+          $tani += "CRY_ENV_FILE : '$($env:CRY_ENV_FILE)'"
+          $tani += "CRY_ENV var  : " + [bool]$env:CRY_ENV
+          foreach ($y in "C:\srv", "C:\srv\cry", $env:CRY_ENV_FILE) {
+            $tani += "$y -> $(Test-Path -LiteralPath $y)"
+          }
+          $tani += "--- icacls C:\srv ---"
+          $tani += (icacls "C:\srv" 2>&1 | Out-String)
+          $tani | ForEach-Object { Write-Host $_ }
+          $tani | Set-Content "tani.txt" -Encoding UTF8
+
+          if (Test-Path -LiteralPath $env:CRY_ENV_FILE) {
+            Copy-Item -LiteralPath $env:CRY_ENV_FILE ".env" -Force
+            Write-Host "OK: .env dosyadan alindi"
+          } elseif ($env:CRY_ENV) {
+            # Secret satirlari CRLF ile gelebilir; Postgres parolasinin sonuna
+            # gorunmez bir karakter yapismasi "sifre yanlis" diye geri doner.
+            ($env:CRY_ENV -replace "`r`n", "`n") | Set-Content ".env" -Encoding ASCII -NoNewline
+            Write-Host "OK: .env secret'tan yazildi"
+          } else {
+            Write-Host "HATA: ne dosya ne secret bulundu"
             exit 1
           }
-          Copy-Item $env:CRY_ENV_FILE ".env" -Force
-          $satir = (Get-Content ".env" | Where-Object { $_ -ne "" }).Count
-          Write-Host "OK: .env yerine kondu ($satir satir)"
 
       - name: Docker ayakta mı
         run: |
