@@ -6,6 +6,7 @@
  */
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { prisma } from "@cry/db";
 import { OTURUM_CEREZI, oturumCoz, type Oturum } from "./oturum";
 
 export async function oturumOku(): Promise<Oturum | null> {
@@ -24,6 +25,12 @@ export function adminMi(oturum: Oturum | null): boolean {
 /**
  * API uç noktaları için kapı. Yetkisizlikte HAZIR yanıt döner, böylece
  * çağıran "kontrol ettim ama dönmeyi unuttum" hatasına düşemez.
+ *
+ * Jetonun İMZASI geçerli olması yetmez, kullanıcının HÂLÂ var ve aktif olması
+ * da sorulur. Aksi hâlde oturum kullanıcıyı gömüyor: yönetici birini kapatıyor
+ * ama elindeki çerez süresi dolana kadar (12 saat) çalışmaya devam ediyor.
+ * Ölçüldü: silinmiş bir kullanıcının çerezi istekleri 500 ile düşürüyordu,
+ * çünkü denetim kaydı artık var olmayan bir kişiye yazılmaya çalışılıyordu.
  */
 export async function apiOturum(): Promise<
   { oturum: Oturum; yanit?: undefined } | { oturum?: undefined; yanit: NextResponse }
@@ -32,7 +39,20 @@ export async function apiOturum(): Promise<
   if (!oturum) {
     return { yanit: NextResponse.json({ error: "oturum gerekli" }, { status: 401 }) };
   }
-  return { oturum };
+
+  const kullanici = await prisma.user.findUnique({
+    where: { id: oturum.userId },
+    select: { active: true, role: { select: { key: true } } },
+  });
+  if (!kullanici || !kullanici.active) {
+    return {
+      yanit: NextResponse.json({ error: "oturum artık geçerli değil" }, { status: 401 }),
+    };
+  }
+
+  // Rol de jetondan değil KAYITTAN okunur: yetkisi düşürülen bir kullanıcı,
+  // eski jetonuyla yönetici kalmamalı.
+  return { oturum: { ...oturum, role: kullanici.role.key } };
 }
 
 export async function apiAdmin(): Promise<

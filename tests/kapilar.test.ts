@@ -38,6 +38,19 @@ describe("ilk giriş şifre kapısı", () => {
   });
 });
 
+describe("oturum kullanıcıyı gömmez", () => {
+  it("apiOturum kullanıcıyı veritabanından da doğrular", async () => {
+    // Jetonun imzası geçerli olabilir ama kullanıcı kapatılmış ya da silinmiş
+    // olabilir. Ölçüldü: silinmiş kullanıcının çerezi istekleri 500 ile
+    // düşürüyordu; kapı artık kaydı soruyor.
+    const kaynak = await import("node:fs/promises").then((f) =>
+      f.readFile(new URL("../apps/web/src/lib/yetki.ts", import.meta.url), "utf8"),
+    );
+    expect(kaynak).toContain("prisma.user.findUnique");
+    expect(kaynak).toContain("kullanici.active");
+  });
+});
+
 describe("şifre ölçütü", () => {
   it("kısa şifreyi eler", () => {
     expect(sifreOlcutu("kisa")).not.toBeNull();

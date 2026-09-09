@@ -12,6 +12,9 @@ import { ChainSourceError, type ChainId } from "./types";
 export type FetchOptions = {
   chain: ChainId;
   headers?: Record<string, string>;
+  /** TronGrid'in işlem uçları POST istiyor; varsayılan GET. */
+  method?: "GET" | "POST";
+  body?: string;
   /** Toplam deneme sayısı (ilk deneme dâhil). */
   retries?: number;
   timeoutMs?: number;
@@ -49,7 +52,9 @@ export async function getJson<T>(url: string, opts: FetchOptions): Promise<T> {
 
     try {
       const yanit = await fetch(url, {
+        method: opts.method ?? "GET",
         headers: { accept: "application/json", ...opts.headers },
+        body: opts.body,
         signal: kontrol.signal,
       });
 

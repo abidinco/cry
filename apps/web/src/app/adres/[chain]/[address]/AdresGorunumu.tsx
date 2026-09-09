@@ -79,7 +79,7 @@ export default function AdresGorunumu({ chain, address }: { chain: string; addre
 
   const ozetYukle = useCallback(async () => {
     const yanit = await fetch(taban);
-    const govde = (await yanit.json()) as Ozet;
+    const govde = (await yanit.json().catch(() => ({}))) as Ozet;
     if (!yanit.ok) {
       setHata(govde.error ?? "Adres okunamadı");
       return null;

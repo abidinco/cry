@@ -9,7 +9,7 @@ Her dosya **tek oturumda bitecek** büyüklükte, kendi bitiş ölçütünü ta�
 | 03 | Kimlik: şifre değiştirme + çıkış + kullanıcı yönetimi | ✅ bitti (2026-09-09) |
 | 04 | Adres görünümü + indeks işini kuyruğa atma (uçtan uca ilk TRON sorgusu) | ✅ bitti (2026-09-09) |
 | 4b | [Arayüz: tasarım dili](../arayuz.md) | ✅ bitti (2026-09-09) |
-| 05 | Yoklama katmanının uç noktası + `probe_cache` | ⏳ |
+| 05 | Yoklama katmanının uç noktası + `probe_cache` | ✅ bitti (2026-09-09) |
 | 06 | Takip motoru: FIFO, durma sezgiselleri, terminal düğüm | ⏳ |
 | 07 | Graf görünümü (Cytoscape.js) | ⏳ |
 | 08 | Deposit sezgiseli + aktivasyon kümelemesi | ⏳ |

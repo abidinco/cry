@@ -3,6 +3,8 @@ export * from "./units";
 export * from "./registry";
 export * from "./tron-address";
 export { detectNetwork } from "./network-detect";
+export { probe } from "./network-probe";
+export type { ProbeDeps, ProbeHit, ProbeResult } from "./network-probe";
 export type { Detection, Candidate, EvmChain } from "./network-detect";
 export {
   PRIMARY_EVM_CHAINS,
