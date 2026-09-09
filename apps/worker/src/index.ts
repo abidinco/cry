@@ -6,8 +6,10 @@
  */
 import { Worker, type Job } from "bullmq";
 import IORedis from "ioredis";
-import { KUYRUK, KUYRUK_ONEKI, type IndeksIsi } from "@cry/kuyruk";
+import { prisma } from "@cry/db";
+import { KUYRUK, KUYRUK_ONEKI, type IndeksIsi, type TakipIsi } from "@cry/kuyruk";
 import { adresIndeksle } from "./indeksle";
+import { takipKos } from "./takip";
 import type { ChainId } from "@cry/chain";
 
 const baglanti = new IORedis(process.env.REDIS_URL ?? "redis://redis:6379", {
@@ -31,6 +33,7 @@ const indeksWorker = new Worker<IndeksIsi>(
         `✓ ${chain}:${sonuc.address} — ${sonuc.yeniHareket} yeni hareket, ` +
           `${sonuc.okunanSayfa} sayfa` +
           (sonuc.sonTarih ? `, ${sonuc.sonTarih.slice(0, 10)} tarihine kadar` : "") +
+          (sonuc.atlananOnay ? `, ${sonuc.atlananOnay} onay atlandı` : "") +
           (sonuc.tamamlandi ? "" : " (devam edecek)"),
       );
     }
@@ -39,16 +42,51 @@ const indeksWorker = new Worker<IndeksIsi>(
   { connection: baglanti, concurrency: ESZAMANLI, prefix: KUYRUK_ONEKI },
 );
 
+/**
+ * Takip koşusu ayrı bir kuyrukta ve eşzamanlılığı 1: bir koşu düğüm düğüm
+ * ilerlerken aynı adresleri indeksleyebiliyor, iki koşunun aynı anda aynı
+ * adresi taraması boşuna kaynak harcar.
+ */
+const takipWorker = new Worker<TakipIsi>(
+  KUYRUK.takip,
+  async (is: Job<TakipIsi>) => {
+    const sonuc = await takipKos(BigInt(is.data.traceRunId));
+    console.log(
+      `✓ takip ${is.data.traceRunId} — ${sonuc.dugum} düğüm, ${sonuc.kenar} kenar, ` +
+        `durma: ${JSON.stringify(sonuc.durma)}`,
+    );
+    return sonuc;
+  },
+  { connection: baglanti, concurrency: 1, prefix: KUYRUK_ONEKI },
+);
+
+takipWorker.on("failed", async (is, hata) => {
+  console.error(`✗ takip ${is?.data?.traceRunId} başarısız:`, hata?.message);
+  // Koşu KAYDA "hata" diye geçer: yarım kalan bir taramanın "bitti"
+  // görünmesi, eksik bir grafı tam sanmak demektir.
+  if (is?.data?.traceRunId) {
+    await prisma.traceRun
+      .update({
+        where: { id: BigInt(is.data.traceRunId) },
+        data: { status: "hata", finishedAt: new Date(), stopReason: hata?.message?.slice(0, 200) },
+      })
+      .catch(() => {});
+  }
+});
+
 indeksWorker.on("failed", (is, hata) => {
   console.error(`✗ ${is?.id ?? "?"} başarısız:`, hata?.message);
 });
 
-console.log(`worker ayakta — kuyruk: ${KUYRUK.indeks}, eşzamanlı: ${ESZAMANLI}`);
+console.log(
+  `worker ayakta — kuyruklar: ${KUYRUK.indeks} (${ESZAMANLI}), ${KUYRUK.takip} (1)`,
+);
 
 for (const sinyal of ["SIGINT", "SIGTERM"] as const) {
   process.on(sinyal, async () => {
     console.log(`${sinyal} — kuyruk kapatılıyor`);
     await indeksWorker.close();
+    await takipWorker.close();
     await baglanti.quit();
     process.exit(0);
   });

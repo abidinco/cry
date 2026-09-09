@@ -78,8 +78,17 @@ export async function takipKos(traceRunId: bigint): Promise<{
       }
 
       const guncel = await dugumBilgisi(zincir, dugum.adres);
-      const izliToplam = dugum.girisler.reduce(
-        (t, g) => t + (g.tutar * BigInt(Math.round(g.pay * 1e6))) / 1_000_000n,
+      // Varlık başına ayrı toplam: TRX ile USDT toplanmaz. Tek varlık varsa
+      // düğüme yazılır, birden çok varlık varsa YAZILMAZ — çünkü karşılığı
+      // olmayan bir sayı, okuyanı yanlış bir büyüklüğe inandırır.
+      const varlikToplami = new Map<string, bigint>();
+      for (const g of dugum.girisler) {
+        const pay = (g.tutar * BigInt(Math.round(g.pay * 1e6))) / 1_000_000n;
+        varlikToplami.set(g.varlik, (varlikToplami.get(g.varlik) ?? 0n) + pay);
+      }
+      // Durma ölçütündeki tutar eşiği için: en büyük tek varlık tutarı.
+      const izliToplam = [...varlikToplami.values()].reduce(
+        (en, v) => (v > en ? v : en),
         0n,
       );
 
@@ -97,7 +106,7 @@ export async function takipKos(traceRunId: bigint): Promise<{
         gorulen.size,
       );
 
-      await dugumYaz(traceRunId, zincir, dugum, izliToplam, sebep, guncel.etiketler);
+      await dugumYaz(traceRunId, zincir, dugum, varlikToplami, sebep, guncel.etiketler);
       if (sebep) {
         durmaSayaci[sebep] = (durmaSayaci[sebep] ?? 0) + 1;
         continue;
@@ -258,10 +267,13 @@ async function dugumYaz(
   traceRunId: bigint,
   zincir: string,
   dugum: Sira,
-  izliTutar: bigint,
+  varlikToplami: Map<string, bigint>,
   sebep: DurmaSebebi | null,
   etiketler: DugumBilgisi["etiketler"],
 ) {
+  // Tek varlık varsa tutar yazılır; birden çoksa null — toplamı ekrana basmak
+  // "1 TRX + 1 USDT = 2" demek olurdu.
+  const tekVarlik = varlikToplami.size === 1 ? [...varlikToplami.values()][0] : null;
   await prisma.traceNode.upsert({
     where: {
       traceRunId_chain_address: { traceRunId, chain: zincir, address: dugum.adres },
@@ -272,7 +284,7 @@ async function dugumYaz(
       chain: zincir,
       address: dugum.adres,
       hop: dugum.hop,
-      amountRaw: izliTutar.toString(),
+      amountRaw: tekVarlik?.toString() ?? null,
       isTerminal: sebep !== null,
       terminalReason: sebep,
       // Etiket görüntüsü DONDURULUR: rapor alındıktan sonra etiket değişse

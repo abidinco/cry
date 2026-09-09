@@ -120,6 +120,25 @@ export default function AdresGorunumu({ chain, address }: { chain: string; addre
     return () => clearInterval(zamanlayici);
   }, [ozet?.isDurumu, ozetYukle, hareketYukle, yon]);
 
+  /** Takip koşusu: kural ve eşikler kayda yazılır, koşu worker'da yürür. */
+  async function takipBaslat(kural: string) {
+    setHata(null);
+    const yanit = await fetch("/api/takip", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chain, address: ozet?.address ?? address, taintRule: kural }),
+    });
+    const govde = (await yanit.json().catch(() => ({}))) as {
+      traceRunId?: string;
+      error?: string;
+    };
+    if (!yanit.ok || !govde.traceRunId) {
+      setHata(govde.error ?? "takip başlatılamadı");
+      return;
+    }
+    window.location.href = `/takip/${govde.traceRunId}`;
+  }
+
   async function tara() {
     setHata(null);
     const yanit = await fetch(`${taban}/indeksle`, { method: "POST" });
@@ -164,9 +183,19 @@ export default function AdresGorunumu({ chain, address }: { chain: string; addre
         koken={ozet.biliniyor ? "kaynak" : "yok"}
         baslik="ölçüm"
         sag={
-          <button className="birincil" onClick={tara} disabled={calisiyor || !ozet.adaptorHazir}>
-            {calisiyor ? "taranıyor" : ozet.biliniyor ? "yeniden tara" : "zincirden çek"}
-          </button>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button onClick={tara} disabled={calisiyor || !ozet.adaptorHazir}>
+              {calisiyor ? "taranıyor" : ozet.biliniyor ? "yeniden tara" : "zincirden çek"}
+            </button>
+            <button
+              className="birincil"
+              onClick={() => takipBaslat("fifo")}
+              disabled={!ozet.biliniyor || calisiyor}
+              title="Bu adrese gelen paranın nereye gittiğini takip eder (FIFO)"
+            >
+              takibi başlat
+            </button>
+          </div>
         }
       >
         <div className="panel satirlar">

@@ -42,3 +42,16 @@ describe("tutar dönüşümü", () => {
     }
   });
 });
+
+describe("onay kaydı transfer değildir", () => {
+  it("TRC20 ucu onayları aynı listede döndürüyor ve filtrelenmeleri gerekiyor", async () => {
+    // Ölçüldü (2026-09-09): 200 kaydın 27'si Approval ve tutarları 2^256-1.
+    // Onay bir harcama İZNİDİR, para hareketi değil; transfer sayılırsa graf
+    // hayalet kenarlarla dolar.
+    const kaynak = await import("node:fs/promises").then((f) =>
+      f.readFile(new URL("../packages/chain/src/adapters/tron.ts", import.meta.url), "utf8"),
+    );
+    expect(kaynak).toContain('k.type === "Transfer"');
+    expect(kaynak).toContain("atlananOnay");
+  });
+});

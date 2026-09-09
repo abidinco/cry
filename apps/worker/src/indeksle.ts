@@ -22,6 +22,8 @@ export type IndeksSonucu = {
   tamamlandi: boolean;
   /** Bu turda görülen en yeni hareketin tarihi — sonraki tur buradan devam. */
   sonTarih?: string | null;
+  /** Transfer sayılmayan onay kayıtları: sessizce atılan kayıt "yoktu" sanılır. */
+  atlananOnay?: number;
   atlanmaSebebi?: string;
 };
 
@@ -135,6 +137,10 @@ export async function adresIndeksle(
     okunanSayfa: sayfa,
     tamamlandi,
     sonTarih: enSonTs?.toISOString() ?? null,
+    atlananOnay:
+      "atlananOnaySayisi" in adaptor
+        ? (adaptor as { atlananOnaySayisi: number }).atlananOnaySayisi
+        : undefined,
   };
 }
 

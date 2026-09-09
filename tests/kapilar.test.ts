@@ -68,3 +68,16 @@ describe("şifre ölçütü", () => {
     expect(sifreOlcutu("bosluklu-sifre ")).not.toBeNull();
   });
 });
+
+describe("kuyruk adlandırması", () => {
+  it("kuyruk adı ve iş kimliği ':' TAŞIMAZ", async () => {
+    // BullMQ ikisini de reddediyor ("cannot contain :") ve hata ancak iş
+    // kuyruğa atılırken çıkıyor — yani çalışma anında, kullanıcının önünde.
+    const { KUYRUK, indeksIsAnahtari, takipIsAnahtari } = await import(
+      "../packages/kuyruk/src/index.js"
+    );
+    for (const ad of Object.values(KUYRUK)) expect(ad).not.toContain(":");
+    expect(indeksIsAnahtari("tron", "TR7NHq")).not.toContain(":");
+    expect(takipIsAnahtari("42")).not.toContain(":");
+  });
+});

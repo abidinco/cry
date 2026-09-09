@@ -37,9 +37,20 @@ export type FiyatIsi = {
 };
 
 /**
+ * İŞ KİMLİĞİNDE DE ":" YASAK — kuyruk adındaki kuralın aynısı, ve BullMQ bunu
+ * "Custom Ids cannot contain :" diye reddediyor. Ayraç bu yüzden "-": ne
+ * zincir adı ne adres bu karakteri taşıyor.
+ */
+const AYRAC = "-";
+
+/**
  * Bir adres için iş anahtarı. Aynı adres için kuyrukta bekleyen ikinci bir iş
  * açılmaz: kullanıcı düğmeye üç kez basınca üç tur tarama yapılmamalı.
  */
 export function indeksIsAnahtari(chain: string, address: string): string {
-  return `indeks:${chain}:${address}`;
+  return ["indeks", chain, address].join(AYRAC);
+}
+
+export function takipIsAnahtari(traceRunId: string): string {
+  return ["takip", traceRunId].join(AYRAC);
 }

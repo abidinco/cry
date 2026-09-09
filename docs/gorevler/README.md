@@ -10,7 +10,7 @@ Her dosya **tek oturumda bitecek** büyüklükte, kendi bitiş ölçütünü ta�
 | 04 | Adres görünümü + indeks işini kuyruğa atma (uçtan uca ilk TRON sorgusu) | ✅ bitti (2026-09-09) |
 | 4b | [Arayüz: tasarım dili](../arayuz.md) | ✅ bitti (2026-09-09) |
 | 05 | Yoklama katmanının uç noktası + `probe_cache` | ✅ bitti (2026-09-09) |
-| 06 | Takip motoru: FIFO, durma sezgiselleri, terminal düğüm | ⏳ |
+| 06 | Takip motoru: FIFO, durma sezgiselleri, terminal düğüm | ✅ bitti (2026-09-09) |
 | 07 | Graf görünümü (Cytoscape.js) | ⏳ |
 | 08 | Deposit sezgiseli + aktivasyon kümelemesi | ⏳ |
 | 09 | Fiyat/kur (TCMB) + rapor + PDF + SHA-256 | ⏳ |

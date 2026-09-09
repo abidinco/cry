@@ -6,9 +6,19 @@
  */
 import { Queue } from "bullmq";
 import IORedis from "ioredis";
-import { KUYRUK, KUYRUK_ONEKI, indeksIsAnahtari, type IndeksIsi } from "@cry/kuyruk";
+import {
+  KUYRUK,
+  KUYRUK_ONEKI,
+  indeksIsAnahtari,
+  takipIsAnahtari,
+  type IndeksIsi,
+  type TakipIsi,
+} from "@cry/kuyruk";
 
-const kure = globalThis as unknown as { __cryKuyruk?: Queue<IndeksIsi> };
+const kure = globalThis as unknown as {
+  __cryKuyruk?: Queue<IndeksIsi>;
+  __cryTakip?: Queue<TakipIsi>;
+};
 
 function baglanti() {
   return new IORedis(process.env.REDIS_URL ?? "redis://redis:6379", {
@@ -67,4 +77,24 @@ export async function isDurumu(chain: string, address: string): Promise<IsDurumu
   if (durum === "failed") return "hata";
   if (durum === "active") return "calisiyor";
   return "bekliyor";
+}
+
+export function takipKuyrugu(): Queue<TakipIsi> {
+  kure.__cryTakip ??= new Queue<TakipIsi>(KUYRUK.takip, {
+    connection: baglanti(),
+    prefix: KUYRUK_ONEKI,
+    defaultJobOptions: {
+      // Takip koşusu YENİDEN DENENMEZ: yarım kalan bir koşunun düğümleri
+      // yazılmış oluyor ve ikinci deneme onların üstüne farklı bir grafla
+      // gelir. Hata kayda geçer, kullanıcı yeniden başlatır.
+      attempts: 1,
+      removeOnComplete: { age: 86_400, count: 100 },
+      removeOnFail: { age: 7 * 86_400 },
+    },
+  });
+  return kure.__cryTakip;
+}
+
+export async function takipIstegi(traceRunId: string): Promise<void> {
+  await takipKuyrugu().add(KUYRUK.takip, { traceRunId }, { jobId: takipIsAnahtari(traceRunId) });
 }

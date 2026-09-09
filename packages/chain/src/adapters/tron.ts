@@ -74,11 +74,21 @@ export class TronAdapter implements ChainAdapter {
    * hareket ikinci kez yazılıyordu (ölçüldü). Tur başında sıfırlanır.
    */
   private txSayaci = new Map<string, number>();
+  /**
+   * Atlanan onay sayısı. Sessizce atılan kayıt "yoktu" sanılır; tur bunu
+   * raporlayabilsin diye sayılıyor.
+   */
+  private atlananOnay = 0;
 
   constructor(opts: TronAdapterOptions = {}) {
     this.baseUrl = (opts.baseUrl ?? TRONGRID).replace(/\/$/, "");
     this.kapi = RateGate.perSecond(opts.requestsPerSecond ?? (opts.apiKey ? 10 : 2));
     this.basliklar = opts.apiKey ? { "TRON-PRO-API-KEY": opts.apiKey } : {};
+  }
+
+  /** Bu turda kaç onay kaydı transfer sayılmadı. */
+  get atlananOnaySayisi(): number {
+    return this.atlananOnay;
   }
 
   normalizeAddress(input: string): string {
@@ -160,7 +170,10 @@ export class TronAdapter implements ChainAdapter {
     const turler = opts.kinds;
 
     // İmleç yoksa bu turun İLK sayfasıdır; sayaç oradan başlar.
-    if (!opts.cursor) this.txSayaci.clear();
+    if (!opts.cursor) {
+      this.txSayaci.clear();
+      this.atlananOnay = 0;
+    }
 
     const nativeIstensin = !turler || turler.includes("native") || turler.includes("internal");
     const tokenIstensin = !turler || turler.includes("token");
@@ -221,14 +234,23 @@ export class TronAdapter implements ChainAdapter {
     // Aynı işlemde BİREBİR AYNI transferin birden çok kez bulunması gerçek
     // bir durumdur (ölçüldü: bir tx'te 20 özdeş Transfer olayı), o yüzden
     // içerik tek başına anahtar olamaz — sıra numarası şart.
+    // ONAY (Approval) BİR PARA HAREKETİ DEĞİLDİR: harcama izni verir, değer
+    // taşımaz. TRC20 ucu ikisini aynı listede döndürüyor (ölçüldü: 200
+    // kaydın 27'si onay) ve "sonsuz onay" 2^256-1 tutarıyla geliyor. Transfer
+    // sayılsalardı graf hayalet kenarlarla ve absürt tutarlarla dolardı.
+    const onaylar = kayitlar.filter((k: any) => k.type && k.type !== "Transfer").length;
+    if (onaylar > 0) this.atlananOnay += onaylar;
+
     const items: Transfer[] =
       tur === "token"
-        ? kayitlar.map((k: any) => {
-            const tx = String(k.transaction_id);
-            const sira = this.txSayaci.get(tx) ?? 0;
-            this.txSayaci.set(tx, sira + 1);
-            return this.trc20Cevir(k, sira);
-          })
+        ? kayitlar
+            .filter((k: any) => !k.type || k.type === "Transfer")
+            .map((k: any) => {
+              const tx = String(k.transaction_id);
+              const sira = this.txSayaci.get(tx) ?? 0;
+              this.txSayaci.set(tx, sira + 1);
+              return this.trc20Cevir(k, sira);
+            })
         : kayitlar.flatMap((k: any) => this.nativeCevir(k));
 
     // Fingerprint sayfa dolduğu sürece anlamlı; kayıt bittiyse akış da bitti.
