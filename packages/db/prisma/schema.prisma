@@ -27,7 +27,7 @@ model Role {
   name        String
   // İleride yeni rol tanımlanabilsin diye yetkiler veri; koda gömülmüyor.
   permissions Json     @default("[]")
-  createdAt   DateTime @default(now())
+  createdAt   DateTime @default(now()) @map("created_at")
   users       User[]
 
   @@map("roles")
@@ -36,15 +36,15 @@ model Role {
 model User {
   id                 Int       @id @default(autoincrement())
   username           String    @unique
-  passwordHash       String
-  displayName        String?
-  roleId             Int
+  passwordHash       String    @map("password_hash")
+  displayName        String?   @map("display_name")
+  roleId             Int       @map("role_id")
   role               Role      @relation(fields: [roleId], references: [id])
   // Seed ile üretilen ilk şifre kullanılmaya devam edemez.
-  mustChangePassword Boolean   @default(true)
+  mustChangePassword Boolean   @default(true) @map("must_change_password")
   active             Boolean   @default(true)
-  createdAt          DateTime  @default(now())
-  lastLoginAt        DateTime?
+  createdAt          DateTime  @default(now()) @map("created_at")
+  lastLoginAt        DateTime? @map("last_login_at")
 
   cases     Case[]
   labels    Label[]    @relation("LabelCreator")
@@ -57,13 +57,13 @@ model User {
 /// Kim, ne zaman, hangi adresi sorguladı. Admin'e görünür.
 model AuditLog {
   id        BigInt   @id @default(autoincrement())
-  userId    Int?
+  userId    Int?     @map("user_id")
   user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   action    String // search|trace|report|label.create|login
   target    String?
   meta      Json     @default("{}")
   ip        String?
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @map("created_at")
 
   @@index([userId, createdAt])
   @@index([action, createdAt])
@@ -101,23 +101,23 @@ model Address {
   /// Kanonik yazım: TRON base58, EVM küçük harf. Aynı cüzdan iki satır olmaz.
   address String
 
-  firstSeen  DateTime?
-  lastSeen   DateTime?
-  balanceRaw String?
-  isContract Boolean?  @default(false)
+  firstSeen  DateTime? @map("first_seen")
+  lastSeen   DateTime? @map("last_seen")
+  balanceRaw String?   @map("balance_raw")
+  isContract Boolean?  @default(false) @map("is_contract")
 
   /// Artımlı indeksin belleği: bir daha bu noktadan önceye sorulmaz.
-  indexedThroughBlock Int?
-  indexedThroughTs    DateTime?
-  indexCursor         String?
-  lastIndexedAt       DateTime?
+  indexedThroughBlock Int?      @map("indexed_through_block")
+  indexedThroughTs    DateTime? @map("indexed_through_ts")
+  indexCursor         String?   @map("index_cursor")
+  lastIndexedAt       DateTime? @map("last_indexed_at")
   /// "boş" ile "bakılmadı" ayrı sorulardır.
-  indexState          String    @default("bilinmiyor") // bilinmiyor|kismi|tam
+  indexState          String    @default("bilinmiyor") @map("index_state") // bilinmiyor|kismi|tam
 
   /// TRON: bu hesabı kim aktive etti (aynı kişi kümelemesinin dayanağı).
-  activatedByAddress String?
-  activatedAt        DateTime?
-  activationTxHash   String?
+  activatedByAddress String?   @map("activated_by_address")
+  activatedAt        DateTime? @map("activated_at")
+  activationTxHash   String?   @map("activation_tx_hash")
 
   labels       Label[]
   watches      Watch[]
@@ -133,27 +133,27 @@ model Address {
 model Transfer {
   id          BigInt   @id @default(autoincrement())
   chain       String
-  txHash      String
+  txHash      String   @map("tx_hash")
   /// Aynı tx içindeki sıra — bir tx birden çok hareket taşıyabilir.
   index       Int
-  blockNumber Int?
+  blockNumber Int?     @map("block_number")
   ts          DateTime
 
-  fromAddressId BigInt?
+  fromAddressId BigInt?  @map("from_address_id")
   fromAddress   Address? @relation("TransferFrom", fields: [fromAddressId], references: [id])
-  toAddressId   BigInt?
+  toAddressId   BigInt?  @map("to_address_id")
   toAddress     Address? @relation("TransferTo", fields: [toAddressId], references: [id])
 
-  assetId   Int
+  assetId   Int     @map("asset_id")
   asset     Asset   @relation(fields: [assetId], references: [id])
   /// Ham tam sayı. Numeric değil String: 2^63 üstü token tutarları var.
-  amountRaw String
+  amountRaw String  @map("amount_raw")
   kind      String // native|token|internal|utxo
   success   Boolean @default(true)
-  feeRaw    String?
+  feeRaw    String? @map("fee_raw")
   raw       Json?
 
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @map("created_at")
 
   @@unique([chain, txHash, index])
   @@index([fromAddressId, ts])
@@ -168,7 +168,7 @@ model ProbeCache {
   input    String   @unique
   kind     String // address|tx
   result   Json
-  probedAt DateTime @default(now())
+  probedAt DateTime @default(now()) @map("probed_at")
 
   @@map("probe_cache")
 }
@@ -180,7 +180,7 @@ model ProbeCache {
 model Label {
   id        Int     @id @default(autoincrement())
   chain     String
-  addressId BigInt
+  addressId BigInt  @map("address_id")
   address   Address @relation(fields: [addressId], references: [id], onDelete: Cascade)
 
   title       String
@@ -191,22 +191,22 @@ model Label {
 
   /// Etiket NEREDEN geldi: tronscan|ofac|acik_kaynak|kesif|kullanici
   source     String
-  sourceUrl  String?
+  sourceUrl  String?   @map("source_url")
   /// 0..1. Keşif motorunun ürettiği etikette hesaplanmış değer durur.
   confidence Float     @default(0)
   /// Doğrulanmamış etiket rapora "doğrulanmamış" ibaresiyle girer.
-  verifiedAt DateTime?
-  verifiedBy String?
+  verifiedAt DateTime? @map("verified_at")
+  verifiedBy String?   @map("verified_by")
 
   visibility   String    @default("private") // private|public
   /// Public etiket admin onayı ister; başlangıçta hepsi onaydan geçer.
-  approvedAt   DateTime?
-  approvedById Int?
+  approvedAt   DateTime? @map("approved_at")
+  approvedById Int?      @map("approved_by_id")
   approvedBy   User?     @relation("LabelApprover", fields: [approvedById], references: [id])
 
-  createdById Int?
+  createdById Int?     @map("created_by_id")
   createdBy   User?    @relation("LabelCreator", fields: [createdById], references: [id])
-  createdAt   DateTime @default(now())
+  createdAt   DateTime @default(now()) @map("created_at")
   evidence    Json     @default("{}")
 
   @@index([addressId])
@@ -218,16 +218,16 @@ model Label {
 model DepositCandidate {
   id               BigInt    @id @default(autoincrement())
   chain            String
-  depositAddress   String
-  hotWalletAddress String
+  depositAddress   String    @map("deposit_address")
+  hotWalletAddress String    @map("hot_wallet_address")
   exchange         String?
   /// Kaç süpürme, toplam tutar, ilk/son tarih — kanıt burada.
   evidence         Json      @default("{}")
   confidence       Float     @default(0)
   status           String    @default("aday") // aday|onaylandi|reddedildi
-  reviewedById     Int?
-  reviewedAt       DateTime?
-  detectedAt       DateTime  @default(now())
+  reviewedById     Int?      @map("reviewed_by_id")
+  reviewedAt       DateTime? @map("reviewed_at")
+  detectedAt       DateTime  @default(now()) @map("detected_at")
 
   @@unique([chain, depositAddress, hotWalletAddress])
   @@index([exchange, status])
@@ -243,13 +243,13 @@ model Case {
   slug        String    @unique
   title       String
   description String?
-  ownerId     Int
+  ownerId     Int       @map("owner_id")
   owner       User      @relation(fields: [ownerId], references: [id])
   /// Varsayılan private; public yapmak admin onayı ister.
   visibility  String    @default("private")
-  approvedAt  DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  approvedAt  DateTime? @map("approved_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
   notes     CaseNote[]
   queries   CaseQuery[]
@@ -262,11 +262,11 @@ model Case {
 
 model CaseNote {
   id        Int      @id @default(autoincrement())
-  caseId    Int
+  caseId    Int      @map("case_id")
   case      Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
   body      String
-  authorId  Int?
-  createdAt DateTime @default(now())
+  authorId  Int?     @map("author_id")
+  createdAt DateTime @default(now()) @map("created_at")
 
   @@index([caseId, createdAt])
   @@map("case_notes")
@@ -275,14 +275,14 @@ model CaseNote {
 /// Vaka içi arama geçmişi — ileri/geri gezinme çubuğunu bu besler.
 model CaseQuery {
   id        BigInt   @id @default(autoincrement())
-  caseId    Int
+  caseId    Int      @map("case_id")
   case      Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  rawInput  String
+  rawInput  String   @map("raw_input")
   /// detectNetwork() çıktısı — "neden TRON dedin" cevabı burada durur.
   detection Json
   chain     String?
   resolved  String?
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @map("created_at")
 
   @@index([caseId, createdAt])
   @@map("case_queries")
@@ -294,21 +294,21 @@ model CaseQuery {
 
 model TraceRun {
   id     BigInt @id @default(autoincrement())
-  caseId Int
+  caseId Int    @map("case_id")
   case   Case   @relation(fields: [caseId], references: [id], onDelete: Cascade)
 
   chain       String
-  rootAddress String
+  rootAddress String @map("root_address")
   direction   String @default("ileri") // ileri|geri
   /// Seçilen kural rapora METODOLOJİ olarak yazılır.
-  taintRule   String // fifo|orantisal|zaman_pencereli
+  taintRule   String @map("taint_rule") // fifo|orantisal|zaman_pencereli
   params      Json   @default("{}") // hop bütçesi, min tutar, dallanma eşiği…
 
   status     String    @default("kuyrukta") // kuyrukta|calisiyor|bitti|durduruldu|hata
-  startedAt  DateTime  @default(now())
-  finishedAt DateTime?
+  startedAt  DateTime  @default(now()) @map("started_at")
+  finishedAt DateTime? @map("finished_at")
   /// Neden durdu: butce|dallanma|esik|terminal|dugum_siniri
-  stopReason String?
+  stopReason String?   @map("stop_reason")
   stats      Json      @default("{}")
 
   nodes   TraceNode[]
@@ -321,19 +321,19 @@ model TraceRun {
 
 model TraceNode {
   id         BigInt   @id @default(autoincrement())
-  traceRunId BigInt
+  traceRunId BigInt   @map("trace_run_id")
   traceRun   TraceRun @relation(fields: [traceRunId], references: [id], onDelete: Cascade)
 
   chain          String
   address        String
   hop            Int
   /// Bu düğüme atfedilen pay (0..1) — seçilen taint kuralının çıktısı.
-  taintShare     Float   @default(0)
-  amountRaw      String?
-  isTerminal     Boolean @default(false)
-  terminalReason String?
+  taintShare     Float   @default(0) @map("taint_share")
+  amountRaw      String? @map("amount_raw")
+  isTerminal     Boolean @default(false) @map("is_terminal")
+  terminalReason String? @map("terminal_reason")
   /// Düğüm anındaki etiket görüntüsü — rapor donduğunda değişmemeli.
-  labelSnapshot  Json    @default("{}")
+  labelSnapshot  Json    @default("{}") @map("label_snapshot")
 
   @@unique([traceRunId, chain, address])
   @@index([traceRunId, hop])
@@ -342,21 +342,21 @@ model TraceNode {
 
 model TraceEdge {
   id         BigInt   @id @default(autoincrement())
-  traceRunId BigInt
+  traceRunId BigInt   @map("trace_run_id")
   traceRun   TraceRun @relation(fields: [traceRunId], references: [id], onDelete: Cascade)
 
   chain         String
-  txHash        String
-  txIndex       Int
-  fromAddress   String
-  toAddress     String
-  assetSymbol   String
-  assetContract String?
+  txHash        String   @map("tx_hash")
+  txIndex       Int      @map("tx_index")
+  fromAddress   String   @map("from_address")
+  toAddress     String   @map("to_address")
+  assetSymbol   String   @map("asset_symbol")
+  assetContract String?  @map("asset_contract")
   decimals      Int
-  amountRaw     String
+  amountRaw     String   @map("amount_raw")
   ts            DateTime
   hop           Int
-  taintShare    Float    @default(0)
+  taintShare    Float    @default(0) @map("taint_share")
 
   @@index([traceRunId, hop])
   @@index([traceRunId, ts])
@@ -366,9 +366,9 @@ model TraceEdge {
 /// Kanıt bütünlüğü: rapor alındığında graf DONDURULUR ve saklanır.
 model Report {
   id         BigInt    @id @default(autoincrement())
-  caseId     Int
+  caseId     Int       @map("case_id")
   case       Case      @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  traceRunId BigInt?
+  traceRunId BigInt?   @map("trace_run_id")
   traceRun   TraceRun? @relation(fields: [traceRunId], references: [id])
 
   title    String
@@ -378,8 +378,8 @@ model Report {
   /// PDF'e basılan SHA-256 özeti.
   sha256   String
 
-  createdById Int?
-  createdAt   DateTime @default(now())
+  createdById Int?     @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
 
   @@index([caseId, createdAt])
   @@map("reports")
@@ -392,14 +392,14 @@ model Report {
 /// Günlük kapanış yeterli; saniye hassasiyeti ücretli ve gerekmiyor.
 model PriceDaily {
   id        BigInt   @id @default(autoincrement())
-  assetId   Int
+  assetId   Int      @map("asset_id")
   asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
   date      DateTime @db.Date
   usd       Decimal  @db.Decimal(38, 12)
   source    String
   /// Kullanıcı elle girdiyse rapor bunu ayırt etmeli.
   manual    Boolean  @default(false)
-  fetchedAt DateTime @default(now())
+  fetchedAt DateTime @default(now()) @map("fetched_at")
 
   @@unique([assetId, date])
   @@map("prices_daily")
@@ -408,9 +408,9 @@ model PriceDaily {
 /// USD/TRY — TCMB'nin ücretsiz XML servisi; resmi kur raporda daha sağlam.
 model FxRateDaily {
   date      DateTime @id @db.Date
-  usdTry    Decimal  @db.Decimal(18, 6)
+  usdTry    Decimal  @map("usd_try") @db.Decimal(18, 6)
   source    String   @default("tcmb")
-  fetchedAt DateTime @default(now())
+  fetchedAt DateTime @default(now()) @map("fetched_at")
 
   @@map("fx_rates_daily")
 }
@@ -424,18 +424,18 @@ model FxRateDaily {
 model Watch {
   id        Int     @id @default(autoincrement())
   chain     String
-  addressId BigInt
+  addressId BigInt  @map("address_id")
   address   Address @relation(fields: [addressId], references: [id], onDelete: Cascade)
-  caseId    Int?
+  caseId    Int?    @map("case_id")
   case      Case?   @relation(fields: [caseId], references: [id], onDelete: SetNull)
 
   label          String?
   active         Boolean   @default(true)
   /// Servisin en son gördüğü işlem — aynı hareket iki kez bildirilmesin.
-  lastSeenTxHash String?
-  lastCheckedAt  DateTime?
-  createdById    Int?
-  createdAt      DateTime  @default(now())
+  lastSeenTxHash String?   @map("last_seen_tx_hash")
+  lastCheckedAt  DateTime? @map("last_checked_at")
+  createdById    Int?      @map("created_by_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
 
   alerts Alert[]
 
@@ -445,17 +445,17 @@ model Watch {
 
 model Alert {
   id      BigInt @id @default(autoincrement())
-  watchId Int
+  watchId Int    @map("watch_id")
   watch   Watch  @relation(fields: [watchId], references: [id], onDelete: Cascade)
 
-  txHash      String
+  txHash      String    @map("tx_hash")
   ts          DateTime
-  amountRaw   String?
-  assetSymbol String?
+  amountRaw   String?   @map("amount_raw")
+  assetSymbol String?   @map("asset_symbol")
   direction   String? // gelen|giden
-  sentAt      DateTime?
+  sentAt      DateTime? @map("sent_at")
   channel     String    @default("telegram")
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime  @default(now()) @map("created_at")
 
   @@unique([watchId, txHash])
   @@index([watchId, createdAt])
