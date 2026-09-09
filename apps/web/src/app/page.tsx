@@ -8,12 +8,8 @@ export default async function AnaSayfa() {
   if (!oturum) redirect("/giris");
 
   return (
-    <main className="kutu">
+    <main className="sayfa">
       <UstBar username={oturum.username} admin={adminMi(oturum)} />
-      <p className="soluk">
-        Cüzdan adresi, işlem hash&apos;i ya da explorer bağlantısı yapıştır. Hangi ağ olduğu
-        formattan çözülür; çözülemeyen durumlar yoklanır.
-      </p>
       <AramaKutusu />
     </main>
   );

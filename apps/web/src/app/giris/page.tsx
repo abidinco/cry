@@ -20,7 +20,7 @@ export default function GirisSayfasi() {
     setBekliyor(false);
     if (!yanit.ok) {
       const govde = (await yanit.json().catch(() => ({}))) as { error?: string };
-      setHata(govde.error ?? "giriş başarısız");
+      setHata(govde.error ?? "Giriş yapılamadı");
       return;
     }
     const hedef = new URLSearchParams(window.location.search).get("callbackUrl") ?? "/";
@@ -29,22 +29,38 @@ export default function GirisSayfasi() {
   }
 
   return (
-    <main className="kutu" style={{ maxWidth: 380 }}>
-      <h1 style={{ fontSize: 22 }}>cry</h1>
-      <form className="panel" onSubmit={gonder} style={{ display: "grid", gap: 10 }}>
-        <label>
-          <div className="soluk">Kullanıcı adı</div>
-          <input value={username} onChange={(e) => setUsername(e.target.value)} autoFocus style={{ width: "100%" }} />
+    <main
+      className="sayfa"
+      style={{ maxWidth: 360, display: "grid", alignContent: "center", minHeight: "100dvh" }}
+    >
+      <div style={{ marginBottom: 26 }}>
+        <div className="marka" style={{ fontSize: 22 }}>cry</div>
+        <div className="etiket">kripto akış analizi</div>
+      </div>
+
+      <form onSubmit={gonder} className="kayit satirlar" data-koken="kaynak">
+        <label className="satirlar" style={{ gap: 5 }}>
+          <span className="etiket">kullanıcı adı</span>
+          <input value={username} onChange={(e) => setUsername(e.target.value)} autoFocus />
         </label>
-        <label>
-          <div className="soluk">Şifre</div>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: "100%" }} />
+        <label className="satirlar" style={{ gap: 5 }}>
+          <span className="etiket">şifre</span>
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
         </label>
-        {hata && <div style={{ color: "var(--hata)" }}>{hata}</div>}
-        <button disabled={bekliyor}>{bekliyor ? "…" : "Giriş"}</button>
+        {hata && (
+          <div className="veri" style={{ color: "var(--hata)" }}>
+            {hata}
+          </div>
+        )}
+        <div style={{ marginTop: 4 }}>
+          <button className="birincil" disabled={bekliyor} style={{ padding: "7px 22px" }}>
+            {bekliyor ? "…" : "gir"}
+          </button>
+        </div>
       </form>
-      <p className="soluk" style={{ fontSize: 13 }}>
-        Kayıt yok; kullanıcıları yönetici açar.
+
+      <p className="etiket" style={{ marginTop: 22 }}>
+        kayıt yok · kullanıcıları yönetici açar
       </p>
     </main>
   );

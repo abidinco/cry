@@ -1,56 +1,307 @@
+/*
+ * cry — tasarım jetonları.
+ *
+ * Yön: "kayıt defteri". Yoğun, sakin, bilgi önce. Süs yok; ekranda yer kaplayan
+ * her şey bir olguyu anlatır.
+ *
+ * RENK KANALLARI ayrıdır ve karışmaz:
+ *   yön    (para gelen/giden)  -> yesil / kehribar
+ *   uyarı  (bir şey yanlış)    -> kirmizi
+ *   köken  (bilgi nereden)     -> sol oluktaki işaret
+ *   vurgu  (bağlantı, odak)    -> indigo — hiçbir veri sınıfı bu rengi kullanmaz
+ */
+
 :root {
-  color-scheme: light dark;
-  --zemin: #0f1115;
-  --panel: #171a21;
-  --metin: #e6e8ec;
-  --metin-soluk: #99a0ad;
-  --cizgi: #262b35;
-  --vurgu: #6ea8fe;
-  --uyari: #e0a33e;
-  --hata: #e0603e;
-  --tamam: #4fb286;
+  /* yüzeyler: soğuk arşiv grisi, hafif mavi çalan */
+  --zemin: #0f1216;
+  --yuzey: #161a20;
+  --yuzey-2: #1c222a;
+  --cizgi: #262d37;
+  --cizgi-2: #1e242d;
+
+  /* metin kademeleri */
+  --m1: #e4e8ee;
+  --m2: #98a2b3;
+  --m3: #6b7482;
+
+  /* vurgu: yalnızca bağlantı, odak ve birincil eylem */
+  --vurgu: #6c79e0;
+  --vurgu-2: #8e98ea;
+
+  /* yön ve durum */
+  --gelen: #3fa37a;
+  --giden: #d98a3d;
+  --hata: #d9584f;
+  --dikkat: #e0b341;
+
+  /* köken işaretleri — sol oluk */
+  --kok-kaynak: #6c79e0; /* kaynağın kendi beyanı */
+  --kok-indeks: #5a6b87; /* bizim kayıtlarımızdan türetildi */
+  --kok-supheli: #e0b341; /* doğrulanmamış */
+  --kok-yok: #333b46; /* bilinmiyor */
+
+  --olcu: 4px;
+  --kose: 3px;
 }
 
 * { box-sizing: border-box; }
 
+html { color-scheme: dark; }
+
 body {
   margin: 0;
   background: var(--zemin);
-  color: var(--metin);
-  font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--m1);
+  font-family: var(--yazi-govde), ui-sans-serif, system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
-a { color: var(--vurgu); }
+h1, h2, h3 {
+  font-family: var(--yazi-baslik), var(--yazi-govde), sans-serif;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
 
-.kutu {
-  max-width: 900px;
+h1 { font-size: 17px; }
+h2 { font-size: 13px; }
+
+a {
+  color: var(--vurgu);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+a:hover { border-bottom-color: color-mix(in srgb, var(--vurgu) 45%, transparent); }
+
+:focus-visible {
+  outline: 2px solid var(--vurgu);
+  outline-offset: 2px;
+}
+
+/* --- veri --- */
+
+.veri {
+  font-family: var(--yazi-veri), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+
+/* Etiket: küçük, seyrek, büyük harf. Bir DEĞERİ değil, adını taşır. */
+.etiket {
+  font-family: var(--yazi-veri), monospace;
+  font-size: 10px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--m3);
+}
+
+.m2 { color: var(--m2); }
+.m3 { color: var(--m3); }
+
+/* --- düzen --- */
+
+.sayfa {
+  max-width: 1120px;
   margin: 0 auto;
-  padding: 40px 20px;
+  padding: 0 20px 60px;
 }
+
+/*
+ * KÖKEN OLUĞU — bu arayüzün imzası.
+ *
+ * Her kayıt bloğunun solunda ince bir işaret durur ve o bloktaki bilginin
+ * NEREDEN geldiğini söyler. Projenin en derin kuralı bu ("her etiket kaynağını
+ * ve güvenini taşır"); ekranda da bir kanal olarak yaşaması gerekiyor, yoksa
+ * kaynak yalnızca veritabanında kalır ve okuyan onu hiç sormaz.
+ */
+.kayit {
+  position: relative;
+  padding-left: 16px;
+  margin-bottom: 22px;
+}
+
+.kayit::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 3px;
+  bottom: 3px;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--kok-yok);
+}
+
+.kayit[data-koken="kaynak"]::before { background: var(--kok-kaynak); }
+.kayit[data-koken="indeks"]::before { background: var(--kok-indeks); }
+.kayit[data-koken="supheli"]::before { background: var(--kok-supheli); }
 
 .panel {
-  background: var(--panel);
-  border: 1px solid var(--cizgi);
-  border-radius: 10px;
-  padding: 20px;
+  background: var(--yuzey);
+  border: 1px solid var(--cizgi-2);
+  border-radius: var(--kose);
+  padding: 14px 16px;
 }
 
-input, button {
+/* --- alan/değer satırları --- */
+
+.satirlar { display: grid; gap: 9px; }
+
+.satir {
+  display: grid;
+  grid-template-columns: 132px 1fr;
+  gap: 12px;
+  align-items: baseline;
+}
+
+/* Kökenini söyleyen küçük not; değerin peşine takılır, ayrı satır açmaz. */
+.koken-notu {
+  font-family: var(--yazi-veri), monospace;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--m3);
+  margin-left: 8px;
+  white-space: nowrap;
+}
+.koken-notu[data-koken="supheli"] { color: var(--dikkat); }
+
+/* --- tablo --- */
+
+/*
+ * Dar ekranda sütun GİZLENMEZ, tablo yatay kayar: bir adli listede hangi
+ * sütunun gereksiz olduğuna ekran genişliği karar veremez.
+ */
+.tablo-sar {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tablo {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tablo-sar .tablo { min-width: 620px; }
+
+.tablo th {
+  text-align: left;
+  white-space: nowrap;
+  font-family: var(--yazi-veri), monospace;
+  font-size: 10px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--m3);
+  font-weight: 500;
+  padding: 0 10px 7px 0;
+  border-bottom: 1px solid var(--cizgi);
+}
+
+.tablo td {
+  padding: 6px 14px 6px 0;
+  border-bottom: 1px solid var(--cizgi-2);
+  vertical-align: baseline;
+}
+
+.tablo tbody tr:hover { background: var(--yuzey); }
+.tablo .sag { text-align: right; }
+/* 2^256-1 gibi uç değerler gerçekten görülüyor: kırpmadan sarsın. */
+.tablo .tutar-hucre { word-break: break-all; }
+
+/* Tutarın küsuratı sönük: büyüklük tek bakışta okunsun (defter geleneği). */
+.kusurat { color: var(--m3); }
+
+/* --- denetimler --- */
+
+button, .dugme {
   font: inherit;
-  border-radius: 8px;
+  font-family: var(--yazi-veri), monospace;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--m1);
+  background: var(--yuzey-2);
   border: 1px solid var(--cizgi);
-  padding: 10px 12px;
-  background: #10131a;
-  color: var(--metin);
+  border-radius: var(--kose);
+  padding: 6px 12px;
+  cursor: pointer;
 }
 
-button {
+button:hover:not(:disabled) { border-color: var(--m3); background: #222933; }
+button:disabled { opacity: 0.45; cursor: default; }
+
+button.birincil {
   background: var(--vurgu);
-  color: #0b0d12;
-  border: 0;
-  cursor: pointer;
+  border-color: var(--vurgu);
+  color: #0d1016;
   font-weight: 600;
 }
+button.birincil:hover:not(:disabled) { background: var(--vurgu-2); border-color: var(--vurgu-2); }
 
-.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
-.soluk { color: var(--metin-soluk); }
+input, select {
+  font: inherit;
+  font-family: var(--yazi-veri), monospace;
+  font-size: 12px;
+  color: var(--m1);
+  background: #0c0f13;
+  border: 1px solid var(--cizgi);
+  border-radius: var(--kose);
+  padding: 8px 10px;
+}
+input::placeholder { color: var(--m3); }
+input:focus, select:focus { border-color: var(--vurgu); }
+
+/* --- rozet --- */
+
+.rozet {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--yazi-veri), monospace;
+  font-size: 11px;
+  padding: 2px 8px;
+  border: 1px solid var(--cizgi);
+  border-radius: 2px;
+  color: var(--m2);
+}
+.rozet[data-ton="gelen"] { color: var(--gelen); border-color: color-mix(in srgb, var(--gelen) 35%, var(--cizgi)); }
+.rozet[data-ton="giden"] { color: var(--giden); border-color: color-mix(in srgb, var(--giden) 35%, var(--cizgi)); }
+.rozet[data-ton="hata"] { color: var(--hata); border-color: color-mix(in srgb, var(--hata) 35%, var(--cizgi)); }
+.rozet[data-ton="dikkat"] { color: var(--dikkat); border-color: color-mix(in srgb, var(--dikkat) 35%, var(--cizgi)); }
+
+/* --- üst şerit --- */
+
+.ust {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 44px;
+  border-bottom: 1px solid var(--cizgi);
+  margin-bottom: 22px;
+}
+
+.ust .marka {
+  font-family: var(--yazi-baslik), sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  color: var(--m1);
+  border: 0;
+}
+
+/* --- boş durum: davet, mazeret değil --- */
+
+.bos {
+  border: 1px dashed var(--cizgi);
+  border-radius: var(--kose);
+  padding: 18px;
+  color: var(--m2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+@media (max-width: 640px) {
+  .satir { grid-template-columns: 1fr; gap: 2px; }
+  .sayfa { padding: 0 14px 40px; }
+}

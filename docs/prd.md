@@ -148,14 +148,32 @@ Hepsi oturum ister; istisnalar ayrıca belirtildi.
   SEÇİLİR ve raporda metodoloji olarak yazılır.
 - Kendi arşiv düğümünü çalıştırmak (TRON 2,5-3,5 TB).
 
-## 6. Kararı bekleyen maddeler
+## 6. Verilmiş kararlar
 
-Bunlar bilinçli olarak boş; **kullanıcı kararı bekliyor** ve varsayılan
-uydurulmadı:
+Bunlar 2026-09-09'da karara bağlandı; gerekçeleriyle birlikte burada duruyor
+ki bir sonraki tur aynı tartışmayı yeniden açmasın.
 
-1. Varsayılan atıf kuralı hangisi olacak?
-2. Varsayılan hop sayısı ve düğüm/dallanma eşikleri?
-3. Graf kütüphanesi: React Flow mu, Cytoscape.js mi?
-4. BigQuery modülü Faz 1'e mi girecek, Faz 2'ye mi?
+**Varsayılan atıf kuralı: FIFO.** Adli muhasebede yerleşik ve raporda
+savunması kolay ("ilk giren ilk çıkar"), deterministik, ve tek bir okunur
+zincir üretir. Orantısal kural izi binlerce kesire dağıtıp grafı okunmaz
+yapıyor; o karşılaştırma için duruyor. Üç kural da uygulanacak, kullanıcı
+seçebilecek, seçilen kural rapora metodoloji olarak yazılacak.
 
-Karar verilince buradan silinir ve kural asıl yerine yazılır.
+**Varsayılan eşikler: 5 hop · 300 düğüm · dallanma 50 · tutar eşiği KAPALI.**
+Tipik zincir borsaya varmadan 3-5 sıçrama yapıyor; 300 düğüm ekranda hâlâ
+okunur; çıkışı 50'yi aşan düğüm zaten borsa ya da mikserdir, orada durup
+işaretlemek doğru. Tutar eşiği bilerek kapalı: açık bir eşik küçük ama
+kritik bir transferi SESSİZCE eler.
+
+**Graf kütüphanesi: Cytoscape.js.** Canvas'a çiziyor (React Flow her düğümü
+DOM elemanı yapıyor ve birkaç yüz düğümde yavaşlıyor), hop seviyelerine uygun
+hazır yerleşimler ve takip motorunun zaten ihtiyacı olan graf algoritmaları
+(BFS, en kısa yol, derece) içinde geliyor.
+
+**BigQuery: Faz 2.** Tek bir soruyu ucuzlatıyor ("bu aktive edici başka kaç
+hesap açmış") ve o sorunun küçük hâli kendi indeksimizden cevaplanabiliyor.
+Görev 08'e sınırlı bir TronGrid yedeği konacak; Google Cloud bağımlılığı
+takip motoru kendini kanıtladıktan sonra.
+
+**Arayüz yönü: yoğun adli araç.** Ayrıntı ve gerekçe:
+[docs/arayuz.md](arayuz.md).

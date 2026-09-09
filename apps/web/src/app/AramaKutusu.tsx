@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Bos, Kayit, Rozet } from "@/components/ui";
 
 type Aday = {
   family: string;
@@ -19,6 +20,13 @@ type Sonuc = {
   warnings: string[];
 };
 
+const TUR_ADI: Record<string, string> = {
+  address: "adres",
+  tx: "işlem",
+  ens: "ENS adı",
+  unknown: "tanınmadı",
+};
+
 export default function AramaKutusu() {
   const [girdi, setGirdi] = useState("");
   const [sonuc, setSonuc] = useState<Sonuc | null>(null);
@@ -35,10 +43,10 @@ export default function AramaKutusu() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ input: girdi }),
       });
-      if (!yanit.ok) throw new Error(`sunucu ${yanit.status}`);
+      if (!yanit.ok) throw new Error(`Sunucu ${yanit.status} döndü`);
       setSonuc((await yanit.json()) as Sonuc);
     } catch (e) {
-      setHata(e instanceof Error ? e.message : "bilinmeyen hata");
+      setHata(e instanceof Error ? e.message : "Çözümlenemedi");
       setSonuc(null);
     } finally {
       setBekliyor(false);
@@ -46,72 +54,92 @@ export default function AramaKutusu() {
   }
 
   return (
-    <section>
-      <form onSubmit={gonder} style={{ display: "flex", gap: 8, margin: "20px 0" }}>
+    <>
+      <form onSubmit={gonder} style={{ display: "flex", gap: 8, marginBottom: 22 }}>
         <input
           value={girdi}
           onChange={(e) => setGirdi(e.target.value)}
-          placeholder="TR7NHq… / 0xabc… / tronscan.org/#/address/…"
-          className="mono"
+          placeholder="cüzdan adresi, işlem hash'i ya da explorer bağlantısı"
           style={{ flex: 1 }}
           spellCheck={false}
+          autoFocus
         />
-        <button disabled={bekliyor || girdi.trim().length === 0}>
-          {bekliyor ? "…" : "Çözümle"}
+        <button className="birincil" disabled={bekliyor || girdi.trim().length === 0}>
+          {bekliyor ? "…" : "çözümle"}
         </button>
       </form>
 
       {hata && <p style={{ color: "var(--hata)" }}>{hata}</p>}
 
-      {sonuc && (
-        <div className="panel">
-          <div className="mono soluk">{sonuc.normalized}</div>
-          <p style={{ margin: "8px 0" }}>
-            Tür: <strong>{sonuc.kind}</strong>
-          </p>
-
-          {sonuc.warnings.length > 0 && (
-            <ul style={{ color: "var(--uyari)" }}>
-              {sonuc.warnings.map((u) => (
-                <li key={u}>{u}</li>
-              ))}
-            </ul>
-          )}
-
-          <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 8 }}>
-            <thead>
-              <tr className="soluk" style={{ textAlign: "left" }}>
-                <th>Ağ</th>
-                <th>Güven</th>
-                <th>Gerekçe</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sonuc.candidates.map((a, i) => (
-                <tr key={i} style={{ borderTop: "1px solid var(--cizgi)" }}>
-                  <td className="mono">
-                    {/* Zincir KESİN ise adres sayfasına gidilir; belirsizse
-                        link verilmez — yanlış zincire açılan bir sayfa,
-                        "bu adres burada yok" diye YANLIŞ bir cevap üretir. */}
-                    {a.network && sonuc.kind === "address" && !a.needsProbe ? (
-                      <a href={`/adres/${a.network}/${encodeURIComponent(sonuc.normalized)}`}>
-                        {a.network}
-                      </a>
-                    ) : (
-                      (a.network ?? a.family)
-                    )}
-                  </td>
-                  <td className="mono">{a.confidence.toFixed(2)}</td>
-                  <td className="soluk">
-                    {a.reason}
-                    {a.needsProbe && <em> — yoklanacak: {a.probeChains?.join(", ")}</em>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {!sonuc && !hata && (
+        <Bos>
+          Ağ, yapıştırılan metnin biçiminden çözülür — hiçbir ağ çağrısı yapılmadan.
+          Biçim tek bir zinciri göstermiyorsa adaylar yoklanır.
+        </Bos>
       )}
-    </section>
+
+      {sonuc && (
+        <Kayit
+          koken={sonuc.candidates.length > 0 ? "kaynak" : "supheli"}
+          baslik={`çözümleme · ${TUR_ADI[sonuc.kind] ?? sonuc.kind}`}
+        >
+          <div className="panel">
+            <div className="veri" style={{ wordBreak: "break-all", marginBottom: 12 }}>
+              {sonuc.normalized}
+            </div>
+
+            {sonuc.warnings.length > 0 && (
+              <ul style={{ margin: "0 0 12px", paddingLeft: 16, color: "var(--dikkat)" }}>
+                {sonuc.warnings.map((u) => (
+                  <li key={u}>{u}</li>
+                ))}
+              </ul>
+            )}
+
+            {sonuc.candidates.length > 0 && (
+              <table className="tablo">
+                <thead>
+                  <tr>
+                    <th style={{ width: 130 }}>ağ</th>
+                    <th style={{ width: 60 }}>güven</th>
+                    <th>gerekçe</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sonuc.candidates.map((a, i) => (
+                    <tr key={i}>
+                      <td>
+                        {/* Zincir KESİN ise adres sayfasına gidilir. Belirsizken
+                            link vermek, yanlış zincirde "kayıt yok" diyen bir
+                            sayfa üretir — cevapsızlık değil, YANLIŞ cevap. */}
+                        {a.network && sonuc.kind === "address" && !a.needsProbe ? (
+                          <a
+                            className="veri"
+                            href={`/adres/${a.network}/${encodeURIComponent(sonuc.normalized)}`}
+                          >
+                            {a.network}
+                          </a>
+                        ) : (
+                          <span className="veri">{a.network ?? a.family}</span>
+                        )}
+                      </td>
+                      <td className="veri m2">{a.confidence.toFixed(2)}</td>
+                      <td className="m2">
+                        {a.reason}
+                        {a.needsProbe && (
+                          <div style={{ marginTop: 4 }}>
+                            <Rozet ton="dikkat">yoklanacak: {a.probeChains?.join(", ")}</Rozet>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </Kayit>
+      )}
+    </>
   );
 }

@@ -13,7 +13,7 @@ export default async function AdresSayfasi({
   const { chain, address } = await params;
 
   return (
-    <main className="kutu">
+    <main className="sayfa">
       <UstBar username={oturum.username} admin={adminMi(oturum)} />
       <AdresGorunumu chain={chain} address={decodeURIComponent(address)} />
     </main>

@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { hamdanMetne } from "@cry/chain";
+import { Adres, Bos, Kayit, Rozet, Satir, Tarih, Tutar, type Koken } from "@/components/ui";
+import { hareketsizGun, kisaAdres, sayi, tarih } from "@/lib/bicim";
 
 type Etiket = {
   id: number;
@@ -45,43 +46,25 @@ type Hareket = {
   yon: "gelen" | "giden";
 };
 
-const gun = (a: string | null) => (a ? new Date(a).toLocaleString("tr-TR") : "—");
+const SAYFA = 50;
 
-/** "Bakılmadı" ile "boş" ayrı sorulardır ve ekranda da ayrı yazılır. */
+/** İndeks durumu tek cümlede: ne kadarına baktık, ne zaman. */
 function indeksMetni(o: Ozet): string {
-  if (!o.biliniyor) return "hiç taranmadı";
-  if (o.indexState === "tam") return `tam · ${gun(o.lastIndexedAt)}`;
-  if (o.indexState === "kismi") return `kısmi (devam edecek) · ${gun(o.lastIndexedAt)}`;
+  if (!o.biliniyor) return "bu adres için zincire hiç gidilmedi";
+  if (o.indexState === "tam") return `tam · ${tarih(o.lastIndexedAt)}`;
+  if (o.indexState === "kismi") return `kısmi · ${tarih(o.lastIndexedAt)}`;
   return "bilinmiyor";
 }
 
-/** Bekleme durumu: son hareketin üstünden kaç gün geçti. */
-function beklemeMetni(sonHareket: string | null): string {
-  if (!sonHareket) return "";
-  const gunSayisi = Math.floor((Date.now() - new Date(sonHareket).getTime()) / 86_400_000);
-  return gunSayisi < 1 ? "" : ` · ${gunSayisi} gündür hareketsiz`;
-}
-
-/**
- * Tarih kaynağın beyanı mı, bizim indeksimizden mi türetildi? İndeks kısmiyse
- * gördüğümüz ilk hareket adresin gerçek ilki OLMAYABİLİR ve bu söylenir.
- */
-function tarihNotu(o: Ozet): string {
-  if (o.tarihKaynagi !== "indeks") return "";
-  return o.indexState === "tam" ? " (indeksten)" : " (indeksteki en eski/yeni — tarama kısmi)";
-}
-
-function kisalt(a: string) {
-  return a.length > 16 ? `${a.slice(0, 8)}…${a.slice(-6)}` : a;
-}
-
-function Satir({ ad, deger }: { ad: string; deger: React.ReactNode }) {
-  return (
-    <div style={{ display: "flex", gap: 10 }}>
-      <span className="soluk" style={{ minWidth: 130 }}>{ad}</span>
-      <span>{deger}</span>
-    </div>
-  );
+/** Tarihin kökeni: kaynağın beyanı mı, bizim kayıtlarımızdan mı. */
+function tarihKokeni(o: Ozet): { koken: Koken; not?: string } {
+  if (o.tarihKaynagi === "kaynak") return { koken: "kaynak" };
+  if (o.tarihKaynagi === "indeks") {
+    return o.indexState === "tam"
+      ? { koken: "indeks", not: "indeksten" }
+      : { koken: "supheli", not: "indeks kısmi — daha eskisi olabilir" };
+  }
+  return { koken: "yok" };
 }
 
 export default function AdresGorunumu({ chain, address }: { chain: string; address: string }) {
@@ -89,6 +72,7 @@ export default function AdresGorunumu({ chain, address }: { chain: string; addre
   const [hareketler, setHareketler] = useState<Hareket[]>([]);
   const [toplam, setToplam] = useState(0);
   const [sayfa, setSayfa] = useState(0);
+  const [yon, setYon] = useState<"" | "gelen" | "giden">("");
   const [hata, setHata] = useState<string | null>(null);
 
   const taban = `/api/adres/${chain}/${encodeURIComponent(address)}`;
@@ -97,7 +81,7 @@ export default function AdresGorunumu({ chain, address }: { chain: string; addre
     const yanit = await fetch(taban);
     const govde = (await yanit.json()) as Ozet;
     if (!yanit.ok) {
-      setHata(govde.error ?? "alınamadı");
+      setHata(govde.error ?? "Adres okunamadı");
       return null;
     }
     setOzet(govde);
@@ -105,8 +89,8 @@ export default function AdresGorunumu({ chain, address }: { chain: string; addre
   }, [taban]);
 
   const hareketYukle = useCallback(
-    async (s: number) => {
-      const yanit = await fetch(`${taban}/hareketler?sayfa=${s}`);
+    async (s: number, y: string) => {
+      const yanit = await fetch(`${taban}/hareketler?sayfa=${s}${y ? `&yon=${y}` : ""}`);
       if (!yanit.ok) return;
       const govde = (await yanit.json()) as { hareketler: Hareket[]; toplam: number };
       setHareketler(govde.hareketler ?? []);
@@ -117,8 +101,11 @@ export default function AdresGorunumu({ chain, address }: { chain: string; addre
 
   useEffect(() => {
     void ozetYukle();
-    void hareketYukle(sayfa);
-  }, [ozetYukle, hareketYukle, sayfa]);
+  }, [ozetYukle]);
+
+  useEffect(() => {
+    void hareketYukle(sayfa, yon);
+  }, [hareketYukle, sayfa, yon]);
 
   // Tarama sürerken sayfa kendini tazeler; iş bitince yoklama DURUR.
   useEffect(() => {
@@ -127,138 +114,210 @@ export default function AdresGorunumu({ chain, address }: { chain: string; addre
       const yeni = await ozetYukle();
       if (yeni && yeni.isDurumu !== "bekliyor" && yeni.isDurumu !== "calisiyor") {
         setSayfa(0);
-        void hareketYukle(0);
+        void hareketYukle(0, yon);
       }
     }, 3000);
     return () => clearInterval(zamanlayici);
-  }, [ozet?.isDurumu, ozetYukle, hareketYukle]);
+  }, [ozet?.isDurumu, ozetYukle, hareketYukle, yon]);
 
   async function tara() {
     setHata(null);
     const yanit = await fetch(`${taban}/indeksle`, { method: "POST" });
     const govde = (await yanit.json().catch(() => ({}))) as { error?: string };
     if (!yanit.ok) {
-      setHata(govde.error ?? "tarama başlatılamadı");
+      setHata(govde.error ?? "Tarama başlatılamadı");
       return;
     }
     void ozetYukle();
   }
 
   if (hata) return <p style={{ color: "var(--hata)" }}>{hata}</p>;
-  if (!ozet) return <p className="soluk">yükleniyor…</p>;
+  if (!ozet) return <p className="etiket">yükleniyor</p>;
 
   const calisiyor = ozet.isDurumu === "bekliyor" || ozet.isDurumu === "calisiyor";
+  const bekleme = hareketsizGun(ozet.lastSeen);
+  const tk = tarihKokeni(ozet);
 
   return (
-    <section>
-      <h1 className="mono" style={{ fontSize: 16, wordBreak: "break-all" }}>{ozet.address}</h1>
-      <div className="soluk" style={{ marginBottom: 12 }}>
-        {ozet.chain}
-        {ozet.isContract ? " · sözleşme" : ""}
-      </div>
-
-      {ozet.etiketler.length > 0 && (
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+    <>
+      <div style={{ marginBottom: 20 }}>
+        <h1 className="veri" style={{ fontSize: 15, wordBreak: "break-all" }}>
+          {ozet.address}
+        </h1>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 7 }}>
+          <span className="etiket">{ozet.chain}</span>
+          {ozet.isContract && <Rozet>sözleşme</Rozet>}
           {ozet.etiketler.map((e) => (
-            <span
+            <Rozet
               key={e.id}
-              className="panel"
-              style={{ padding: "4px 8px", fontSize: 12 }}
-              title={`kaynak: ${e.source} · güven: ${e.confidence}`}
+              ton={e.verifiedAt ? undefined : "dikkat"}
+              baslik={`kaynak: ${e.source} · güven: ${e.confidence}`}
             >
               {e.title}
-              {!e.verifiedAt && <em className="soluk"> · doğrulanmamış</em>}
-            </span>
+              {!e.verifiedAt && " · doğrulanmamış"}
+            </Rozet>
           ))}
-        </div>
-      )}
-
-      <div className="panel" style={{ display: "grid", gap: 6, marginBottom: 14 }}>
-        <Satir ad="İndeks durumu" deger={indeksMetni(ozet)} />
-        <Satir ad="İlk hareket" deger={`${gun(ozet.firstSeen)}${tarihNotu(ozet)}`} />
-        <Satir
-          ad="Son hareket"
-          deger={`${gun(ozet.lastSeen)}${beklemeMetni(ozet.lastSeen)}${tarihNotu(ozet)}`}
-        />
-        <Satir ad="Bakiye" deger={ozet.balanceRaw ? `${hamdanMetne(ozet.balanceRaw, 6)} TRX` : "—"} />
-        <Satir
-          ad="Hareket"
-          deger={`${ozet.hareketSayisi.gelen} gelen · ${ozet.hareketSayisi.giden} giden`}
-        />
-        {ozet.activatedByAddress && (
-          <Satir
-            ad="Aktive eden"
-            deger={
-              <a className="mono" href={`/adres/${ozet.chain}/${ozet.activatedByAddress}`}>
-                {ozet.activatedByAddress}
-              </a>
-            }
-          />
-        )}
-        <div style={{ marginTop: 6 }}>
-          <button onClick={tara} disabled={calisiyor || !ozet.adaptorHazir}>
-            {calisiyor ? "taranıyor…" : ozet.biliniyor ? "Yeniden tara" : "Zincirden çek"}
-          </button>
-          {!ozet.adaptorHazir && (
-            <span className="soluk" style={{ marginLeft: 8 }}>
-              bu zincirin adaptörü henüz doldurulmadı
-            </span>
-          )}
-          {ozet.isDurumu === "hata" && (
-            <span style={{ color: "var(--hata)", marginLeft: 8 }}>son tarama hata verdi</span>
-          )}
         </div>
       </div>
 
-      <h2 style={{ fontSize: 15 }}>
-        Hareketler <span className="soluk">({toplam})</span>
-      </h2>
-      {hareketler.length === 0 ? (
-        <p className="soluk">
-          {ozet.biliniyor ? "Kayitli hareket yok." : "Bu adres henuz taranmadi."}
-        </p>
-      ) : (
-        <>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-            <thead>
-              <tr className="soluk" style={{ textAlign: "left" }}>
-                <th>Tarih</th>
-                <th>Yon</th>
-                <th>Karsi taraf</th>
-                <th style={{ textAlign: "right" }}>Tutar</th>
-              </tr>
-            </thead>
-            <tbody>
-              {hareketler.map((h, i) => {
-                const karsi = h.yon === "gelen" ? h.from : h.to;
-                return (
-                  <tr key={h.txHash + i} style={{ borderTop: "1px solid var(--cizgi)" }}>
-                    <td className="mono" style={{ fontSize: 12 }}>{gun(h.ts)}</td>
-                    <td style={{ color: h.yon === "gelen" ? "var(--tamam)" : "var(--uyari)" }}>
-                      {h.yon === "gelen" ? "gelen" : "giden"}
+      <Kayit
+        koken={ozet.biliniyor ? "kaynak" : "yok"}
+        baslik="ölçüm"
+        sag={
+          <button className="birincil" onClick={tara} disabled={calisiyor || !ozet.adaptorHazir}>
+            {calisiyor ? "taranıyor" : ozet.biliniyor ? "yeniden tara" : "zincirden çek"}
+          </button>
+        }
+      >
+        <div className="panel satirlar">
+          <Satir ad="indeks">
+            <span className="veri">{indeksMetni(ozet)}</span>
+            {ozet.indexState === "kismi" && (
+              <span className="koken-notu" data-koken="supheli">
+                devam edecek
+              </span>
+            )}
+          </Satir>
+          <Satir ad="ilk hareket" koken={tk.koken} not={tk.not}>
+            <Tarih deger={ozet.firstSeen} metin={tarih(ozet.firstSeen)} />
+          </Satir>
+          <Satir ad="son hareket" koken={tk.koken} not={tk.not}>
+            <Tarih deger={ozet.lastSeen} metin={tarih(ozet.lastSeen)} />
+            {bekleme !== null && (
+              <span className="koken-notu">{sayi(bekleme)} gündür hareketsiz</span>
+            )}
+          </Satir>
+          <Satir ad="bakiye">
+            {ozet.balanceRaw ? <Tutar ham={ozet.balanceRaw} ondalik={6} sembol="TRX" /> : "—"}
+          </Satir>
+          <Satir ad="hareket">
+            <span className="veri">
+              {sayi(ozet.hareketSayisi.gelen)} gelen · {sayi(ozet.hareketSayisi.giden)} giden
+            </span>
+          </Satir>
+          {ozet.activatedByAddress && (
+            <Satir ad="aktive eden" koken="kaynak" not="zincirde yazılı">
+              <Adres deger={ozet.activatedByAddress} zincir={ozet.chain} />
+            </Satir>
+          )}
+          {!ozet.adaptorHazir && (
+            <Satir ad="uyarı">
+              <span style={{ color: "var(--dikkat)" }}>
+                Bu zincirin adaptörü henüz doldurulmadı; tarama yapılamaz.
+              </span>
+            </Satir>
+          )}
+          {ozet.isDurumu === "hata" && (
+            <Satir ad="uyarı">
+              <span style={{ color: "var(--hata)" }}>Son tarama hata verdi.</span>
+            </Satir>
+          )}
+        </div>
+      </Kayit>
+
+      <Kayit
+        koken="kaynak"
+        baslik={`hareketler · ${sayi(toplam)}`}
+        sag={
+          <div style={{ display: "flex", gap: 6 }}>
+            {(["", "gelen", "giden"] as const).map((y) => (
+              <button
+                key={y || "hepsi"}
+                onClick={() => {
+                  setYon(y);
+                  setSayfa(0);
+                }}
+                style={y === yon ? { borderColor: "var(--vurgu)", color: "var(--vurgu)" } : undefined}
+              >
+                {y || "hepsi"}
+              </button>
+            ))}
+          </div>
+        }
+      >
+        {hareketler.length === 0 ? (
+          <Bos>
+            {ozet.biliniyor
+              ? "Bu süzgeçte kayıtlı hareket yok."
+              : "Henüz hareket yok. Yukarıdaki düğme adresin geçmişini zincirden çeker."}
+          </Bos>
+        ) : (
+          <>
+            <div className="tablo-sar">
+            <table className="tablo">
+              <thead>
+                <tr>
+                  <th style={{ width: 140 }}>tarih</th>
+                  <th style={{ width: 70 }}>yön</th>
+                  <th>karşı taraf</th>
+                  <th className="sag" style={{ width: 190 }}>tutar</th>
+                  <th style={{ width: 92 }}>işlem</th>
+                </tr>
+              </thead>
+              <tbody>
+                {hareketler.map((h, i) => (
+                  <tr key={h.txHash + i}>
+                    <td>
+                      <Tarih deger={h.ts} metin={tarih(h.ts)} />
                     </td>
-                    <td className="mono" style={{ fontSize: 12 }}>
-                      {karsi ? <a href={`/adres/${ozet.chain}/${karsi}`}>{kisalt(karsi)}</a> : "-"}
+                    <td>
+                      <span className="veri" style={{ color: `var(--${h.yon})` }}>
+                        {h.yon}
+                      </span>
                     </td>
-                    <td className="mono" style={{ textAlign: "right" }}>
-                      {hamdanMetne(h.amountRaw, h.decimals)} {h.symbol}
-                      {!h.success && <span style={{ color: "var(--hata)" }}> · basarisiz</span>}
+                    <td>
+                      {h.yon === "gelen" ? (
+                        h.from ? <Adres deger={h.from} zincir={ozet.chain} /> : <span className="m3">—</span>
+                      ) : h.to ? (
+                        <Adres deger={h.to} zincir={ozet.chain} />
+                      ) : (
+                        <span className="m3">—</span>
+                      )}
+                    </td>
+                    <td className="sag tutar-hucre">
+                      <Tutar ham={h.amountRaw} ondalik={h.decimals} sembol={h.symbol} />
+                      {!h.success && (
+                        <span className="koken-notu" style={{ color: "var(--hata)" }}>
+                          başarısız
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      {/* Zincirdeki kaydın kendisi: her satır kaynağına
+                          tıklanarak gidilebilmeli. */}
+                      <a
+                        className="veri m3"
+                        href={`https://tronscan.org/#/transaction/${h.txHash}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        title={h.txHash}
+                      >
+                        {kisaAdres(h.txHash, 5, 4)}
+                      </a>
                     </td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-            <button onClick={() => setSayfa((s) => Math.max(0, s - 1))} disabled={sayfa === 0}>
-              onceki
-            </button>
-            <button onClick={() => setSayfa((s) => s + 1)} disabled={(sayfa + 1) * 50 >= toplam}>
-              sonraki
-            </button>
-          </div>
-        </>
-      )}
-    </section>
+                ))}
+              </tbody>
+            </table>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center" }}>
+              <button onClick={() => setSayfa((s) => Math.max(0, s - 1))} disabled={sayfa === 0}>
+                önceki
+              </button>
+              <span className="etiket">
+                {sayi(sayfa * SAYFA + 1)}–{sayi(Math.min((sayfa + 1) * SAYFA, toplam))} / {sayi(toplam)}
+              </span>
+              <button
+                onClick={() => setSayfa((s) => s + 1)}
+                disabled={(sayfa + 1) * SAYFA >= toplam}
+              >
+                sonraki
+              </button>
+            </div>
+          </>
+        )}
+      </Kayit>
+    </>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-/** Her sayfanın üstündeki ince şerit: kim girmiş, nereye gidilir, çıkış. */
+/** Üst şerit: kim girmiş, nereye gidilir, çıkış. Sabit yükseklik, tek çizgi. */
 export default function UstBar({ username, admin }: { username: string; admin: boolean }) {
   async function cik() {
     await fetch("/api/oturum/cikis", { method: "POST" });
@@ -8,32 +8,24 @@ export default function UstBar({ username, admin }: { username: string; admin: b
   }
 
   return (
-    <header
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 14,
-        borderBottom: "1px solid var(--cizgi)",
-        paddingBottom: 10,
-        marginBottom: 18,
-      }}
-    >
-      <a href="/" style={{ fontWeight: 700, textDecoration: "none" }}>
+    <header className="ust">
+      <a href="/" className="marka">
         cry
       </a>
+      <span className="etiket" style={{ marginLeft: -8 }}>
+        akış analizi
+      </span>
       <span style={{ flex: 1 }} />
       {admin && (
-        <a href="/yonetim" className="soluk" style={{ fontSize: 13 }}>
-          Yönetim
+        <a href="/yonetim" className="etiket" style={{ color: "var(--m2)" }}>
+          yönetim
         </a>
       )}
-      <a href="/sifre-degistir" className="soluk" style={{ fontSize: 13 }}>
-        Şifre
+      <a href="/sifre-degistir" className="etiket" style={{ color: "var(--m2)" }}>
+        şifre
       </a>
-      <span className="mono soluk">{username}</span>
-      <button onClick={cik} style={{ fontSize: 13, padding: "6px 10px" }}>
-        Çıkış
-      </button>
+      <span className="veri m3">{username}</span>
+      <button onClick={cik}>çıkış</button>
     </header>
   );
 }

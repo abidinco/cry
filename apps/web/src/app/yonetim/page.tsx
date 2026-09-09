@@ -10,9 +10,8 @@ export default async function YonetimSayfasi() {
   if (!adminMi(oturum)) redirect("/");
 
   return (
-    <main className="kutu">
+    <main className="sayfa">
       <UstBar username={oturum.username} admin />
-      <h1 style={{ fontSize: 20 }}>Yönetim</h1>
       <KullaniciYonetimi />
     </main>
   );

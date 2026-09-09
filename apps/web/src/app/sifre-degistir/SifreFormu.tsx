@@ -32,23 +32,23 @@ export default function SifreFormu({ zorunlu }: { zorunlu: boolean }) {
   }
 
   return (
-    <form className="panel" onSubmit={gonder} style={{ display: "grid", gap: 10 }}>
+    <form className="panel satirlar" onSubmit={gonder} style={{ gap: 12 }}>
       <label>
-        <div className="soluk">Mevcut şifre</div>
+        <div className="etiket">Mevcut şifre</div>
         <input type="password" value={mevcut} onChange={(e) => setMevcut(e.target.value)} autoFocus style={{ width: "100%" }} />
       </label>
       <label>
-        <div className="soluk">Yeni şifre (en az 10 karakter)</div>
+        <div className="etiket">Yeni şifre (en az 10 karakter)</div>
         <input type="password" value={yeni} onChange={(e) => setYeni(e.target.value)} style={{ width: "100%" }} />
       </label>
       <label>
-        <div className="soluk">Yeni şifre (tekrar)</div>
+        <div className="etiket">Yeni şifre (tekrar)</div>
         <input type="password" value={tekrar} onChange={(e) => setTekrar(e.target.value)} style={{ width: "100%" }} />
       </label>
-      {hata && <div style={{ color: "var(--hata)" }}>{hata}</div>}
-      <button disabled={bekliyor}>{bekliyor ? "…" : "Değiştir"}</button>
+      {hata && <div className="veri" style={{ color: "var(--hata)" }}>{hata}</div>}
+      <button className="birincil" disabled={bekliyor}>{bekliyor ? "…" : "değiştir"}</button>
       {!zorunlu && (
-        <a className="soluk" href="/" style={{ fontSize: 13 }}>
+        <a className="etiket" href="/" style={{ fontSize: 13 }}>
           Vazgeç
         </a>
       )}
