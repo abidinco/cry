@@ -11,7 +11,14 @@
     "resolveJsonModule": true,
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
-    "types": ["node"]
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      // Testler middleware ve yetki katmanını doğrudan içe aktarıyor; o
+      // dosyalar Next uygulamasının "@/" takma adını kullanıyor ve kök
+      // derleme onu bilmezse CI kırılır (kırıldı da).
+      "@/*": ["apps/web/src/*"]
+    }
   },
   "include": ["packages/*/src/**/*.ts", "tests/**/*.ts"],
   "exclude": ["node_modules", "**/dist", "**/.next"]
