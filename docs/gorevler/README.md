@@ -16,6 +16,14 @@ Her dosya **tek oturumda bitecek** büyüklükte, kendi bitiş ölçütünü ta�
 | 09 | Fiyat/kur (TCMB) + rapor + PDF + SHA-256 | ⏳ |
 | 10 | İzleme: takip listesi arayüzü + self-hosted runner kurulumu | ⏳ |
 
+**Sıradaki iş bir KARARA bağlı:** 07 mi, yoksa sıradan dışarıdaki etiket
+tohumlaması mı önce? Gerekçesi ve ölçümü
+[bekleyen-kararlar §6](../bekleyen-kararlar.md). Kısası: etiket olmadan graf
+"hangi borsa" sorusunu cevaplayamıyor, çünkü arşivde 0 etiket var.
+
+Yan dosyalar: [kurallar](../../CLAUDE.md) · [bekleyen kararlar](../bekleyen-kararlar.md) ·
+[çözülmesi gerekenler](../cozulmesi-gerekenler.md) · [öneriler](../oneriler.md).
+
 ## Sırayı belirleyen kural
 
 Bir görev, **kendinden önceki görevin ürettiği veriyi ekranda gösterebiliyorsa**

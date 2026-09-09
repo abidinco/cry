@@ -12,6 +12,10 @@ Karar verilince madde **silinir** ve kural [kurallar](../CLAUDE.md) ya da
 [veri kriterleri](veri-kriterleri.md) dosyasına yazılır. Burası bir arşiv
 değil; tarihçe git geçmişinde.
 
+Kardeş dosyalar: karar beklemeyen eksikler
+[cozulmesi-gerekenler.md](cozulmesi-gerekenler.md), benim önerilerim
+[oneriler.md](oneriler.md).
+
 ---
 
 ## 1. BSC ücretsiz planda yoklanamıyor
@@ -133,3 +137,138 @@ bir kerelik `/srv/cry/.env` gerekiyor.
 **Geri alınabilir:** evet.
 
 **Karar yeri:** `docs/gorevler/README.md`.
+
+---
+
+## 6. Sıradaki görev hangisi: graf mı, etiketler mi
+
+**Soru:** Görev 07 (graf görünümü) sırada. Ama etiket tohumlaması sıradan
+DIŞARIDA duruyor ve ondan önce yapılması gerekebilir. Hangisi önce?
+
+**Ölçüm (2026-09-09):** arşivde 0 etiket. Bu yüzden takip motorunun
+`terminal` durma sebebi hiç ateşlenmiyor ve her tarama bütçede bitiyor
+(gerçek koşuda ölçüldü: 25 düğüm, sebep `dugum_siniri`). Graf bugün
+çizilirse **hepsi aynı renkte, hiçbiri "borsa" demeyen** bir düğüm bulutu
+çizer.
+
+**Seçenekler:**
+1. **Önce etiket, sonra graf** (önerim) — TronScan tohumlaması yarım gün;
+   ardından graf ilk çizimde asıl bilgiyi (nerede bitti, hangi borsa)
+   gösterir. Grafın en pahalı işi düğümü sınıflandırmaktır ve sınıf
+   etiketten gelir.
+2. **Önce graf** — görsel ilerleme hemen görünür, etiket sonra binince graf
+   yeniden renklendirilir. İki kez dokunmak demek.
+
+**Karar verilmezse:** Görev 07 sıradaki iş olarak duruyor ve muhtemelen
+yukarıdaki 1. sırayla çakışıyor.
+
+**Geri alınabilir:** evet, ikisi de sıra meselesi.
+
+**Karar yeri:** `docs/gorevler/README.md` tablosu.
+
+---
+
+## 7. Graf düzeni: hiyerarşi mi, kuvvet mi — ve kaç düğüm çizilir
+
+**Soru:** Cytoscape hangi düzenle çizsin, ve düğüm sayısı sınırı ne olsun?
+
+**Ölçüm:** ilk gerçek koşu **25 düğüm / 231 kenar** üretti; düğüm sınırı
+varsayılan 300. 300 düğüm ve kabaca on katı kenar, kuvvet tabanlı düzende
+tarayıcıda saniyeler sürer ve okunmaz bir yumak verir.
+
+**Seçenekler:**
+1. **Hiyerarşik (dagre), soldan sağa hop sırası** (önerim) — hop zaten bir
+   SIRADIR; hiyerarşi o sırayı görselleştirir ve "para nereden nereye"
+   sorusu yukarıdan aşağı okunur. Adli bir ekte de böyle basılır.
+2. **Kuvvet tabanlı (cose/fcose)** — kümeleri güzel gösterir, ama düğüm
+   yerleşimi her açılışta DEĞİŞİR; rapora giren bir görselde bu kabul
+   edilemez (aynı koşu iki farklı resim üretir).
+3. İkisi arasında tuş.
+
+**Ek soru:** çizilen düğüm sayısı sınırı — "ilk 100 düğüm + gerisi 've N
+düğüm daha'" mı, hepsi mi?
+
+**Karar verilmezse:** Görev 07 kendi başına bir düzen seçer ve seçim
+rapordaki görselin yeniden üretilebilirliğini belirler.
+
+**Geri alınabilir:** evet.
+
+**Karar yeri:** Görev 07 + [arayuz.md](arayuz.md).
+
+---
+
+## 8. Fiyat: hangi AN, hangi kaynak
+
+**Soru:** Bir hareketin TL karşılığı hangi ana göre yazılsın?
+
+**Ölçüm:** `prices_daily` ve `fx_rates_daily` tabloları boş; bugün hiçbir
+tutarın TL karşılığı yok.
+
+**Seçenekler:**
+1. **İşlem GÜNÜNÜN kuru** — "o gün ne kadardı" sorusunun cevabı; adli
+   yazıda beklenen budur.
+2. **Rapor gününün kuru** — "bugün ne kadar" sorusunun cevabı.
+3. **İkisi birden** (önerim) — rapor satırı "işlem günü X ₺ (rapor günü Y ₺)"
+   der ve hangi kurun kullanıldığını YAZAR. Tek sayı yazmak, hangi soruya
+   cevap verdiğini gizler.
+
+**Kaynak ayrı bir soru:** TCMB yalnızca USD/TRY verir (resmî, ücretsiz,
+günlük). Token → USD için ayrı bir kaynak gerekir (CoinGecko ücretsiz katman).
+Stablecoin'de 1 USDT ≈ 1 USD varsayımı **yazılmaz, ölçülür** — depeg günleri
+gerçek.
+
+**Karar verilmezse:** Görev 09 raporu token cinsinden kalır; resmî yazıya TL
+elle eklenir.
+
+**Geri alınabilir:** evet, fiyat ayrı tabloda; rapor yeniden üretilir.
+
+**Karar yeri:** Görev 09 + CLAUDE.md → Veri kuralları.
+
+---
+
+## 9. Rapor neyi dondurur, hash neyin üstünden alınır
+
+**Soru:** SHA-256 **PDF'in** mi, yoksa raporun dayandığı **kanıt paketinin**
+(JSON) mi özeti olsun?
+
+**Ölçüm:** `reports` tablosu boş; şema hem dosya hem içerik alanı taşıyor.
+
+**Seçenekler:**
+1. **JSON kanıt paketi + onun hash'i, PDF ondan üretilir** (önerim) — PDF
+   yazı tipine, sürüme, sayfa boyutuna göre bayt bayt değişir; aynı veriden
+   iki farklı hash çıkar. Dondurulması gereken şey KANITTIR, sayfa düzeni
+   değil.
+2. **PDF'in hash'i** — karşı tarafa verilen dosyanın kimliğini doğrular.
+3. **İkisi de** — pakette iki satır.
+
+**Karar verilmezse:** Görev 09'un çıktısı "hash'li" görünür ama neyin hash'i
+olduğu belirsizdir; itiraz edildiğinde savunulamaz.
+
+**Geri alınabilir:** hayır sayılır — verilmiş bir rapordaki hash geri
+alınamaz. Bu yüzden ilk rapordan ÖNCE karar gerekir.
+
+**Karar yeri:** Görev 09 + CLAUDE.md.
+
+---
+
+## 10. İzleme: sıklık ve uyarı eşiği
+
+**Soru:** İzlemedeki bir adres ne sıklıkla kontrol edilsin, hangi olayda
+mesaj gitsin?
+
+**Ölçüm:** `watches` boş, servis hiç koşmadı. TronGrid anahtarlı sınır
+10 istek/sn — sıklık teknik olarak serbest, mesele gürültü.
+
+**Seçenekler:**
+1. **5 dakikada bir, her harekette mesaj** — hızlı, ama aktif bir cüzdan
+   telefonu susmaz hâle getirir.
+2. **15 dakikada bir, eşik üstü harekette mesaj** (önerim) — eşik varlık
+   bazında ve adres bazında ayarlanır; küçük hareketler günlük özete girer.
+3. Yalnızca günlük özet.
+
+**Karar verilmezse:** Görev 10'da servis bir varsayılan seçer ve ilk gürültü
+turunda değiştirilir.
+
+**Geri alınabilir:** evet, ayar.
+
+**Karar yeri:** Görev 10 + `apps/watcher`.

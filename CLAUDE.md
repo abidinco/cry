@@ -4,8 +4,19 @@ Kripto para akışını takip eden analiz aracı. Next.js 15 + TypeScript +
 Prisma/PostgreSQL + BullMQ; testler Vitest. Ayrıntı: [README](README.md),
 [PRD](docs/prd.md), [devir dosyası](docs/proje-devir.md).
 
-Bu dosya **kararları ve acı deneyimle öğrenilenleri** tutar. Bekleyen sorular
-ayrı: [docs/bekleyen-kararlar.md](docs/bekleyen-kararlar.md).
+Bu dosya **kararları ve acı deneyimle öğrenilenleri** tutar. Dört ayrı
+dosya, dört ayrı soru — biri ötekinin yerine yazılmaz:
+
+| Dosya | Cevapladığı soru |
+|---|---|
+| **CLAUDE.md** (burası) | Karar VERİLDİ; kural bu. |
+| [docs/bekleyen-kararlar.md](docs/bekleyen-kararlar.md) | Ölçüldü ama TERCİH bekliyor; cevabı insan verir. |
+| [docs/cozulmesi-gerekenler.md](docs/cozulmesi-gerekenler.md) | Ne yapılacağı belli, YAPILMAMIŞ. |
+| [docs/oneriler.md](docs/oneriler.md) | Yapılsa faydalı; sıralama fayda/maliyet. |
+
+Bir madde karara bağlanınca bekleyenlerden **silinir** ve kuralı buraya
+yazılır. Aynı şey iki dosyada durursa ikisi zamanla ayrışır ve hangisinin
+güncel olduğu sorulamaz hâle gelir.
 
 ## Çalışma düzeni
 
@@ -73,6 +84,41 @@ adlarını isterdi.
 - **Sembol kimlik değildir, SÖZLEŞME kimliktir.** Arşivde "U S D T" adlı
   (boşluklu) taklit bir token var ve gerçek USDT'den ayırt eden tek şey
   sözleşme adresi.
+
+## Takip ve rapor
+
+- **Atıf kuralı bir SEÇİMDİR, bir gerçek değil — ve rapora YAZILIR.** FIFO,
+  orantısal ve zaman pencereli dağıtım aynı veriden farklı sonuç veriyor
+  (testle sabitlendi: `tests/dagitim.test.ts`). Ekranda ve raporda hangi
+  kuralın kullanıldığı, hop bütçesiyle birlikte tek satırda görünür. Kuralı
+  söylemeyen bir yüzde, tartışmada savunulamaz.
+- **Durma SEBEBİ yazılmadan durulmaz.** "Burada iz kesildi" ile "burada
+  bütçe bitti" aynı ekranda aynı görünürse, ikincisi taramayı sürdürmekle
+  çözülebilirken çözülmez. Sıra da kuralın parçası: borsaya varıldıysa
+  sebep `terminal`dir, `butce` değil — tersi sırada rapor asıl bulguyu
+  kaybeder.
+- **Ateşlenemeyen bir ölçüt, ölçüt değildir.** `terminal` sebebi etiket
+  okuyor ve arşivde 0 etiket var (2026-09-09); yani kod doğru, sonuç yok.
+  Bir kapının yazılmış olması çalıştığını göstermez — ateşlendiği ÖLÇÜLÜR.
+- **Etiket görüntüsü kayıt anında DONDURULUR** (`labelSnapshot`). Rapor
+  alındıktan sonra etiket düzeltilirse eski rapor kendi anlattığı şeyle
+  çelişmemeli; rapor bir anın tutanağıdır.
+- **Yetenek bayrağı bir İDDİADIR.** `capabilities.internalTransfers: true`
+  yazmak, iç transferlerin ayrıştırıldığını göstermez — TRON adaptöründe
+  bugün göstermiyor. Doğrulanmamış bir bayrak, bakılmamış bir yeri
+  "kapsandı" gösterir; "yok ≠ bakılamadı" kuralının kod tarafı.
+- **Boş adaptör SESSİZ kalmaz.** Bitcoin/Solana/EVM adaptörleri `throw`
+  ediyor ve `registry.hazirMi()` onları kapıda tutuyor. "Sonuç bulunamadı"
+  diye dönen bir boş adaptör, kapsanmayan zinciri temiz gösterirdi.
+
+## Görev disiplini
+
+- **Bir görev, kendinden öncekinin ürettiği veriyi EKRANDA gösterebiliyorsa
+  bitmiştir.** "Yazıldı ama hiçbir sayfa sormuyor" bitmiş sayılmaz — bu
+  projede bir kez yaşandı (`KisiAd` kardeşi: veri yazıldı, okuyan yoktu).
+- **Ölçümü olmayan madde yazılmaz.** Dokümanlardaki her sayı, yanında
+  yeniden üretim komutuyla durur. Kanıtı yeniden ölçülemeyen bir tespit,
+  bir sonraki turda kanıya dönüşür.
 
 ## Güvenlik
 

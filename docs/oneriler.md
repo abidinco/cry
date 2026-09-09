@@ -1,8 +1,9 @@
 # Öneriler
 
 Yapılmamış ama yapılması işe yarayacak şeyler. Karar bekleyenler ayrı
-([bekleyen-kararlar.md](bekleyen-kararlar.md)); burası benim önerilerim —
-sıralaması fayda/maliyet.
+([bekleyen-kararlar.md](bekleyen-kararlar.md)), ne yapılacağı belli olup
+yapılmamış eksikler ayrı ([cozulmesi-gerekenler.md](cozulmesi-gerekenler.md));
+burası benim önerilerim — sıralaması fayda/maliyet.
 
 ## Yakın vadede değerli
 
@@ -65,3 +66,42 @@ sonra.
 **11. Grafın kendisini rapora gömmek.**
 Cytoscape ekran görüntüsü yerine, dondurulmuş graftan sunucu tarafında SVG
 üretmek. Rapor yeniden üretilebilir olmalı ve ekran görüntüsü değildir.
+
+## Sonradan eklenenler (2026-09-09)
+
+**12. Etiketi ADRESE değil KÜMEYE bağla.**
+Bir borsanın onlarca sıcak cüzdanı, zincir başına ayrı adresleri ve binlerce
+deposit adresi var. Bugün etiket düz bir satır; "Binance" derken hangi
+Binance adresi olduğu rapordan okunamaz. Bir üst düğüm (borsa) + altında
+adresler, sonradan eklemesi pahalı bir yapı — etiket tohumlamasından ÖNCE
+kararlaştırmak ucuz. (§8'in yapısal hâli.)
+
+**13. Rapora "bakılmayan yerler" bölümü koy.**
+Arşivin dürüstlüğü "yok ≠ bakılamadı" ayrımına dayanıyor ve bu ayrım şu an
+yalnızca veritabanında yaşıyor. Rapor, izlenen yolun yanında **izlenmeyeni**
+de saymalı: hangi düğümler indekssiz kaldı, hangi zincir yoklanamadı, hangi
+etiket doğrulanmamış. Karşı tarafın ilk soracağı şey budur; cevabı raporun
+kendisinde durmalı.
+
+**14. Her koşuya sürüm damgası.**
+Bir taramanın sonucu, o gün çalışan kodun atıf kuralına ve eşiklerine
+bağlı. Koşuya kod sürümü (git SHA) + eşikler + atıf kuralı yazılmazsa iki
+ay sonra "bu rakam neden değişti" sorusunun cevabı yok. Alan zaten var
+sayılır; yazılması bir satır.
+
+**15. Zincir adaptörleri için ortak bir "canlı sözleşme testi".**
+Bugünkü testler saf mantığı sınıyor (43 test, hepsi yeşil) — ama bu projedeki
+ciddi kusurların hepsi CANLI veriyle çıktı. Elle seçilmiş birkaç gerçek
+adres/işlem üzerinde, ağa çıkan ve normalde atlanan bir test dosyası
+(`npm run test:canli`) bu sınıfı yakalar: kaynağın alan adı değişince
+sessizce boş dönmek yerine kırmızı yanar.
+
+**16. Adres sayfasında "bu adres neden burada" satırı.**
+14.798 adresin çoğu bir hareketin karşı tarafı olarak açıldı. Bir adresi
+açan kullanıcı, oraya nereden gelindiğini (hangi işlem, hangi koşu) görmeli;
+aksi hâlde arşiv, kendi kaydının kaynağını söyleyemez.
+
+**17. Yoklama sonucunu adres sayfasında GÖSTER.**
+`probe_cache` doluyor ama sonuç yalnızca arama anında görünüyor. "Bu adres
+başka hangi zincirlerde aktif" sorusu, adres sayfasının kalıcı bir satırı
+olmalı — aynı adres birden çok EVM zincirinde yaşıyor olabilir.
