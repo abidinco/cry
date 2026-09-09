@@ -59,6 +59,28 @@ tarayıcı üçüncü bir tarafa haber vermiş olurdu.
   basılır** — büyüklük tek bakışta okunsun.
 - Tarihler ekranda **TSİ**, ipucu balonunda **UTC** (rapor UTC istiyor).
 
+## Graf
+
+Düzen **hiyerarşik (dagre), soldan sağa hop sırasıyla**. Gerekçe estetik
+değil yeniden üretilebilirlik: kuvvet tabanlı bir düzende yerleşim her
+açılışta değişir ve aynı koşu iki farklı resim verir — rapora giren bir
+görselde bu savunulamaz. Aynı sebeple düğümler **sürüklenemez**.
+
+Grafta renk TEK BİR ŞEY anlatır: düğümün durumu. Yön rengi (gelen/giden)
+kullanılmaz, çünkü yönü okun kendisi söylüyor.
+
+| Çerçeve | Anlam |
+|---|---|
+| indigo | kök (odak) |
+| yeşil | doğrulanmış borsa etiketi — iz burada tamamlandı |
+| kehribar, kesik | borsa ADAYI, etiket doğrulanmamış |
+| gri, kesik | bizim koyduğumuz sınır (bütçe, dallanma) — iz bitmedi |
+| gri, noktalı | taranamadı ("yok" değil, "bakılamadı") |
+
+En çok **100 düğüm** çizilir ve seçim deterministiktir: önce kök, sonra iz
+biten düğümler, sonra hop sırası. Kırpılan kısım sessizce yok sayılmaz —
+kaç düğüm ve kaç kenar çizilmediği ekranda yazar, tamamı tablolarda durur.
+
 ## Yoğunluk ve dar ekran
 
 13 piksel taban, sıkı satır aralığı. Dar ekranda **sütun gizlenmez**, tablo

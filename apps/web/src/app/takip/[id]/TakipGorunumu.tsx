@@ -1,8 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Adres, Bos, Kayit, Rozet, Satir, Tarih, Tutar } from "@/components/ui";
 import { sayi, tarih } from "@/lib/bicim";
+
+// Cytoscape tarayıcı API'lerine dokunuyor; sunucuda çizilemez.
+const Graf = dynamic(() => import("./Graf"), {
+  ssr: false,
+  loading: () => <p className="etiket">graf yükleniyor</p>,
+});
 
 type Dugum = {
   address: string;
@@ -50,7 +57,10 @@ const KURAL_ADI: Record<string, string> = {
 
 /** Durma sebebi: kullanıcının anlayacağı cümle. */
 const SEBEP: Record<string, string> = {
-  terminal: "etiketli borsa adresine ulaşıldı",
+  terminal: "doğrulanmış borsa etiketine ulaşıldı",
+  // Aynı cümleyi doğrulanmamış bir etiketle kurmak, kaynağı olmayan bir
+  // hüküm olurdu; iz yine burada durur ama iddianın gücü yazılır.
+  terminal_aday: "borsa ADAYINA ulaşıldı — etiket doğrulanmamış",
   butce: "hop bütçesi doldu",
   dugum_siniri: "düğüm sınırına ulaşıldı",
   dallanma: "çıkış sayısı eşiği aştı (borsa ya da mikser olabilir)",
@@ -62,6 +72,7 @@ const SEBEP: Record<string, string> = {
 export default function TakipGorunumu({ id }: { id: string }) {
   const [kosu, setKosu] = useState<Kosu | null>(null);
   const [hata, setHata] = useState<string | null>(null);
+  const [secili, setSecili] = useState<string | null>(null);
 
   const yukle = useCallback(async () => {
     const yanit = await fetch(`/api/takip/${id}`);
@@ -85,6 +96,31 @@ export default function TakipGorunumu({ id }: { id: string }) {
     return () => clearInterval(z);
   }, [kosu?.status, yukle]);
 
+  // Graf verisi kosu değişmedikçe yeniden kurulmaz: her render'da yeni bir
+  // dizi vermek Cytoscape'i baştan çizdirir ve yerleşim titrer.
+  const grafDugumleri = useMemo(
+    () =>
+      (kosu?.dugumler ?? []).map((d) => ({
+        address: d.address,
+        hop: d.hop,
+        isTerminal: d.isTerminal,
+        terminalReason: d.terminalReason,
+        etiketler: d.etiketler,
+      })),
+    [kosu?.dugumler],
+  );
+  const grafKenarlari = useMemo(
+    () =>
+      (kosu?.kenarlar ?? []).map((k) => ({
+        from: k.from,
+        to: k.to,
+        hop: k.hop,
+        taintShare: k.taintShare,
+        symbol: k.symbol,
+      })),
+    [kosu?.kenarlar],
+  );
+
   if (hata) return <p style={{ color: "var(--hata)" }}>{hata}</p>;
   if (!kosu) return <p className="etiket">yükleniyor</p>;
 
@@ -104,6 +140,7 @@ export default function TakipGorunumu({ id }: { id: string }) {
     dugumTutarlari.set(k.to, liste);
   }
   const borsalar = kosu.dugumler.filter((d) => d.terminalReason === "terminal");
+  const borsaAdaylari = kosu.dugumler.filter((d) => d.terminalReason === "terminal_aday");
 
   return (
     <>
@@ -154,6 +191,63 @@ export default function TakipGorunumu({ id }: { id: string }) {
           </Satir>
         </div>
       </Kayit>
+
+      {kosu.dugumler.length > 0 && (
+        <Kayit
+          koken="indeks"
+          baslik="graf"
+          sag={
+            <span className="etiket m3">
+              hiyerarşik düzen — aynı koşu her açılışta aynı resmi verir
+            </span>
+          }
+        >
+          <Graf
+            dugumler={grafDugumleri}
+            kenarlar={grafKenarlari}
+            kokAdres={kosu.rootAddress}
+            onSecim={setSecili}
+          />
+          {secili && (
+            <div className="panel satirlar" style={{ marginTop: 8 }}>
+              <Satir ad="seçilen">
+                <Adres deger={secili} zincir={kosu.chain} kisa={false} />
+              </Satir>
+              <Satir ad="durum">
+                <span className="m2">
+                  {(() => {
+                    const d = kosu.dugumler.find((x) => x.address === secili);
+                    if (!d) return "—";
+                    const sebep = d.terminalReason
+                      ? (SEBEP[d.terminalReason] ?? d.terminalReason)
+                      : "devam edildi";
+                    return `${d.hop}. sıçrama · ${sebep}`;
+                  })()}
+                </span>
+              </Satir>
+            </div>
+          )}
+        </Kayit>
+      )}
+
+      {borsaAdaylari.length > 0 && (
+        <Kayit
+          koken="supheli"
+          baslik="borsa ADAYINA ulaşan iz"
+          sag={<span className="etiket m3">etiket doğrulanmamış — rapora bu ibareyle girer</span>}
+        >
+          <div className="panel">
+            {borsaAdaylari.map((d) => (
+              <div key={d.address} style={{ marginBottom: 6 }}>
+                <Adres deger={d.address} zincir={kosu.chain} />{" "}
+                {d.etiketler.map((e, i) => (
+                  <Rozet key={i}>{e.title}</Rozet>
+                ))}
+              </div>
+            ))}
+          </div>
+        </Kayit>
+      )}
 
       {borsalar.length > 0 && (
         <Kayit koken="kaynak" baslik="borsaya ulaşan iz">
