@@ -85,6 +85,48 @@ adlarını isterdi.
   (boşluklu) taklit bir token var ve gerçek USDT'den ayırt eden tek şey
   sözleşme adresi.
 
+## Etiket kaynağı — ölçülmüş olan, varsayılan değil
+
+- **TronScan artık anahtarsız cevap VERMİYOR** (ölçüldü 2026-09-09:
+  `apilist.tronscanapi.com` → `401 Authorization Required`, openresty).
+  Devir dosyası ve öneriler "TronScan tag'leri API'den ücretsiz gelir"
+  diyordu; bu bir varsayımdı ve çöktü. Bir kaynağın ücretsizliği bir
+  ÖLÇÜMDÜR, hatırlanan bir olgu değil.
+- **TRON hesaplarında on-chain `account_name` YOK.** "Borsa cüzdanları
+  kendi adlarını zincire yazar" fikri denendi: arşivin en yoğun beş
+  karşı tarafında (Binance hot wallet olduğu bilinenler dâhil) TronGrid
+  yanıtında `account_name` alanı hiç dönmüyor. Zincirden bedava etiket
+  çıkmıyor.
+- **Ücretsiz, anahtarsız ve resmî çalışan tek kaynak: OFAC SDN.**
+  `SDN_ENHANCED.XML` (83 MB, `dataAsOf` taşıyor) 320 tekil adres verdi
+  (tron 230 · ethereum 94 · arbitrum 1 · bsc 1). Uygulaması
+  `packages/etiket` — ayrıştırıcı SAF (metin girer, bulgu çıkar), ağ ve
+  veritabanı ayrı; kural bir fixture üstünde sınanıyor.
+- **Zincir SEMBOLDEN değil ADRESİN BİÇİMİNDEN çözülür.** OFAC "Digital
+  Currency Address - USDT" diyor ve altındaki adres kimi kayıtta `T…`
+  (TRON), kimi kayıtta `1…`/`3…` (Bitcoin üstünde Omni USDT, ölçüldü:
+  7 kayıt). Sembole bakan bir ayrıştırıcı bitcoin adreslerini TRON'a
+  yazardı. Sembol yalnızca EVM ailesi İÇİNDE hangi zincir olduğunu
+  söyler ve her hâlükârda kanıta yazılır. ("Sembol kimlik değildir,
+  SÖZLEŞME kimliktir" kuralının adres tarafı.)
+- **Yaptırım etiketi TERMİNAL DEĞİLDİR.** Motor yalnızca `exchange*` ile
+  başlayan kategoriyi terminal sayar: paranın borsaya girmesi izin
+  BİTTİĞİ anlamına gelir, yaptırımlı bir adresten para hareket etmeye
+  devam eder. Ağır bir bulgudur, bir son değil.
+- **Etiketlemek TARAMAK değildir.** Etiket için açılan adres
+  `index_state = "bilinmiyor"` kalır; aksi hâlde 320 bakılmamış adres
+  "bakıldı, temiz" görünürdü ("yok ≠ bakılamadı").
+- **Ve tohumlamanın asıl ölçüsü "kaç etiket yazdım" değil, "arşivdeki
+  hangi adrese denk geldi".** Ölçüldü: 324 etiketin arşivdeki 14.798
+  adresle kesişimi **0**. Yani etiketler doğru, kaynak resmî, kod
+  çalışıyor — ve `terminal` durma sebebi hâlâ ateşlenemiyor. Yazılmış
+  ama hiçbir kaydın SORMADIĞI etiket, olmayan etikettir.
+- **Aday etiket bir İDDİADIR ve öyle girer** (kullanıcı kararı
+  2026-09-09): dört borsa adresi `source: "kullanici"`, `confidence 0.3`,
+  `verifiedAt` BOŞ. Adresin biçimi doğrulanmış olması etiketin doğru
+  olduğunu göstermez; onayı on-chain davranış ve insan verir. Liste
+  KAPALI ve her satır gerekçesini taşır (`packages/etiket/src/aday.ts`).
+
 ## Takip ve rapor
 
 - **Atıf kuralı bir SEÇİMDİR, bir gerçek değil — ve rapora YAZILIR.** FIFO,
@@ -138,6 +180,17 @@ adlarını isterdi.
 Tasarım dili ve gerekçesi: [docs/arayuz.md](docs/arayuz.md). Özet: yoğun adli
 araç, imza öğesi **köken oluğu** (bilginin nereden geldiğini söyleyen sol
 işaret), renk kanalları ayrık, yazı tipleri build anında gömülü.
+
+- **Graf HİYERARŞİK çizilir (dagre), soldan sağa hop sırasıyla** (kullanıcı
+  kararı 2026-09-09). Gerekçe estetik değil YENİDEN ÜRETİLEBİLİRLİK: kuvvet
+  tabanlı düzende (fcose/cose) düğüm yerleşimi her açılışta değişir, yani
+  aynı koşu iki farklı resim üretir — rapora giren bir görselde bu
+  savunulamaz. Hop zaten bir SIRADIR; hiyerarşi o sırayı görselleştirir ve
+  "para nereden nereye" sorusu tek yönde okunur.
+- **Çizilen düğüm sayısı 100 ile sınırlı, gerisi "ve N düğüm daha" diye
+  SAYILIR.** Düğüm sınırı 300 ve kabaca on katı kenar okunmaz bir yumak
+  verir; ama kırpılan kısım sessizce yok sayılmaz — kaç düğümün
+  çizilmediği ekranda yazar.
 
 ## Kuyruk ve worker
 

@@ -11,15 +11,20 @@ Her dosya **tek oturumda bitecek** büyüklükte, kendi bitiş ölçütünü ta�
 | 4b | [Arayüz: tasarım dili](../arayuz.md) | ✅ bitti (2026-09-09) |
 | 05 | Yoklama katmanının uç noktası + `probe_cache` | ✅ bitti (2026-09-09) |
 | 06 | Takip motoru: FIFO, durma sezgiselleri, terminal düğüm | ✅ bitti (2026-09-09) |
-| 07 | Graf görünümü (Cytoscape.js) | ⏳ |
+| E | Etiket tohumlaması (OFAC + aday borsa adresleri) | ✅ bitti (2026-09-09) — 324 etiket; arşivle kesişim 0, bkz. bekleyen §1 |
+| 07 | Graf görünümü (Cytoscape.js, dagre soldan sağa) | ⏳ sırada |
 | 08 | Deposit sezgiseli + aktivasyon kümelemesi | ⏳ |
 | 09 | Fiyat/kur (TCMB) + rapor + PDF + SHA-256 | ⏳ |
 | 10 | İzleme: takip listesi arayüzü + self-hosted runner kurulumu | ⏳ |
 
-**Sıradaki iş bir KARARA bağlı:** 07 mi, yoksa sıradan dışarıdaki etiket
-tohumlaması mı önce? Gerekçesi ve ölçümü
-[bekleyen-kararlar §6](../bekleyen-kararlar.md). Kısası: etiket olmadan graf
-"hangi borsa" sorusunu cevaplayamıyor, çünkü arşivde 0 etiket var.
+**Sıra karara bağlanmıştı ve karar verildi (2026-09-09): önce etiket,
+sonra graf.** Etiket tohumlaması yapıldı — ama ölçüm sırayı doğrulamakla
+kalmadı, sorunun yerini de değiştirdi: 324 etiket yazıldı ve arşivdeki
+14.798 adresle kesişimi **0**. Yani graf bugün çizilirse hâlâ "hangi borsa"
+diyemez, ama sebebi artık "etiket yok" değil, "TRON'da ücretsiz borsa
+etiketi kaynağı yok" ([bekleyen-kararlar §1](../bekleyen-kararlar.md)).
+Graf bu yüzden bekletilmiyor: kalan iş etiketin KAYNAĞI, grafın kendisi
+değil.
 
 Yan dosyalar: [kurallar](../../CLAUDE.md) · [bekleyen kararlar](../bekleyen-kararlar.md) ·
 [çözülmesi gerekenler](../cozulmesi-gerekenler.md) · [öneriler](../oneriler.md).

@@ -18,34 +18,53 @@ Kardeş dosyalar: karar beklemeyen eksikler
 
 ---
 
-## 1. BSC ücretsiz planda yoklanamıyor
+## 1. TRON borsa etiketi nereden gelecek
 
-**Soru:** Etherscan'in ücretsiz planı BSC'yi kapsamıyor. Ne yapalım?
+**Soru:** Arşiv TRON ve `terminal` durma sebebi ateşlenmiyor. Borsa
+etiketini nereden alacağız?
 
-**Ölçüm (2026-09-09):** `chainid=56` isteği `{"status":"0","result":"Free API
-access is not supported for this chain"}` döndürüyor. Ethereum ve Polygon
-sorunsuz. Yoklama ekranı bunu artık "yoklanamadı" diye dürüstçe yazıyor, ama
-BSC'de duran bir adresi bulamıyoruz — ve USDT-BEP20 Türkiye dosyalarında
-sık geçiyor.
+**Ölçüm (2026-09-09):** 324 etiket yazıldı (OFAC 320 + 4 aday) ve
+arşivdeki 14.798 adresle kesişim **0**. Ücretsiz TRON etiket kaynağı
+ölçüldü ve kalmadı: TronScan anahtarsız `401`, zincirde `account_name`
+yok. Buna karşılık arşivin kendi yapısal sinyali güçlü:
+
+```
+adres                                gönderen  alıcı  hareket
+TAUN6FwrnwwmaEqYcckffC7wYmbaS6cBiX         14   2248     6249
+THPvaUhoh2Qn2y9THCZML3H815hhFhn5YC       1096     40     2067
+TXFBqBbqJommqZf7BV8NNYzePh97UmJodJ        335    561     3838
+```
 
 **Yeniden üretim:**
 ```bash
-curl -s "https://api.etherscan.io/v2/api?chainid=56&module=proxy&action=eth_getTransactionByHash&txhash=0x0&apikey=$ETHERSCAN_API_KEY"
+docker exec cry-db psql -U cry -d cry -c "
+with d as (select a.address,
+  count(distinct t.from_address_id) filter (where t.to_address_id=a.id) as gonderen,
+  count(distinct t.to_address_id) filter (where t.from_address_id=a.id) as alici,
+  count(*) as hareket
+  from addresses a join transfers t on t.to_address_id=a.id or t.from_address_id=a.id
+  group by a.address)
+select * from d order by gonderen+alici desc limit 12;"
 ```
 
 **Seçenekler:**
-1. **Blockscout'u BSC için yedek yap** — ücretsiz, 5 RPS. Yazılması yarım
-   gün. (Önerim bu.)
-2. **Etherscan ücretli plan** — aylık ücret, tek anahtarla tüm zincirler.
-3. **BSC'yi birincil listeden çıkar** — dürüst ama arayan kişi BSC'de
-   duran parayı hiç bulamaz.
+1. **TronScan ücretsiz API anahtarı** — tronscan.org üzerinden kayıt
+   gerekiyor ve kaydı SEN açarsın (ajan hesap açmaz). Anahtar gelirse
+   tag'ler doğrudan gelir ve tohumlama `packages/etiket` içine ikinci bir
+   kaynak olarak eklenir.
+2. **Yapısal keşif** (Görev 08'in hafif hâli) — yukarıdaki şekli okuyup
+   "servis cüzdanı adayı" üretir, kullanıcı onaylar. Liste bayatlar, motor
+   bayatlamaz — projenin kendi tercihi bu yönde. Ama şekil bir etiket
+   DEĞİLDİR: aday "Binance mi Paribu mu" sorusunu cevaplamaz, yalnızca
+   "burası bir servis" der.
+3. **İkisi birden** — anahtar kimliği verir, keşif kapsamı verir.
 
-**Karar verilmezse:** EVM yoklaması üç zincirden birini hep "yoklanamadı"
-diye işaretler; kullanıcı her seferinde elle başka bir explorer'a bakar.
+**Karar verilmezse:** aracın var olma sebebi olan cümle ("para şu borsaya
+girdi") kurulamaz; her rapor "bütçe bitti" der.
 
-**Geri alınabilir:** evet, hepsi.
+**Geri alınabilir:** evet, etiket silinebilir.
 
-**Karar yeri:** `packages/chain/src/network-probe.ts` + CLAUDE.md.
+**Karar yeri:** `packages/etiket` + CLAUDE.md → Etiket kaynağı.
 
 ---
 
@@ -73,32 +92,7 @@ açar, graf okunmaz.
 
 ---
 
-## 3. Aday borsa adresleri arşive girsin mi
-
-**Soru:** Devir dosyasındaki dört aday adres (BtcTurk/Paribu, EVM+TRON)
-"aday, doğrulanmamış" olarak veritabanına girsin mi?
-
-**Ölçüm:** Adresler base58check/EIP-55 doğrulamasından geçiyor, yani gerçek
-adresler. Ama etiketin doğruluğu kanıtlanmadı; Paribu olduğu iddia edilen
-TRON adresi takip sitelerinde borsa etiketi taşımıyor.
-
-**Seçenekler:**
-1. **Aday olarak gir** (devir dosyasının önerisi) — sistem on-chain
-   davranışla test eder, sen onaylarsın. Rapora "doğrulanmamış" ibaresiyle
-   girer.
-2. **Hiç girme** — keşif motoru bulana kadar bekle.
-
-**Karar verilmezse:** takip motorunun "terminal düğüm" ölçütü hiç
-tetiklenmez, çünkü arşivde tek bir borsa etiketi yok. Tarama her zaman hop
-bütçesinde biter.
-
-**Geri alınabilir:** evet, etiket silinebilir.
-
-**Karar yeri:** `docs/veri-kriterleri.md` → Etiket.
-
----
-
-## 4. Takip koşusu vakasız çalışabilir mi
+## 3. Takip koşusu vakasız çalışabilir mi
 
 **Soru:** Şema `TraceRun.caseId`'yi ZORUNLU tutuyor. Hızlı bir bakış için
 vaka açmadan takip koşulabilsin mi?
@@ -118,7 +112,7 @@ vaka açmadan takip koşulabilsin mi?
 
 ---
 
-## 5. Sunucudaki izleme servisi kurulsun mu, ne zaman
+## 4. Sunucudaki izleme servisi kurulsun mu, ne zaman
 
 **Soru:** Telegram kanalı çalışıyor (doğrulandı). İzleme servisini Hetzner'a
 şimdi mi kuralım?
@@ -140,64 +134,7 @@ bir kerelik `/srv/cry/.env` gerekiyor.
 
 ---
 
-## 6. Sıradaki görev hangisi: graf mı, etiketler mi
-
-**Soru:** Görev 07 (graf görünümü) sırada. Ama etiket tohumlaması sıradan
-DIŞARIDA duruyor ve ondan önce yapılması gerekebilir. Hangisi önce?
-
-**Ölçüm (2026-09-09):** arşivde 0 etiket. Bu yüzden takip motorunun
-`terminal` durma sebebi hiç ateşlenmiyor ve her tarama bütçede bitiyor
-(gerçek koşuda ölçüldü: 25 düğüm, sebep `dugum_siniri`). Graf bugün
-çizilirse **hepsi aynı renkte, hiçbiri "borsa" demeyen** bir düğüm bulutu
-çizer.
-
-**Seçenekler:**
-1. **Önce etiket, sonra graf** (önerim) — TronScan tohumlaması yarım gün;
-   ardından graf ilk çizimde asıl bilgiyi (nerede bitti, hangi borsa)
-   gösterir. Grafın en pahalı işi düğümü sınıflandırmaktır ve sınıf
-   etiketten gelir.
-2. **Önce graf** — görsel ilerleme hemen görünür, etiket sonra binince graf
-   yeniden renklendirilir. İki kez dokunmak demek.
-
-**Karar verilmezse:** Görev 07 sıradaki iş olarak duruyor ve muhtemelen
-yukarıdaki 1. sırayla çakışıyor.
-
-**Geri alınabilir:** evet, ikisi de sıra meselesi.
-
-**Karar yeri:** `docs/gorevler/README.md` tablosu.
-
----
-
-## 7. Graf düzeni: hiyerarşi mi, kuvvet mi — ve kaç düğüm çizilir
-
-**Soru:** Cytoscape hangi düzenle çizsin, ve düğüm sayısı sınırı ne olsun?
-
-**Ölçüm:** ilk gerçek koşu **25 düğüm / 231 kenar** üretti; düğüm sınırı
-varsayılan 300. 300 düğüm ve kabaca on katı kenar, kuvvet tabanlı düzende
-tarayıcıda saniyeler sürer ve okunmaz bir yumak verir.
-
-**Seçenekler:**
-1. **Hiyerarşik (dagre), soldan sağa hop sırası** (önerim) — hop zaten bir
-   SIRADIR; hiyerarşi o sırayı görselleştirir ve "para nereden nereye"
-   sorusu yukarıdan aşağı okunur. Adli bir ekte de böyle basılır.
-2. **Kuvvet tabanlı (cose/fcose)** — kümeleri güzel gösterir, ama düğüm
-   yerleşimi her açılışta DEĞİŞİR; rapora giren bir görselde bu kabul
-   edilemez (aynı koşu iki farklı resim üretir).
-3. İkisi arasında tuş.
-
-**Ek soru:** çizilen düğüm sayısı sınırı — "ilk 100 düğüm + gerisi 've N
-düğüm daha'" mı, hepsi mi?
-
-**Karar verilmezse:** Görev 07 kendi başına bir düzen seçer ve seçim
-rapordaki görselin yeniden üretilebilirliğini belirler.
-
-**Geri alınabilir:** evet.
-
-**Karar yeri:** Görev 07 + [arayuz.md](arayuz.md).
-
----
-
-## 8. Fiyat: hangi AN, hangi kaynak
+## 5. Fiyat: hangi AN, hangi kaynak
 
 **Soru:** Bir hareketin TL karşılığı hangi ana göre yazılsın?
 
@@ -226,7 +163,7 @@ elle eklenir.
 
 ---
 
-## 9. Rapor neyi dondurur, hash neyin üstünden alınır
+## 6. Rapor neyi dondurur, hash neyin üstünden alınır
 
 **Soru:** SHA-256 **PDF'in** mi, yoksa raporun dayandığı **kanıt paketinin**
 (JSON) mi özeti olsun?
@@ -251,7 +188,7 @@ alınamaz. Bu yüzden ilk rapordan ÖNCE karar gerekir.
 
 ---
 
-## 10. İzleme: sıklık ve uyarı eşiği
+## 7. İzleme: sıklık ve uyarı eşiği
 
 **Soru:** İzlemedeki bir adres ne sıklıkla kontrol edilsin, hangi olayda
 mesaj gitsin?

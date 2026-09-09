@@ -17,22 +17,58 @@ fiyat: 0       rapor: 0          deposit adayı: 0
 
 ---
 
-## 1. Aracın asıl çıktısı üretilemiyor: arşivde tek bir etiket yok
+## 1. Etiketler yazıldı ama arşivdeki hiçbir adrese DENK GELMİYOR
 
-**Ne bozuk:** `labels` tablosu **boş (0 satır)**. Takip motoru etiketi
-okuyor (`apps/worker/src/takip.ts:218`, `category.startsWith("exchange")`) ve
-durma sıralamasında `terminal`i en öne koyuyor — ama ölçüt hiç ateşlenemez.
+**Ne bozuk:** `labels` tablosu artık boş değil — **324 etiket** var
+(OFAC SDN 320 + kullanıcının 4 aday borsa adresi). Ama arşivdeki 14.798
+adresle kesişimi **sıfır**. Takip motoru etiketi okuyor
+(`packages/motor/src/durma.ts`, `borsaMi` → `terminal`) ve ölçüt hâlâ
+ateşlenemiyor.
 
-**Nasıl görülür:** her tarama `butce` / `dugum_siniri` ile biter. Rapor asla
-"para şu borsaya girdi" demez, hep "bütçe bitti" der. Aracın var olma sebebi
-tam olarak birinci cümleydi.
+**Nasıl görülür:** her tarama yine `butce` / `dugum_siniri` ile biter.
+Rapor "para şu borsaya girdi" demiyor.
 
-**Ölçüm:** `select count(*) from labels;` → 0.
+**Ölçüm (2026-09-09):**
+```bash
+docker exec cry-db psql -U cry -d cry -c "select category,count(*) from labels group by 1;"
+docker exec cry-db psql -U cry -d cry -c "
+  select count(*) from labels l join addresses a on a.id=l.address_id
+  where exists (select 1 from transfers t where t.from_address_id=a.id or t.to_address_id=a.id);"
+```
+→ `sanction:320, exchange_hot:4` · kesişim `0`.
 
-**Nerede:** veri eksiği, kod değil. Kaynağı bir karar
-([bekleyen-kararlar](bekleyen-kararlar.md) §3) ya da bir tohumlama işi
-([oneriler](oneriler.md) §2 TronScan) — ikisinden biri yapılmadan Görev 09
-raporu boş bir iddia taşır.
+**Neden böyle:** arşiv TRON, ve TRON borsa etiketi veren ücretsiz kaynak
+kalmadı — TronScan anahtarsız `401` döndürüyor, zincirde `account_name`
+yok (ikisi de ölçüldü, bkz. CLAUDE.md → "Etiket kaynağı"). OFAC yaptırım
+listesi resmî ve çalışıyor ama bu dosyadaki paranın gittiği yerler
+yaptırımlı adresler değil, BORSALAR.
+
+**Nerede:** iki yoldan biri gerekiyor ve ikisi de bir karar
+([bekleyen-kararlar](bekleyen-kararlar.md) → TronScan anahtarı / yapısal
+keşif). Arşivin kendi yapısal sinyali hazır duruyor: en yoğun karşı taraf
+`TAUN6FwrnwwmaEqYcckffC7wYmbaS6cBiX` 2.248 farklı adrese gönderiyor,
+`THPvaUhoh2Qn2y9THCZML3H815hhFhn5YC` 1.096 farklı adresten alıyor — bu
+şekil bir servis cüzdanının şeklidir, ama şekil bir ETİKET DEĞİLDİR.
+
+---
+
+## 1b. BSC yoklaması Blockscout'a devredilecek (karar verildi)
+
+**Karar (2026-09-09):** Etherscan'in ücretsiz planı BSC'yi kapsamıyor
+(`chainid=56` → "Free API access is not supported for this chain");
+BSC yoklaması **Blockscout'a** düşecek (ücretsiz, 5 RPS).
+
+**Nasıl görülür:** bugün EVM yoklaması üç zincirden birini hep
+"yoklanamadı" diye işaretliyor ve USDT-BEP20 Türkiye dosyalarında sık
+geçiyor.
+
+**Ölçüm:**
+```bash
+curl -s "https://api.etherscan.io/v2/api?chainid=56&module=proxy&action=eth_getTransactionByHash&txhash=0x0&apikey=$ETHERSCAN_API_KEY"
+```
+
+**Nerede:** `packages/chain/src/network-probe.ts` — BSC dalı Blockscout'a
+yönlendirilir, öteki zincirler Etherscan'de kalır. Yapılmadı.
 
 ---
 

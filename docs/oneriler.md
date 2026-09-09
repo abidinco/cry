@@ -17,15 +17,18 @@ docker exec cry-db pg_dump -U cry -d cry --format=custom > "cry-yedek-$(Get-Date
 alışkanlık yap. Rapor kanıt dondurma iddiasında; altındaki veritabanı
 yedeksizse iddia yarım kalır.
 
-**2. TronScan etiketlerini tohum olarak çek.**
-TronScan kendi tag'lerini API'den ücretsiz veriyor. Bugün arşivde **tek bir
-borsa etiketi yok**, bu yüzden takip motorunun "terminal düğüm" ölçütü hiç
-tetiklenmiyor. Birkaç yüz etiket, aracın asıl çıktısını (hangi borsa) mümkün
-kılar. Etiketler `source: "tronscan"` ve doğrulanmamış olarak girer.
+**2. ~~TronScan etiketlerini tohum olarak çek.~~ — ÖLÇÜLDÜ, YOL KAPALI.**
+`apilist.tronscanapi.com` anahtarsız `401 Authorization Required` dönüyor
+(2026-09-09); "API'den ücretsiz gelir" bir varsayımdı. Zincirde de bedava
+etiket yok: arşivin en yoğun beş karşı tarafında TronGrid `account_name`
+alanını hiç döndürmüyor. Yerine geçecek iki yol bir karar bekliyor
+([bekleyen-kararlar §1](bekleyen-kararlar.md)).
 
-**3. OFAC yaptırım listesi.**
-Ücretsiz, resmî, makine okunur. Bir adresin yaptırım listesinde olması
-raporda ağır basan bir bulgu ve kaçırılması pahalı.
+**3. ~~OFAC yaptırım listesi.~~ — YAPILDI (2026-09-09).**
+`packages/etiket`, kaynak `SDN_ENHANCED.XML`. 320 tekil adres yazıldı
+(tron 230 · ethereum 94 · arbitrum 1 · bsc 1); adaptörü olmayan 476 kayıt
+biçimi adıyla raporlanıyor (bitcoin 442, monero/zcash/dash…). Yeniden
+üretim: `npx tsx packages/etiket/src/cli.ts --kaynak=ofac`.
 
 **4. Tarama hızını ölç, sonra paralelleştir.**
 TronGrid anahtarı geldi (2 → 10 istek/sn) ama worker eşzamanlılığı hâlâ 4 ve
