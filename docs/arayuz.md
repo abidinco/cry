@@ -90,6 +90,15 @@ Düğüme gelmek bağlı şeritleri yakar; tıklamak defteri o adrese süzer.
 Tam tutar ipucunda ve defterde, şerit etiketinde yalnızca kısa biçim
 ("11,1 Mn") — kısa biçim de bigint üzerinden hesaplanır.
 
+**Takibe devam ve gizleme.** Bir adres seçilince sağ panelde eylemler
+çıkar:
+- **takibe devam et ▸ +2 sıçrama** — aday borsada ve bizim sınırımızda
+  (bütçe, dallanma…) kalan adreslerde; birincil düğme, indigo. Doğrulanmış
+  borsada düğme YOKTUR, yerine "iz burada tamamlandı" yazar.
+- **diyagramda gizle / göster** — adres ve şeritleriyle birlikte. Şerit
+  seçilince "şeridi gizle"; defterde her satırın sonunda göz düğmesi.
+  Gizlenenler lejantın altında çip olarak durur, çipe tıklamak geri getirir.
+
 **Defter ile akış birbirine bağlıdır** (kullanıcı isteği 2026-09-14): bir
 defter satırının üzerine gelmek o şeridi, sıçrama başlığının üzerine gelmek
 o sıçramanın bütün şeritlerini akışta öne çıkarır; tersine, akışta bir

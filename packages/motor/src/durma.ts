@@ -138,3 +138,46 @@ export function kosuDurmaSebebi(sayac: Record<string, number>): string | null {
   const sirali = Object.entries(sayac).sort((a, b) => b[1] - a[1]);
   return sirali[0]?.[0] ?? null;
 }
+
+/**
+ * Durmuş bir düğümden takibe DEVAM edilebilir mi? (kullanıcı kararı 2026-09-14)
+ *
+ * Doğrulanmış borsada HAYIR: borsaya giren para borsanın ortak havuzuna
+ * karışır ve zincirdeki çıkışı artık o paranın devamı DEĞİLDİR — kimin
+ * çektiğini yalnızca borsanın kendi kayıtları söyler. Oradan "devam" etmek
+ * başka müşterilerin parasını bu dosyaya yazmak olurdu.
+ *
+ * Aday borsada ve bizim koyduğumuz sınırlarda (bütçe, dallanma, eşik, düğüm
+ * sınırı) EVET: iz bitmedi, biz durduk. Taranamamış ve sözleşme düğümünde de
+ * evet — karar insanın, sebep kayda geçer.
+ */
+export function devamEdilebilir(
+  sebep: string | null,
+): { olur: true } | { olur: false; neden: string } {
+  if (sebep === null) return { olur: false, neden: "bu adresten zaten devam edildi" };
+  if (sebep === "terminal") {
+    return {
+      olur: false,
+      neden: "doğrulanmış borsa — para borsanın havuzuna karıştı, zincirdeki çıkışı bu paranın devamı değil",
+    };
+  }
+  return { olur: true };
+}
+
+/** Devamın ek bütçesi: kaç sıçrama daha. */
+export const DEVAM_EK_HOP = { varsayilan: 2, en_az: 1, en_cok: 5 } as const;
+
+/**
+ * Devam koşusunun eşikleri: sıçrama bütçesi düğümün OLDUĞU yerden sayılır,
+ * düğüm bütçesi koşunun mevcut büyüklüğünün ÜSTÜNE eklenir. Aksi hâlde 3.
+ * sıçramadaki bir düğümden `maxHop: 3` ile devam etmek anında "bütçe" der.
+ */
+export function devamEsikleri(
+  temel: Esikler,
+  dugumHop: number,
+  mevcutDugum: number,
+  ekHop: number,
+): Esikler {
+  const hop = Math.min(DEVAM_EK_HOP.en_cok, Math.max(DEVAM_EK_HOP.en_az, Math.round(ekHop)));
+  return { ...temel, maxHop: dugumHop + hop, maxDugum: mevcutDugum + temel.maxDugum };
+}

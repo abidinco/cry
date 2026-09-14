@@ -10,6 +10,7 @@ import {
   KUYRUK,
   KUYRUK_ONEKI,
   indeksIsAnahtari,
+  takipDevamIsAnahtari,
   takipIsAnahtari,
   type IndeksIsi,
   type TakipIsi,
@@ -98,3 +99,24 @@ export function takipKuyrugu(): Queue<TakipIsi> {
 export async function takipIstegi(traceRunId: string): Promise<void> {
   await takipKuyrugu().add(KUYRUK.takip, { traceRunId }, { jobId: takipIsAnahtari(traceRunId) });
 }
+
+/**
+ * Durmuş bir düğümden devam işini kuyruğa atar. Aynı düğüm için bekleyen ya
+ * da süren bir devam varsa ikincisi AÇILMAZ.
+ */
+export async function takipDevamIstegi(
+  traceRunId: string,
+  devam: { adres: string; ekHop: number; userId: number },
+): Promise<{ yeni: boolean }> {
+  const kuyruk = takipKuyrugu();
+  const anahtar = takipDevamIsAnahtari(traceRunId, devam.adres);
+  const mevcut = await kuyruk.getJob(anahtar);
+  if (mevcut) {
+    const durum = await mevcut.getState();
+    if (durum === "waiting" || durum === "active" || durum === "delayed") return { yeni: false };
+    await mevcut.remove();
+  }
+  await kuyruk.add(KUYRUK.takip, { traceRunId, devam }, { jobId: anahtar });
+  return { yeni: true };
+}
+

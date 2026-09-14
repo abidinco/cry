@@ -12,6 +12,8 @@ import { prisma } from "@cry/db";
 import {
   dagit,
   durmaSebebi,
+  devamEdilebilir,
+  devamEsikleri,
   kosuDurmaSebebi,
   VARSAYILAN_ESIKLER,
   type AtifKurali,
@@ -36,35 +38,186 @@ type Parametreler = {
 /** Bir düğümün işlenmek üzere bekleyen hâli. */
 type Sira = { adres: string; hop: number; girisler: IzliGiris[] };
 
-export async function takipKos(traceRunId: bigint): Promise<{
-  dugum: number;
-  kenar: number;
-  durma: Record<string, number>;
-}> {
-  const kosu = await prisma.traceRun.findUniqueOrThrow({ where: { id: traceRunId } });
-  const p = (kosu.params ?? {}) as Parametreler;
+type Ozet = { dugum: number; kenar: number; durma: Record<string, number> };
 
-  const esikler: Esikler = {
+function esikleriOku(p: Parametreler): Esikler {
+  return {
     maxHop: p.maxHop ?? VARSAYILAN_ESIKLER.maxHop,
     maxDugum: p.maxDugum ?? VARSAYILAN_ESIKLER.maxDugum,
     dallanmaEsigi: p.dallanmaEsigi ?? VARSAYILAN_ESIKLER.dallanmaEsigi,
     minTutar: p.minTutar ? BigInt(p.minTutar) : VARSAYILAN_ESIKLER.minTutar,
   };
+}
+
+export async function takipKos(traceRunId: bigint): Promise<Ozet> {
+  const kosu = await prisma.traceRun.findUniqueOrThrow({ where: { id: traceRunId } });
+  const p = (kosu.params ?? {}) as Parametreler;
 
   await prisma.traceRun.update({
     where: { id: traceRunId },
     data: { status: "calisiyor", startedAt: new Date() },
   });
 
-  const zincir = kosu.chain;
-  const kural = kosu.taintRule as AtifKurali;
-  const gorulen = new Set<string>();
-  const durmaSayaci: Record<string, number> = {};
-  let kenarSayisi = 0;
+  const tohum = await tohumGirisleri(kosu.chain, kosu.rootAddress, p.tohumTx);
+  await yuru({
+    traceRunId,
+    zincir: kosu.chain,
+    kural: kosu.taintRule as AtifKurali,
+    pencereSaat: p.pencereSaat,
+    esikler: esikleriOku(p),
+    gorulen: new Set<string>([kosu.rootAddress]),
+    sira: [{ adres: kosu.rootAddress, hop: 0, girisler: tohum }],
+  });
 
-  const tohum = await tohumGirisleri(zincir, kosu.rootAddress, p.tohumTx);
-  let sira: Sira[] = [{ adres: kosu.rootAddress, hop: 0, girisler: tohum }];
-  gorulen.add(kosu.rootAddress);
+  return kosuyuKapat(traceRunId);
+}
+
+/**
+ * Durmuş bir düğümden takibe DEVAM eder (kullanıcı kararı 2026-09-14).
+ *
+ * Yeni bir koşu açılmaz: devam aynı koşunun grafına eklenir, çünkü kullanıcı
+ * "oradan nereye gitti" sorusunu AYNI resimde soruyor. Ama bu bir insan
+ * kararıdır ve rapor bunu bilmelidir: düğümün eski durma sebebi, kimin ve ne
+ * zaman devam ettirdiği `stats.devamlar`a yazılır.
+ *
+ * Tohum, o düğüme BU koşuda izlenerek gelen paradır (kenarların izli
+ * tutarı) — adrese giren bütün para değil. Aksi hâlde başka kaynaklardan
+ * gelen para bu dosyanın parası sayılırdı.
+ */
+export async function takipDevam(
+  traceRunId: bigint,
+  adres: string,
+  ekHop: number,
+  kullaniciId: number | null,
+): Promise<Ozet> {
+  const kosu = await prisma.traceRun.findUniqueOrThrow({ where: { id: traceRunId } });
+  const p = (kosu.params ?? {}) as Parametreler;
+  const dugum = await prisma.traceNode.findUniqueOrThrow({
+    where: { traceRunId_chain_address: { traceRunId, chain: kosu.chain, address: adres } },
+  });
+
+  const karar = devamEdilebilir(dugum.terminalReason);
+  if (!karar.olur) throw new Error(`devam edilemez: ${karar.neden}`);
+
+  const mevcut = await prisma.traceNode.findMany({
+    where: { traceRunId },
+    select: { address: true },
+  });
+  const esikler = devamEsikleri(esikleriOku(p), dugum.hop, mevcut.length, ekHop);
+
+  const gelen = await prisma.traceEdge.findMany({
+    where: { traceRunId, toAddress: adres },
+    orderBy: [{ ts: "asc" }, { txIndex: "asc" }],
+  });
+  const varlikId = new Map<string, number | null>();
+  const girisler: IzliGiris[] = [];
+  for (const k of gelen) {
+    const sozlesme = k.assetContract ?? "";
+    if (!varlikId.has(sozlesme)) {
+      const v = await prisma.asset.findUnique({
+        where: { chain_contract: { chain: kosu.chain, contract: sozlesme } },
+        select: { id: true },
+      });
+      varlikId.set(sozlesme, v?.id ?? null);
+    }
+    const id = varlikId.get(sozlesme);
+    // Varlığı çözülemeyen kenar tohuma girmez: yanlış varlığa atfedilen para
+    // yanlış bir çıkışla eşleşir.
+    if (id == null) continue;
+    girisler.push({
+      varlik: String(id),
+      tutar: BigInt(k.amountRaw),
+      ts: k.ts.getTime(),
+      pay: 1,
+      kaynakTx: k.txHash,
+    });
+  }
+
+  const devamKaydi = {
+    adres,
+    oncekiSebep: dugum.terminalReason,
+    hop: dugum.hop,
+    ekHop: esikler.maxHop - dugum.hop,
+    kullaniciId,
+    zaman: new Date().toISOString(),
+  };
+
+  await prisma.$transaction([
+    prisma.traceRun.update({ where: { id: traceRunId }, data: { status: "calisiyor" } }),
+    // Düğüm artık bir durma noktası değil; eski sebep devam kaydında yaşar.
+    prisma.traceNode.update({
+      where: { id: dugum.id },
+      data: { isTerminal: false, terminalReason: null },
+    }),
+  ]);
+
+  await yuru({
+    traceRunId,
+    zincir: kosu.chain,
+    kural: kosu.taintRule as AtifKurali,
+    pencereSaat: p.pencereSaat,
+    esikler,
+    gorulen: new Set(mevcut.map((d) => d.address)),
+    sira: [{ adres, hop: dugum.hop, girisler }],
+    zorlaDevam: adres,
+  });
+
+  return kosuyuKapat(traceRunId, devamKaydi);
+}
+
+/**
+ * Koşunun özetini VERİTABANINDAN yeniden sayar. Devamlarla koşu parça parça
+ * büyüdüğü için bellekteki sayaç tek bir yürüyüşü bilir, koşunun tamamını değil.
+ */
+async function kosuyuKapat(traceRunId: bigint, devam?: Record<string, unknown>): Promise<Ozet> {
+  const [dugum, kenar, sebepler, onceki] = await Promise.all([
+    prisma.traceNode.count({ where: { traceRunId } }),
+    prisma.traceEdge.count({ where: { traceRunId } }),
+    prisma.traceNode.groupBy({
+      by: ["terminalReason"],
+      where: { traceRunId, terminalReason: { not: null } },
+      _count: true,
+    }),
+    prisma.traceRun.findUniqueOrThrow({ where: { id: traceRunId }, select: { stats: true } }),
+  ]);
+  const durma: Record<string, number> = {};
+  for (const s of sebepler) if (s.terminalReason) durma[s.terminalReason] = s._count;
+  const eskiStats = (onceki.stats ?? {}) as { devamlar?: unknown[]; devamHatalari?: unknown[] };
+  const devamlar = [...(eskiStats.devamlar ?? []), ...(devam ? [devam] : [])];
+
+  await prisma.traceRun.update({
+    where: { id: traceRunId },
+    data: {
+      status: "bitti",
+      finishedAt: new Date(),
+      stopReason: kosuDurmaSebebi(durma),
+      stats: {
+        dugum,
+        kenar,
+        durma,
+        ...(devamlar.length ? { devamlar } : {}),
+        ...(eskiStats.devamHatalari ? { devamHatalari: eskiStats.devamHatalari } : {}),
+      } as object,
+    },
+  });
+  return { dugum, kenar, durma };
+}
+
+type Yuruyus = {
+  traceRunId: bigint;
+  zincir: string;
+  kural: AtifKurali;
+  pencereSaat?: number;
+  esikler: Esikler;
+  gorulen: Set<string>;
+  sira: Sira[];
+  /** Kullanıcının devam ettirdiği düğüm: durma ölçütü ona SORULMAZ. */
+  zorlaDevam?: string;
+};
+
+async function yuru(y: Yuruyus): Promise<void> {
+  const { traceRunId, zincir, kural, esikler, gorulen } = y;
+  let sira = y.sira;
 
   while (sira.length > 0) {
     const sonraki: Sira[] = [];
@@ -93,37 +246,33 @@ export async function takipKos(traceRunId: bigint): Promise<{
         0n,
       );
 
-      const sebep = durmaSebebi(
-        {
-          adres: dugum.adres,
-          hop: dugum.hop,
-          cikisSayisi: guncel.cikisSayisi,
-          izliTutar: izliToplam,
-          borsaMi: guncel.borsaMi,
-          borsaEtiketiDogrulanmisMi: guncel.borsaEtiketiDogrulanmisMi,
-          sozlesmeMi: guncel.sozlesmeMi,
-          indekslendiMi: guncel.indekslendiMi,
-        },
-        esikler,
-        gorulen.size,
-      );
+      const sebep =
+        dugum.adres === y.zorlaDevam
+          ? null
+          : durmaSebebi(
+              {
+                adres: dugum.adres,
+                hop: dugum.hop,
+                cikisSayisi: guncel.cikisSayisi,
+                izliTutar: izliToplam,
+                borsaMi: guncel.borsaMi,
+                borsaEtiketiDogrulanmisMi: guncel.borsaEtiketiDogrulanmisMi,
+                sozlesmeMi: guncel.sozlesmeMi,
+                indekslendiMi: guncel.indekslendiMi,
+              },
+              esikler,
+              gorulen.size,
+            );
 
       await dugumYaz(traceRunId, zincir, dugum, varlikToplami, sebep, guncel.etiketler);
-      if (sebep) {
-        durmaSayaci[sebep] = (durmaSayaci[sebep] ?? 0) + 1;
-        continue;
-      }
+      if (sebep) continue;
 
       const hareketler = await hareketleriOku(zincir, dugum.adres);
-      const sonuc = dagit(hareketler, dugum.girisler, {
-        kural,
-        pencereSaat: p.pencereSaat,
-      });
+      const sonuc = dagit(hareketler, dugum.girisler, { kural, pencereSaat: y.pencereSaat });
 
       const hedefler = new Map<string, IzliGiris[]>();
       for (const c of sonuc.cikislar) {
         await kenarYaz(traceRunId, zincir, dugum, c);
-        kenarSayisi++;
         const liste = hedefler.get(c.hedef) ?? [];
         liste.push({ varlik: c.varlik, tutar: c.izliTutar, ts: c.ts, pay: 1, kaynakTx: c.txHash });
         hedefler.set(c.hedef, liste);
@@ -139,18 +288,6 @@ export async function takipKos(traceRunId: bigint): Promise<{
 
     sira = sonraki;
   }
-
-  await prisma.traceRun.update({
-    where: { id: traceRunId },
-    data: {
-      status: "bitti",
-      finishedAt: new Date(),
-      stopReason: kosuDurmaSebebi(durmaSayaci),
-      stats: { dugum: gorulen.size, kenar: kenarSayisi, durma: durmaSayaci },
-    },
-  });
-
-  return { dugum: gorulen.size, kenar: kenarSayisi, durma: durmaSayaci };
 }
 
 /* ---------------- veri okuma ---------------- */

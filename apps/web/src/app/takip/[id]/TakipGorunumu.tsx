@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { yuklemeIzle } from "@/lib/yukleme";
+import { DEVAM_EK_HOP, devamEdilebilir } from "@cry/motor";
 import TakipIskeleti from "./TakipIskeleti";
 import { Adres, Bos, Tarih, Tutar } from "@/components/ui";
 import { kisaTutar, sayi, tarih } from "@/lib/bicim";
@@ -19,6 +20,7 @@ import {
   akisModeli,
   akisOzeti,
   anaVarlik,
+  gizleneniAyikla,
   varliklar,
   type AkisDugumu,
   type AkisKenari,
@@ -33,7 +35,13 @@ type Kosu = {
   taintRule: string;
   status: string;
   stopReason: string | null;
-  stats: { dugum?: number; kenar?: number; durma?: Record<string, number> } | null;
+  stats: {
+    dugum?: number;
+    kenar?: number;
+    durma?: Record<string, number>;
+    devamlar?: { adres: string; oncekiSebep: string | null; ekHop: number; zaman: string }[];
+    devamHatalari?: { adres: string; mesaj: string; zaman: string }[];
+  } | null;
   params: Record<string, unknown> | null;
   startedAt: string;
   finishedAt: string | null;
@@ -72,6 +80,37 @@ export default function TakipGorunumu({ id }: { id: string }) {
   // Defter ↔ diyagram: birinin üzerine gelinen şerit ötekinde öne çıkar.
   const [defterVurgu, setDefterVurgu] = useState<Set<string> | null>(null);
   const [akisOdak, setAkisOdak] = useState<Set<string> | null>(null);
+  // Gizlenen şeritler ve adresler — yalnızca GÖRÜNÜM; bu tarayıcıda koşu başına saklanır.
+  const [gizliSerit, setGizliSerit] = useState<Set<string>>(new Set());
+  const [gizliDugum, setGizliDugum] = useState<Set<string>>(new Set());
+  const [devamIstek, setDevamIstek] = useState<{ adres: string; hata?: string } | null>(null);
+
+  const gizliAnahtar = `takip-gizli-${id}`;
+  useEffect(() => {
+    try {
+      const k = JSON.parse(localStorage.getItem(gizliAnahtar) ?? "null") as { s?: string[]; d?: string[] } | null;
+      if (k) {
+        setGizliSerit(new Set(k.s ?? []));
+        setGizliDugum(new Set(k.d ?? []));
+      }
+    } catch {
+      // saklama kapalıysa gizleme yalnızca bu oturumda yaşar
+    }
+  }, [gizliAnahtar]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(gizliAnahtar, JSON.stringify({ s: [...gizliSerit], d: [...gizliDugum] }));
+    } catch {
+      // yok say
+    }
+  }, [gizliAnahtar, gizliSerit, gizliDugum]);
+
+  const degistir = (kume: Set<string>, oge: string) => {
+    const yeni = new Set(kume);
+    if (yeni.has(oge)) yeni.delete(oge);
+    else yeni.add(oge);
+    return yeni;
+  };
 
   const yukle = useCallback(async () => {
     const yanit = await fetch(`/api/takip/${id}`);
@@ -97,8 +136,8 @@ export default function TakipGorunumu({ id }: { id: string }) {
 
   const secilenVarlik = varlik ?? (kosu ? anaVarlik(kosu.kenarlar) : null);
 
-  const { model, kirpilan } = useMemo(() => {
-    if (!kosu || !secilenVarlik) return { model: null, kirpilan: 0 };
+  const { model, gorunurModel, kirpilan } = useMemo(() => {
+    if (!kosu || !secilenVarlik) return { model: null, gorunurModel: null, kirpilan: 0 };
     // Rapora giren görselin okunabilir kalması için en çok 100 düğüm; seçim
     // deterministik ve BULGUYU kaybetmez (önce kök ve iz biten düğümler).
     const { secilen, kirpilan } = cizilecekler(
@@ -106,16 +145,40 @@ export default function TakipGorunumu({ id }: { id: string }) {
       kosu.rootAddress,
     );
     const cizilen = new Set(secilen.map((d) => d.address));
+    const dugumler = kosu.dugumler.filter((d) => cizilen.has(d.address));
+    // İki model: TAM olan özeti ve defteri besler (koşunun gerçeği), GÖRÜNEN
+    // olan diyagramı — gizlenenler çıkınca kalınlık ölçeği kalan akışa göre kurulur.
+    const g = gizleneniAyikla(dugumler, kosu.kenarlar, kosu.rootAddress, {
+      seritler: gizliSerit,
+      dugumler: gizliDugum,
+    });
     return {
-      model: akisModeli(
-        kosu.dugumler.filter((d) => cizilen.has(d.address)),
-        kosu.kenarlar,
-        kosu.rootAddress,
-        secilenVarlik,
-      ),
+      model: akisModeli(dugumler, kosu.kenarlar, kosu.rootAddress, secilenVarlik),
+      gorunurModel: akisModeli(g.dugumler, g.kenarlar, kosu.rootAddress, secilenVarlik),
       kirpilan,
     };
-  }, [kosu, secilenVarlik]);
+  }, [kosu, secilenVarlik, gizliSerit, gizliDugum]);
+
+  const devamEt = useCallback(
+    async (adres: string, ekHop: number) => {
+      setDevamIstek({ adres });
+      const yanit = await yuklemeIzle(
+        fetch(`/api/takip/${id}/devam`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ adres, ekHop }),
+        }),
+      );
+      const govde = (await yanit.json().catch(() => ({}))) as { error?: string };
+      if (!yanit.ok) {
+        setDevamIstek({ adres, hata: govde.error ?? "devam başlatılamadı" });
+        return;
+      }
+      setDevamIstek(null);
+      await yukle();
+    },
+    [id, yukle],
+  );
 
   if (hata) return <p style={{ color: "var(--hata)" }}>{hata}</p>;
   if (!kosu) return <TakipIskeleti />;
@@ -148,7 +211,7 @@ export default function TakipGorunumu({ id }: { id: string }) {
     </div>
   );
 
-  if (!model || kosu.dugumler.length === 0) {
+  if (!model || !gorunurModel || kosu.dugumler.length === 0) {
     return (
       <>
         {baslik}
@@ -190,6 +253,10 @@ export default function TakipGorunumu({ id }: { id: string }) {
         })()
       : null;
   const seciliDugum = secim?.dugum ? dugumHarita.get(secim.dugum) : null;
+  const seciliSerit = secim?.serit ? model.seritler.find((x) => x.anahtar === secim.serit) : null;
+  const devamKaydi = (adres: string) => kosu.stats?.devamlar?.filter((d) => d.adres === adres).at(-1);
+  const devamHatasi = (adres: string) => kosu.stats?.devamHatalari?.filter((d) => d.adres === adres).at(-1);
+  const gizliToplam = gizliSerit.size + gizliDugum.size;
 
   const oran = (ham: bigint) => Number((ham * 1000n) / cubukEn) / 10;
 
@@ -232,8 +299,45 @@ export default function TakipGorunumu({ id }: { id: string }) {
               <span className="etiket">kalınlık = {model.varlik}</span>
             )}
           </div>
+          {gizliToplam > 0 && (
+            <div className="gizli-serit" role="status">
+              <span className="etiket">
+                gizli: {gizliDugum.size > 0 && `${sayi(gizliDugum.size)} adres`}
+                {gizliDugum.size > 0 && gizliSerit.size > 0 && " · "}
+                {gizliSerit.size > 0 && `${sayi(gizliSerit.size)} şerit`} — kalınlık kalan akışa göre
+              </span>
+              {[...gizliDugum].map((a) => {
+                const d = dugumHarita.get(a);
+                return (
+                  <button key={a} type="button" className="gizli-cip" onClick={() => setGizliDugum((k) => degistir(k, a))} title={`${a} — göster`}>
+                    {d ? dugumAdi(d) : a.slice(0, 8)} <span aria-hidden="true">×</span>
+                  </button>
+                );
+              })}
+              {[...gizliSerit].map((s2) => {
+                const [f, t] = s2.split(">");
+                const fd = dugumHarita.get(f!);
+                const td = dugumHarita.get(t!);
+                return (
+                  <button key={s2} type="button" className="gizli-cip" onClick={() => setGizliSerit((k) => degistir(k, s2))} title="göster">
+                    {fd ? dugumAdi(fd) : "?"} → {td ? dugumAdi(td) : "?"} <span aria-hidden="true">×</span>
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                className="gizli-hepsi"
+                onClick={() => {
+                  setGizliSerit(new Set());
+                  setGizliDugum(new Set());
+                }}
+              >
+                hepsini göster
+              </button>
+            </div>
+          )}
           <Akis
-            model={model}
+            model={gorunurModel}
             kokAdres={kosu.rootAddress}
             secili={secim?.dugum ?? null}
             onSecim={setSecim}
@@ -317,9 +421,62 @@ export default function TakipGorunumu({ id }: { id: string }) {
               <Adres deger={seciliDugum.address} zincir={kosu.chain} kisa={false} />
               <span className="m3">
                 {seciliDugum.hop}. sıçrama ·{" "}
-                {seciliDugum.terminalReason ? (SEBEP[seciliDugum.terminalReason] ?? seciliDugum.terminalReason) : "devam edildi"}
+                {seciliDugum.terminalReason
+                  ? (SEBEP[seciliDugum.terminalReason] ?? seciliDugum.terminalReason)
+                  : devamKaydi(seciliDugum.address)
+                    ? `takibe devam edildi (+${devamKaydi(seciliDugum.address)!.ekHop} sıçrama; önce: ${SEBEP[devamKaydi(seciliDugum.address)!.oncekiSebep ?? ""] ?? "—"})`
+                    : "devam edildi"}
                 {seciliDugum.etiketler.length > 0 && ` · ${seciliDugum.etiketler.map((e) => e.title).join(" · ")}`}
               </span>
+              <div className="takip-eylemler">
+                {(() => {
+                  if (seciliDugum.address === kosu.rootAddress) return null;
+                  const karar = devamEdilebilir(seciliDugum.terminalReason);
+                  if (seciliDugum.terminalReason === "terminal") {
+                    return <span className="takip-kilit">iz burada tamamlandı — doğrulanmış borsada takip sürdürülmez</span>;
+                  }
+                  if (!karar.olur) return null;
+                  const bekliyor = devamIstek?.adres === seciliDugum.address && !devamIstek.hata;
+                  return (
+                    <button
+                      type="button"
+                      className="takip-devam"
+                      disabled={suruyor || bekliyor}
+                      title={suruyor ? "koşu sürüyor — bitince devam edilebilir" : "bu adrese izlenerek gelen paranın nereye gittiğini tara"}
+                      onClick={() => void devamEt(seciliDugum.address, DEVAM_EK_HOP.varsayilan)}
+                    >
+                      {bekliyor || suruyor ? "taranıyor…" : `takibe devam et ▸ +${DEVAM_EK_HOP.varsayilan} sıçrama`}
+                    </button>
+                  );
+                })()}
+                {seciliDugum.address !== kosu.rootAddress && (
+                  <button type="button" className="takip-gizle" onClick={() => setGizliDugum((k) => degistir(k, seciliDugum.address))}>
+                    {gizliDugum.has(seciliDugum.address) ? "diyagramda göster" : "diyagramda gizle"}
+                  </button>
+                )}
+              </div>
+              {devamIstek?.adres === seciliDugum.address && devamIstek.hata && (
+                <span style={{ color: "var(--hata)" }}>{devamIstek.hata}</span>
+              )}
+              {devamHatasi(seciliDugum.address) && !devamKaydi(seciliDugum.address) && (
+                <span style={{ color: "var(--hata)" }}>son devam başarısız: {devamHatasi(seciliDugum.address)!.mesaj}</span>
+              )}
+            </div>
+          )}
+          {seciliSerit && (
+            <div className="takip-secili">
+              <span className="veri">
+                {dugumAdi(dugumHarita.get(seciliSerit.from)!)} → {dugumAdi(dugumHarita.get(seciliSerit.to)!)}
+              </span>
+              <span className="m3">
+                {SERIT_ADI[seciliSerit.tur]} · {sayi(seciliSerit.kenarlar.length)} hareket ·{" "}
+                <Tutar ham={seciliSerit.ham.toString()} ondalik={model.decimals} sembol={model.varlik} />
+              </span>
+              <div className="takip-eylemler">
+                <button type="button" className="takip-gizle" onClick={() => setGizliSerit((k) => degistir(k, seciliSerit.anahtar))}>
+                  {gizliSerit.has(seciliSerit.anahtar) ? "şeridi göster" : "şeridi gizle"}
+                </button>
+              </div>
             </div>
           )}
           <div className="takip-defter">
@@ -329,6 +486,7 @@ export default function TakipGorunumu({ id }: { id: string }) {
                   <th>kimden → kime</th>
                   <th className="sag">{model.varlik}</th>
                   <th className="sag" title="çıkışın ize atfedilen payı">pay</th>
+                  <th aria-label="diyagramda göster / gizle" />
                 </tr>
               </thead>
               <tbody>
@@ -352,7 +510,14 @@ export default function TakipGorunumu({ id }: { id: string }) {
                       <tr
                         title={`${tarih(k.ts)} TSİ · ${k.txHash}`}
                         tabIndex={0}
-                        className={akisOdak?.has(anahtar) || (defterVurgu?.size === 1 && defterVurgu.has(anahtar)) ? "yanik" : undefined}
+                        className={
+                          [
+                            akisOdak?.has(anahtar) || (defterVurgu?.size === 1 && defterVurgu.has(anahtar)) ? "yanik" : "",
+                            gizliSerit.has(anahtar) || gizliDugum.has(k.from) || gizliDugum.has(k.to) ? "gizli" : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ") || undefined
+                        }
                         onMouseEnter={vurgula(new Set([anahtar]))}
                         onMouseLeave={vurgula(null)}
                         onFocus={vurgula(new Set([anahtar]))}
@@ -369,6 +534,21 @@ export default function TakipGorunumu({ id }: { id: string }) {
                           <Tutar ham={k.amountRaw} ondalik={k.decimals} />
                         </td>
                         <td className="sag veri m2">%{Math.round(k.taintShare * 100)}</td>
+                        <td className="takip-goz-hucre">
+                          <button
+                            type="button"
+                            className="takip-goz"
+                            aria-pressed={gizliSerit.has(anahtar)}
+                            aria-label={gizliSerit.has(anahtar) ? "şeridi diyagramda göster" : "şeridi diyagramda gizle"}
+                            title={gizliSerit.has(anahtar) ? "diyagramda göster" : "diyagramda gizle"}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setGizliSerit((kume) => degistir(kume, anahtar));
+                            }}
+                          >
+                            <GozIsareti kapali={gizliSerit.has(anahtar)} />
+                          </button>
+                        </td>
                       </tr>
                     </FragmentSatir>
                   );
@@ -407,10 +587,25 @@ function FragmentSatir({
           onFocus={onGrupGir}
           onBlur={onGrupCik}
         >
-          <td colSpan={3}>{grup}</td>
+          <td colSpan={4}>{grup}</td>
         </tr>
       )}
       {children}
     </>
+  );
+}
+
+function GozIsareti({ kapali }: { kapali: boolean }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+      <path
+        d="M1 8s2.6-4.5 7-4.5S15 8 15 8s-2.6 4.5-7 4.5S1 8 1 8Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.3"
+      />
+      <circle cx="8" cy="8" r="2" fill="currentColor" />
+      {kapali && <path d="M2 14 14 2" stroke="currentColor" strokeWidth="1.5" />}
+    </svg>
   );
 }

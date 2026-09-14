@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { durmaSebebi, hopOnerisi, VARSAYILAN_ESIKLER } from "../packages/motor/src/durma";
+import { devamEdilebilir, devamEsikleri, durmaSebebi, hopOnerisi, VARSAYILAN_ESIKLER } from "../packages/motor/src/durma";
 import type { DugumDurumu } from "../packages/motor/src/durma";
 
 const dugum = (uzer: Partial<DugumDurumu> = {}): DugumDurumu => ({
@@ -74,5 +74,27 @@ describe("hop önerisi", () => {
     const { onerilenHop, gerekce } = hopOnerisi([1, 5, 9], [0, 1, 2]);
     expect(onerilenHop).toBe(3);
     expect(gerekce).toContain("derinleştirilebilir");
+  });
+});
+
+describe("takibe devam", () => {
+  it("doğrulanmış borsada devam YOK, adayda ve bizim sınırlarımızda VAR", () => {
+    expect(devamEdilebilir("terminal").olur).toBe(false);
+    for (const s of ["terminal_aday", "butce", "dallanma", "esik", "dugum_siniri", "indekssiz", "kontrat"]) {
+      expect(devamEdilebilir(s).olur).toBe(true);
+    }
+    expect(devamEdilebilir(null).olur).toBe(false);
+  });
+
+  it("sıçrama bütçesi düğümün yerinden sayılır, düğüm bütçesi mevcut koşunun üstüne eklenir", () => {
+    const e = devamEsikleri({ maxHop: 3, maxDugum: 60, dallanmaEsigi: 50, minTutar: 0n }, 3, 23, 2);
+    expect(e.maxHop).toBe(5);
+    expect(e.maxDugum).toBe(83);
+  });
+
+  it("ek sıçrama 1..5 aralığına sıkıştırılır", () => {
+    const t = { maxHop: 3, maxDugum: 60, dallanmaEsigi: 50, minTutar: 0n };
+    expect(devamEsikleri(t, 2, 10, 99).maxHop).toBe(7);
+    expect(devamEsikleri(t, 2, 10, 0).maxHop).toBe(3);
   });
 });

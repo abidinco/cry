@@ -175,3 +175,29 @@ describe("kısa tutar", () => {
     expect(kisaTutar(2n ** 256n - 1n, 6)).toMatch(/ Mr$/);
   });
 });
+
+describe("gizleme", () => {
+  const ayar = { ...VARSAYILAN_YERLESIM, genislik: 900, yukseklik: 600 };
+  it("yoğun bir şerit gizlenince küçük şeritler KALINLAŞIR — ölçek görünen akışa göre kurulur", async () => {
+    const { gizleneniAyikla } = await import("@/lib/akis");
+    const once = yerlesim(akisModeli(DUGUMLER, KENARLAR, KOK, "USDT"), ayar);
+    const g = gizleneniAyikla(DUGUMLER, KENARLAR, KOK, { seritler: new Set([`${KOK}>ADAY`]), dugumler: new Set() });
+    const sonra = yerlesim(akisModeli(g.dugumler, g.kenarlar, KOK, "USDT"), ayar);
+    expect(sonra.yollar.has(`${KOK}>ADAY`)).toBe(false);
+    expect(sonra.yollar.get(`A>BINANCE`)!.kalinlik).toBeGreaterThan(once.yollar.get(`A>BINANCE`)!.kalinlik);
+  });
+
+  it("gizlenen adres şeritleriyle gider; kök gizlenemez", async () => {
+    const { gizleneniAyikla } = await import("@/lib/akis");
+    const g = gizleneniAyikla(DUGUMLER, KENARLAR, KOK, { seritler: new Set(), dugumler: new Set(["A", KOK]) });
+    expect(g.dugumler.map((d) => d.address)).toContain(KOK);
+    expect(g.dugumler.map((d) => d.address)).not.toContain("A");
+    expect(g.kenarlar.some((k) => k.from === "A" || k.to === "A")).toBe(false);
+  });
+});
+
+describe("devam edilmiş düğüm", () => {
+  it("devam edilen aday, durma sebebi silinse de aday görünür", () => {
+    expect(dugumTuru(d("x", 1, null, ADAY), KOK)).toBe("aday");
+  });
+});

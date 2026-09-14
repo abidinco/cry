@@ -257,6 +257,30 @@ işaret), renk kanalları ayrık, yazı tipleri build anında gömülü.
   taralı + ?, bizim sınırımız kesik çerçeve. Renk hiçbir şeyi tek başına
   anlatmaz. Palet koyu zeminde renk körlüğü denetiminden geçti (ΔE ≥ 9); ilk
   deneme kehribarı fazla açık, griyi ayırt edilemez buldu ve düzeltildi.
+- **Doğrulanmış borsada takip BİTER; aday ve bizim sınırlarımızda DEVAM
+  edilebilir** (kullanıcı kararı 2026-09-14). Gerekçe: borsaya giren para
+  borsanın ortak havuzuna karışır, zincirdeki çıkışı artık o paranın devamı
+  değildir — kimin çektiğini yalnızca borsanın kayıtları söyler. Kural tek
+  yerde (`devamEdilebilir`, `packages/motor/src/durma.ts`) ve API de onu
+  sorar; arayüzde düğmenin görünmemesi bir güvence değildir.
+  **Uyarı:** "doğrulanmış" bir KAYNAK iddiasıdır (TronScan etiketi), mutlak
+  gerçek değil. Etiket yanlışsa iz orada yanlışlıkla kesilir; bu yüzden
+  etiketin kaynağı düğümün ipucunda görünür kalır.
+- **Devam yeni koşu AÇMAZ, aynı koşuya eklenir.** Tohum, o adrese BU koşuda
+  izlenerek gelen paradır — adrese giren bütün para değil; aksi hâlde başka
+  kaynakların parası dosyaya yazılırdı. Sıçrama bütçesi düğümün yerinden
+  sayılır (+1…5, varsayılan 2), düğüm bütçesi mevcut koşunun üstüne eklenir.
+  Bir insan kararıdır ve rapor bunu bilmeli: düğümün eski sebebi, kim ve ne
+  zaman `stats.devamlar`a, ayrıca denetim kaydına yazılır. Devam hatası
+  koşunun tamamını "hata"ya ÇEKMEZ — önceki graf sağlam. Koşu özeti devamdan
+  sonra VERİTABANINDAN yeniden sayılır (bellekteki sayaç tek yürüyüşü bilir).
+  Ölçüldü (koşu 8): 70 Mn USDT'lik adaydan devam → 2 çıkış, yeni adres
+  dallanmada durdu; doğrulanmış Binance'ten devam reddedildi.
+- **Gizleme yalnızca GÖRÜNÜMDÜR.** Şerit ya da adres gizlenince diyagramın
+  kalınlık ölçeği kalan akışa göre kurulur (yoğun bir aday hesabı küçük
+  şeritleri okunmaz yapıyordu), ama özet ve defter koşunun tamamını söyler;
+  defterde gizli satırlar soluk durur. Kök gizlenemez. Seçim bu tarayıcıda
+  koşu başına saklanır, rapora girmez.
 - **Geri dönen para diyagramın ALTINDAN dolaşır.** Köke ya da aynı/önceki
   sıçramadaki bir adrese giden para ileri şeritlerle karışmasın diye ayrı bir
   alt şeritten okla döner. Koşu 7'de köke 3,85 Mn USDT geri dönmüş — eski

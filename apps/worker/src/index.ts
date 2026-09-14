@@ -9,7 +9,7 @@ import IORedis from "ioredis";
 import { prisma } from "@cry/db";
 import { KUYRUK, KUYRUK_ONEKI, type IndeksIsi, type TakipIsi } from "@cry/kuyruk";
 import { adresIndeksle } from "./indeksle";
-import { takipKos } from "./takip";
+import { takipDevam, takipKos } from "./takip";
 import type { ChainId } from "@cry/chain";
 
 const baglanti = new IORedis(process.env.REDIS_URL ?? "redis://redis:6379", {
@@ -50,6 +50,36 @@ const indeksWorker = new Worker<IndeksIsi>(
 const takipWorker = new Worker<TakipIsi>(
   KUYRUK.takip,
   async (is: Job<TakipIsi>) => {
+    const { devam } = is.data;
+    if (devam) {
+      // Devam hatası koşunun TAMAMINI "hata"ya çekmemeli: önceki graf sağlam.
+      // Koşu "bitti"ye döner, hata devam kaydına yazılır.
+      try {
+        const sonuc = await takipDevam(BigInt(is.data.traceRunId), devam.adres, devam.ekHop, devam.userId ?? null);
+        console.log(`✓ takip ${is.data.traceRunId} devam ${devam.adres} — ${sonuc.dugum} düğüm, ${sonuc.kenar} kenar`);
+        return sonuc;
+      } catch (hata) {
+        const mesaj = hata instanceof Error ? hata.message : String(hata);
+        console.error(`✗ takip ${is.data.traceRunId} devam ${devam.adres}:`, mesaj);
+        const id = BigInt(is.data.traceRunId);
+        const kosu = await prisma.traceRun.findUnique({ where: { id }, select: { stats: true } });
+        const stats = (kosu?.stats ?? {}) as { devamHatalari?: unknown[] };
+        await prisma.traceRun.update({
+          where: { id },
+          data: {
+            status: "bitti",
+            stats: {
+              ...stats,
+              devamHatalari: [
+                ...(stats.devamHatalari ?? []),
+                { adres: devam.adres, mesaj: mesaj.slice(0, 200), zaman: new Date().toISOString() },
+              ],
+            } as object,
+          },
+        });
+        return { hata: mesaj };
+      }
+    }
     const sonuc = await takipKos(BigInt(is.data.traceRunId));
     console.log(
       `✓ takip ${is.data.traceRunId} — ${sonuc.dugum} düğüm, ${sonuc.kenar} kenar, ` +

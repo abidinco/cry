@@ -85,6 +85,9 @@ export function dugumTuru(d: AkisDugumu, kokAdres: string): DugumTuru {
   if (d.terminalReason === "terminal_aday") return "aday";
   if (d.terminalReason === "indekssiz") return "taranamadi";
   if (d.terminalReason && SINIR.has(d.terminalReason)) return "sinir";
+  // Kullanıcı bir adaydan takibe DEVAM ettiyse düğümün durma sebebi silinir,
+  // ama adres hâlâ bir borsa adayıdır — kimliği etiketinden okunur.
+  if (d.etiketler.some((e) => e.category.startsWith("exchange") && !e.dogrulandi)) return "aday";
   return "ara";
 }
 
@@ -391,4 +394,36 @@ export function yerlesim(model: AkisModeli, ayar: YerlesimAyari): Yerlesim {
   }
 
   return { kutular, yollar, kolonX, geriSeritY: geriler.length ? altSinir + 10 : null };
+}
+
+/* ------------------------------------------------------------------ */
+/* Gizleme                                                             */
+/* ------------------------------------------------------------------ */
+
+export type Gizlenenler = { seritler: ReadonlySet<string>; dugumler: ReadonlySet<string> };
+
+export const gizliYok = (): Gizlenenler => ({ seritler: new Set(), dugumler: new Set() });
+
+/**
+ * Kullanıcının gizlediği şeritleri ve adresleri ÇİZİMDEN çıkarır
+ * (kullanıcı isteği 2026-09-14). Kalınlık ölçeği görünen akışa göre yeniden
+ * kurulur: yoğun bir aday hesabı gizlenince küçük şeritler okunur hâle gelir.
+ *
+ * Yalnızca görünümü değiştirir, veriyi değil — özet ve defter koşunun
+ * tamamını söylemeye devam eder. Kök gizlenemez: akışın başlangıcıdır.
+ * Gizlenen adresin şeritleri de onunla gider.
+ */
+export function gizleneniAyikla(
+  dugumler: AkisDugumu[],
+  kenarlar: AkisKenari[],
+  kokAdres: string,
+  gizli: Gizlenenler,
+): { dugumler: AkisDugumu[]; kenarlar: AkisKenari[] } {
+  const gizliDugum = (a: string) => a !== kokAdres && gizli.dugumler.has(a);
+  return {
+    dugumler: dugumler.filter((d) => !gizliDugum(d.address)),
+    kenarlar: kenarlar.filter(
+      (k) => !gizliDugum(k.from) && !gizliDugum(k.to) && !gizli.seritler.has(`${k.from}>${k.to}`),
+    ),
+  };
 }

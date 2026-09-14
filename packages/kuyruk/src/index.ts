@@ -28,7 +28,11 @@ export type IndeksIsi = {
   userId?: number;
 };
 
-export type TakipIsi = { traceRunId: string };
+export type TakipIsi = {
+  traceRunId: string;
+  /** Doluysa yeni koşu değil, durmuş bir düğümden DEVAM. */
+  devam?: { adres: string; ekHop: number; userId?: number | null };
+};
 
 export type FiyatIsi = {
   assetId: number;
@@ -53,4 +57,12 @@ export function indeksIsAnahtari(chain: string, address: string): string {
 
 export function takipIsAnahtari(traceRunId: string): string {
   return ["takip", traceRunId].join(AYRAC);
+}
+
+/**
+ * Devam işinin anahtarı: aynı düğümden bekleyen ikinci bir devam açılmaz.
+ * Adres TRON base58 ya da 0x hex — ikisi de ayraç karakterini taşımıyor.
+ */
+export function takipDevamIsAnahtari(traceRunId: string, adres: string): string {
+  return ["takip", traceRunId, "devam", adres].join(AYRAC);
 }
