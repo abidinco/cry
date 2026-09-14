@@ -23,7 +23,7 @@ import {
   type IzliGiris,
 } from "@cry/motor";
 import { adresIndeksle } from "./indeksle";
-import type { ChainId } from "@cry/chain";
+import { yakmaAdresiMi, type ChainId } from "@cry/chain";
 
 type Parametreler = {
   maxHop?: number;
@@ -96,7 +96,7 @@ export async function takipDevam(
     where: { traceRunId_chain_address: { traceRunId, chain: kosu.chain, address: adres } },
   });
 
-  const karar = devamEdilebilir(dugum.terminalReason);
+  const karar = devamEdilebilir(dugum.terminalReason, adres);
   if (!karar.olur) throw new Error(`devam edilemez: ${karar.neden}`);
 
   const mevcut = await prisma.traceNode.findMany({
@@ -225,9 +225,10 @@ async function yuru(y: Yuruyus): Promise<void> {
     for (const dugum of sira) {
       const bilgi = await dugumBilgisi(zincir, dugum.adres);
 
-      // Taranmamış düğüm KENDİLİĞİNDEN taranır: atlanırsa graf kısa kalır ve
+      // Yakma adresi TARANMAZ: milyonlarca hareketi var ve hiçbiri bu paranın
+      // devamı değil. Taranmamış düğüm KENDİLİĞİNDEN taranır: atlanırsa graf kısa kalır ve
       // "iz burada bitti" sanılır.
-      if (!bilgi.indekslendiMi && gorulen.size <= esikler.maxDugum) {
+      if (!bilgi.indekslendiMi && !yakmaAdresiMi(dugum.adres) && gorulen.size <= esikler.maxDugum) {
         await adresIndeksle(zincir as ChainId, dugum.adres, { maxSayfa: 10 }).catch(() => {});
       }
 
@@ -259,6 +260,7 @@ async function yuru(y: Yuruyus): Promise<void> {
                 borsaEtiketiDogrulanmisMi: guncel.borsaEtiketiDogrulanmisMi,
                 sozlesmeMi: guncel.sozlesmeMi,
                 indekslendiMi: guncel.indekslendiMi,
+                yakmaMi: yakmaAdresiMi(dugum.adres),
               },
               esikler,
               gorulen.size,

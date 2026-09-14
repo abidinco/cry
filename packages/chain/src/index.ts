@@ -16,3 +16,4 @@ export { EvmAdapter } from "./adapters/evm";
 export { BitcoinAdapter } from "./adapters/bitcoin";
 export { SolanaAdapter } from "./adapters/solana";
 export { getJson, RateGate } from "./http";
+export { YAKMA_ADRESLERI, yakmaAdresiMi } from "./yakma";

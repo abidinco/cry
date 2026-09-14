@@ -51,7 +51,7 @@ export async function POST(istek: Request, ctx: { params: Promise<{ id: string }
   });
   if (!dugum) return NextResponse.json({ error: "bu adres koşuda yok" }, { status: 404 });
 
-  const karar = devamEdilebilir(dugum.terminalReason);
+  const karar = devamEdilebilir(dugum.terminalReason, govde.adres);
   if (!karar.olur) return NextResponse.json({ error: karar.neden }, { status: 400 });
 
   await prisma.traceRun.update({ where: { id: kosuId }, data: { status: "kuyrukta" } });

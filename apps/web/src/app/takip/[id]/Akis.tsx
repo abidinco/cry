@@ -41,6 +41,7 @@ const DURUM_ADI: Record<ModelDugumu["tur"], string> = {
   kok: "kök",
   borsa: "doğrulanmış borsa — iz burada tamamlandı",
   aday: "borsa adayı — etiket doğrulanmamış",
+  yakildi: "yakma adresi — para yok edildi, iz burada biter",
   sinir: "bizim sınırımız — iz bitmedi",
   taranamadi: "taranamadı — veri yok",
   ara: "ara adres",
@@ -50,6 +51,7 @@ export function dugumAdi(d: ModelDugumu): string {
   if (d.tur === "kok") return "kök";
   if (d.borsa) return `${d.borsa} ✓`;
   if (d.tur === "aday") return "borsa adayı ?";
+  if (d.tur === "yakildi") return "yakıldı ✕";
   return kisaAdres(d.address, 6, 4);
 }
 
@@ -61,6 +63,7 @@ export default function Akis({
   secili,
   onSecim,
   disVurgu,
+  seciliYol,
   onOdak,
 }: {
   model: AkisModeli;
@@ -69,6 +72,8 @@ export default function Akis({
   onSecim: (secim: { dugum?: string; serit?: string } | null) => void;
   /** Dışarıdan (defterden) öne çıkarılan şeritler. */
   disVurgu?: Set<string> | null;
+  /** Tıklanan şerit ve köke kadar geldiği yol. */
+  seciliYol?: Set<string> | null;
   /** Diyagramda odaklanan şeritler — defter kendi satırlarını yakar. */
   onOdak?: (seritler: Set<string> | null) => void;
 }) {
@@ -112,11 +117,12 @@ export default function Akis({
     if (odak?.serit) return odak.serit === s.anahtar;
     if (odak?.dugum) return s.from === odak.dugum || s.to === odak.dugum;
     if (disAktif) return disAktif.has(s.anahtar);
+    if (seciliYol && seciliYol.size > 0) return seciliYol.has(s.anahtar);
     if (secili) return s.from === secili || s.to === secili;
     return true;
   };
-  const herhangiAktif = Boolean(odak || disAktif || secili);
-  const merkez = odak?.dugum ?? (disAktif ? null : secili);
+  const herhangiAktif = Boolean(odak || disAktif || secili || (seciliYol && seciliYol.size > 0));
+  const merkez = odak?.dugum ?? (disAktif || seciliYol?.size ? null : secili);
   const dugumBagli = (adres: string) =>
     !herhangiAktif ||
     adres === merkez ||
@@ -164,6 +170,10 @@ export default function Akis({
             <pattern id="akis-tarama" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
               <rect width="6" height="6" style={{ fill: "var(--akis-aday-zemin)" }} />
               <rect width="2.2" height="6" style={{ fill: "var(--akis-aday)" }} />
+            </pattern>
+            <pattern id="akis-yakma" width="6" height="6" patternUnits="userSpaceOnUse">
+              <rect width="6" height="6" style={{ fill: "var(--zemin)" }} />
+              <path d="M0,0 L6,6 M6,0 L0,6" style={{ stroke: "var(--m2)", strokeWidth: 1 }} />
             </pattern>
             {(Object.keys(SERIT_RENK) as SeritTuru[]).map((t) => (
               <marker key={t} id={`akis-ok-${t}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto">
@@ -247,7 +257,7 @@ export default function Akis({
               .sort((a, b) => a.hop - b.hop || L.kutular.get(a.address)!.orta - L.kutular.get(b.address)!.orta)
               .map((d) => {
                 const k = L.kutular.get(d.address)!;
-                const onemli = d.tur === "kok" || d.tur === "borsa" || d.tur === "aday";
+                const onemli = d.tur === "kok" || d.tur === "borsa" || d.tur === "aday" || d.tur === "yakildi";
                 const buyuk = d.deger >= enBuyuk * 0.02;
                 const onceki = sonY.get(d.hop) ?? -Infinity;
                 const etiketli = (onemli || buyuk) && (onemli || k.orta - onceki >= 24);
@@ -310,7 +320,9 @@ export default function Akis({
                       rx={1.5}
                       style={{
                         fill:
-                          d.tur === "aday"
+                          d.tur === "yakildi"
+                            ? "url(#akis-yakma)"
+                            : d.tur === "aday"
                             ? "url(#akis-tarama)"
                             : d.tur === "borsa"
                               ? "var(--akis-borsa)"
@@ -319,7 +331,7 @@ export default function Akis({
                                 : sinirli
                                   ? "var(--yuzey-2)"
                                   : "var(--akis-dugum)",
-                        stroke: secili === d.address ? "var(--m1)" : sinirli ? "var(--m3)" : "none",
+                        stroke: secili === d.address ? "var(--m1)" : d.tur === "yakildi" ? "var(--m2)" : sinirli ? "var(--m3)" : "none",
                         strokeDasharray: sinirli && secili !== d.address ? "2 2" : undefined,
                         strokeWidth: 1,
                       }}
@@ -332,7 +344,7 @@ export default function Akis({
                           className="akis-ad"
                           style={{
                             fill: d.tur === "borsa" ? "var(--akis-borsa-yazi)" : d.tur === "aday" ? "var(--akis-aday-yazi)" : "var(--m1)",
-                            fontWeight: d.tur === "borsa" || d.tur === "aday" ? 600 : 400,
+                            fontWeight: d.tur === "borsa" || d.tur === "aday" || d.tur === "yakildi" ? 600 : 400,
                           }}
                         >
                           {dugumAdi(d)}

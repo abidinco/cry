@@ -21,6 +21,7 @@ import {
   akisOzeti,
   anaVarlik,
   gizleneniAyikla,
+  seritYolu,
   varliklar,
   type AkisDugumu,
   type AkisKenari,
@@ -62,6 +63,7 @@ const SEBEP: Record<string, string> = {
   terminal: "doğrulanmış borsaya ulaşıldı",
   // Aynı cümleyi doğrulanmamış bir etiketle kurmak kaynağı olmayan bir hüküm olurdu.
   terminal_aday: "borsa ADAYINA ulaşıldı — etiket doğrulanmamış",
+  yakildi: "para yakıldı — yakma adresine gitti, yok edildi",
   butce: "hop bütçesi doldu",
   dugum_siniri: "düğüm sınırı",
   dallanma: "çıkış sayısı eşiği aştı",
@@ -230,6 +232,7 @@ export default function TakipGorunumu({ id }: { id: string }) {
     ...ozet.borsalar.map((b) => b.ham),
     ...ozet.adaylar.map((a) => a.ham),
     ozet.kokeGeri,
+    ozet.yakilan,
   ].reduce((a, b) => (b > a ? b : a), 1n);
 
   // Defter: seçime göre süzülür; sıçrama sırasıyla, zaman sırasıyla.
@@ -254,6 +257,8 @@ export default function TakipGorunumu({ id }: { id: string }) {
       : null;
   const seciliDugum = secim?.dugum ? dugumHarita.get(secim.dugum) : null;
   const seciliSerit = secim?.serit ? model.seritler.find((x) => x.anahtar === secim.serit) : null;
+  // Tıklanan şerit, köke kadar geldiği yolla birlikte öne çıkar.
+  const seciliYol = secim?.serit ? seritYolu(model, secim.serit) : null;
   const devamKaydi = (adres: string) => kosu.stats?.devamlar?.filter((d) => d.adres === adres).at(-1);
   const devamHatasi = (adres: string) => kosu.stats?.devamHatalari?.filter((d) => d.adres === adres).at(-1);
   const gizliToplam = gizliSerit.size + gizliDugum.size;
@@ -285,6 +290,12 @@ export default function TakipGorunumu({ id }: { id: string }) {
               <i className="akis-lejant-kutu" style={{ border: "1px dashed var(--m3)" }} />
               bizim sınırımız
             </span>
+            {model.dugumler.some((d) => d.tur === "yakildi") && (
+              <span>
+                <i className="akis-lejant-kutu akis-lejant-yakma" />
+                yakıldı ✕
+              </span>
+            )}
             <span className="takip-bosluk" />
             {varliklar(kosu.kenarlar).length > 1 ? (
               <label className="etiket">
@@ -342,6 +353,7 @@ export default function TakipGorunumu({ id }: { id: string }) {
             secili={secim?.dugum ?? null}
             onSecim={setSecim}
             disVurgu={defterVurgu}
+            seciliYol={seciliYol}
             onOdak={setAkisOdak}
           />
           {(kirpilan > 0 || model.digerVarlikKenari > 0) && (
@@ -374,6 +386,20 @@ export default function TakipGorunumu({ id }: { id: string }) {
                     <span className="veri">{kisaTutar(a.ham, model.decimals)}</span>
                   </button>
                 ))}
+                {ozet.yakilan > 0n && (
+                  <button
+                    type="button"
+                    className="ozet-cubuk"
+                    onClick={() => {
+                      const z = model.dugumler.find((d) => d.tur === "yakildi");
+                      if (z) setSecim({ dugum: z.address });
+                    }}
+                  >
+                    <span className="ozet-ad">yakıldı ✕</span>
+                    <span className="ozet-yol"><span className="akis-lejant-yakma" style={{ width: `${oran(ozet.yakilan)}%` }} /></span>
+                    <span className="veri">{kisaTutar(ozet.yakilan, model.decimals)}</span>
+                  </button>
+                )}
                 {ozet.kokeGeri > 0n && (
                   <button type="button" className="ozet-cubuk" onClick={() => setSecim({ dugum: kosu.rootAddress })}>
                     <span className="ozet-ad" style={{ color: "var(--akis-geri-yazi)" }}>↩ köke geri</span>
@@ -381,7 +407,7 @@ export default function TakipGorunumu({ id }: { id: string }) {
                     <span className="veri">{kisaTutar(ozet.kokeGeri, model.decimals)}</span>
                   </button>
                 )}
-                {ozet.borsalar.length === 0 && ozet.adaylar.length === 0 && (
+                {ozet.borsalar.length === 0 && ozet.adaylar.length === 0 && ozet.yakilan === 0n && (
                   <span className="m3">İz hiçbir borsaya ya da adaya ulaşmadı.</span>
                 )}
               </div>
@@ -421,7 +447,9 @@ export default function TakipGorunumu({ id }: { id: string }) {
               <Adres deger={seciliDugum.address} zincir={kosu.chain} kisa={false} />
               <span className="m3">
                 {seciliDugum.hop}. sıçrama ·{" "}
-                {seciliDugum.terminalReason
+                {seciliDugum.tur === "yakildi"
+                  ? SEBEP.yakildi
+                  : seciliDugum.terminalReason
                   ? (SEBEP[seciliDugum.terminalReason] ?? seciliDugum.terminalReason)
                   : devamKaydi(seciliDugum.address)
                     ? `takibe devam edildi (+${devamKaydi(seciliDugum.address)!.ekHop} sıçrama; önce: ${SEBEP[devamKaydi(seciliDugum.address)!.oncekiSebep ?? ""] ?? "—"})`
@@ -431,7 +459,10 @@ export default function TakipGorunumu({ id }: { id: string }) {
               <div className="takip-eylemler">
                 {(() => {
                   if (seciliDugum.address === kosu.rootAddress) return null;
-                  const karar = devamEdilebilir(seciliDugum.terminalReason);
+                  const karar = devamEdilebilir(seciliDugum.terminalReason, seciliDugum.address);
+                  if (seciliDugum.tur === "yakildi") {
+                    return <span className="takip-kilit" style={{ color: "var(--m2)" }}>para burada yok edildi — devam edecek bir iz yok</span>;
+                  }
                   if (seciliDugum.terminalReason === "terminal") {
                     return <span className="takip-kilit">iz burada tamamlandı — doğrulanmış borsada takip sürdürülmez</span>;
                   }
@@ -469,6 +500,7 @@ export default function TakipGorunumu({ id }: { id: string }) {
                 {dugumAdi(dugumHarita.get(seciliSerit.from)!)} → {dugumAdi(dugumHarita.get(seciliSerit.to)!)}
               </span>
               <span className="m3">
+                {seciliYol && seciliYol.size > 1 && `köke kadar ${sayi(seciliYol.size)} şeritlik yol öne çıktı · `}
                 {SERIT_ADI[seciliSerit.tur]} · {sayi(seciliSerit.kenarlar.length)} hareket ·{" "}
                 <Tutar ham={seciliSerit.ham.toString()} ondalik={model.decimals} sembol={model.varlik} />
               </span>

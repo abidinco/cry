@@ -6,6 +6,8 @@
  * taramayı sürdürmekle çözülür, birincisi çözülmez.
  */
 
+import { yakmaAdresiMi } from "@cry/chain/yakma";
+
 export type DurmaSebebi =
   | "butce" // hop bütçesi bitti
   | "dugum_siniri" // düğüm sayısı sınırına ulaşıldı
@@ -13,6 +15,7 @@ export type DurmaSebebi =
   | "esik" // tutar eşiğin altına düştü
   | "terminal" // DOĞRULANMIŞ borsa etiketi: iz burada tamamlandı
   | "terminal_aday" // borsa ADAYI: etiket doğrulanmamış, durduk ama iddia zayıf
+  | "yakildi" // yakma/sıfır adresi: para YOK EDİLDİ, iz burada biter
   | "kontrat" // akıllı sözleşme: iz burada kesiliyor
   | "indekssiz"; // düğüm taranmamış, veri yok
 
@@ -58,6 +61,8 @@ export type DugumDurumu = {
   borsaEtiketiDogrulanmisMi?: boolean;
   sozlesmeMi: boolean;
   indekslendiMi: boolean;
+  /** Yakma/sıfır adresi mi (`@cry/chain` → `yakmaAdresiMi`). */
+  yakmaMi?: boolean;
 };
 
 /**
@@ -75,6 +80,10 @@ export function durmaSebebi(
   // Aracın var olma sebebi: paranın girdiği borsayı bulmak. Oraya varıldıysa
   // iz TAMAMLANMIŞTIR, kesilmemiş. Etiket doğrulanmamışsa iz yine burada
   // durur ama sebep bunu söyler.
+  // Yakma her şeyden önce: para yok edildi. Sıfır adresi "çok adrese
+  // gönderiyor" görünür ve sorulmasa dallanma diye devam ettirilebilir bir
+  // sınır sanılır (ölçüldü, koşu 8).
+  if (d.yakmaMi) return "yakildi";
   if (d.borsaMi) return d.borsaEtiketiDogrulanmisMi ? "terminal" : "terminal_aday";
   if (!d.indekslendiMi) return "indekssiz";
   if (d.sozlesmeMi) return "kontrat";
@@ -129,7 +138,7 @@ export function hopOnerisi(
  *
  * Dağılımın tamamı `stats.durma` içinde durur; başlık onu özetler, silmez.
  */
-const BASLIK_ONCELIGI: DurmaSebebi[] = ["terminal", "terminal_aday"];
+const BASLIK_ONCELIGI: DurmaSebebi[] = ["terminal", "yakildi", "terminal_aday"];
 
 export function kosuDurmaSebebi(sayac: Record<string, number>): string | null {
   for (const oncelikli of BASLIK_ONCELIGI) {
@@ -153,7 +162,13 @@ export function kosuDurmaSebebi(sayac: Record<string, number>): string | null {
  */
 export function devamEdilebilir(
   sebep: string | null,
+  adres?: string,
 ): { olur: true } | { olur: false; neden: string } {
+  // Adresin kendisi de sorulur: yakma sebebi eklenmeden ÖNCE yazılmış
+  // koşularda sıfır adresi "dallanma" diye kayıtlı (koşu 8).
+  if (sebep === "yakildi" || (adres !== undefined && yakmaAdresiMi(adres))) {
+    return { olur: false, neden: "para yakma adresine gitti — yok edildi, devam edecek bir iz yok" };
+  }
   if (sebep === null) return { olur: false, neden: "bu adresten zaten devam edildi" };
   if (sebep === "terminal") {
     return {

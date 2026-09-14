@@ -98,3 +98,25 @@ describe("takibe devam", () => {
     expect(devamEsikleri(t, 2, 10, 0).maxHop).toBe(3);
   });
 });
+
+describe("yakıldı", () => {
+  it("yakma adresi borsadan ve sınırlardan ÖNCE gelir", () => {
+    expect(durmaSebebi(dugum({ yakmaMi: true, borsaMi: true, cikisSayisi: 9999 }), VARSAYILAN_ESIKLER, 1)).toBe("yakildi");
+  });
+  it("yakılan paradan devam edilmez", () => {
+    expect(devamEdilebilir("yakildi").olur).toBe(false);
+    // yakma sebebinden önce yazılmış koşu: sıfır adresi "dallanma" diye kayıtlı
+    expect(devamEdilebilir("dallanma", "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb").olur).toBe(false);
+  });
+  it("koşu başlığında yakıldı adaydan önemlidir, doğrulanmış borsadan değil", async () => {
+    const { kosuDurmaSebebi } = await import("../packages/motor/src/durma");
+    expect(kosuDurmaSebebi({ butce: 9, terminal_aday: 1, yakildi: 1 })).toBe("yakildi");
+    expect(kosuDurmaSebebi({ terminal: 1, yakildi: 1 })).toBe("terminal");
+  });
+  it("EVM adresi büyük/küçük harften bağımsız tanınır", async () => {
+    const { yakmaAdresiMi } = await import("../packages/chain/src/yakma");
+    expect(yakmaAdresiMi("0x000000000000000000000000000000000000dEaD")).toBe(true);
+    expect(yakmaAdresiMi("T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb")).toBe(true);
+    expect(yakmaAdresiMi("TAUN6FwrnwwmaEqYcckffC7wYmbaS6cBiX")).toBe(false);
+  });
+});

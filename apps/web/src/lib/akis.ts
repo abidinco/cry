@@ -15,6 +15,8 @@
  * `deger`den türetilmez — zincirde 2^256-1 gibi değerler var.
  */
 
+import { yakmaAdresiMi } from "@cry/chain/yakma";
+
 export type AkisEtiketi = {
   title: string;
   category: string;
@@ -41,7 +43,7 @@ export type AkisKenari = {
   taintShare: number;
 };
 
-export type DugumTuru = "kok" | "borsa" | "aday" | "sinir" | "taranamadi" | "ara";
+export type DugumTuru = "kok" | "borsa" | "aday" | "yakildi" | "sinir" | "taranamadi" | "ara";
 /** Şeridin anlattığı şey — renk kanalı yalnızca bunu taşır. */
 export type SeritTuru = "borsa" | "aday" | "geri" | "akis";
 
@@ -81,6 +83,8 @@ const SINIR = new Set(["butce", "dugum_siniri", "dallanma", "esik"]);
 
 export function dugumTuru(d: AkisDugumu, kokAdres: string): DugumTuru {
   if (d.address === kokAdres) return "kok";
+  // Adres de sorulur: sebep eklenmeden önce yazılmış koşularda "dallanma" kayıtlı.
+  if (d.terminalReason === "yakildi" || yakmaAdresiMi(d.address)) return "yakildi";
   if (d.terminalReason === "terminal") return "borsa";
   if (d.terminalReason === "terminal_aday") return "aday";
   if (d.terminalReason === "indekssiz") return "taranamadi";
@@ -190,6 +194,8 @@ export type AkisOzeti = {
   adaylar: { address: string; ham: bigint; etiket: string | null }[];
   /** Kök adrese GERİ gelen para. */
   kokeGeri: bigint;
+  /** Yakma adresine giden — yok edilen — para. */
+  yakilan: bigint;
   sinirda: number;
   taranamadi: number;
 };
@@ -209,6 +215,7 @@ export function akisOzeti(model: AkisModeli, kokAdres: string): AkisOzeti {
       .map((d) => ({ address: d.address, ham: d.giren, etiket: d.etiketler[0]?.title ?? null }))
       .sort(buyukten),
     kokeGeri: model.seritler.filter((s) => s.to === kokAdres).reduce((t, s) => t + s.ham, 0n),
+    yakilan: model.dugumler.filter((d) => d.tur === "yakildi").reduce((t, d) => t + d.giren, 0n),
     sinirda: model.dugumler.filter((d) => d.tur === "sinir").length,
     taranamadi: model.dugumler.filter((d) => d.tur === "taranamadi").length,
   };
@@ -427,3 +434,38 @@ export function gizleneniAyikla(
     ),
   };
 }
+
+/**
+ * Tıklanan şerit ve ONA GELENE KADARKİ yol (kullanıcı isteği 2026-09-14):
+ * şeridin kaynağına giren ileri şeritler, onların kaynağına girenler… köke
+ * kadar. "Bu para buraya hangi yoldan geldi" sorusunun cevabı.
+ *
+ * Geri dönen şeritler yola alınmaz: döngü açarlar ve para o yoldan
+ * GELMEDİ, oradan döndü.
+ */
+export function seritYolu(model: AkisModeli, anahtar: string): Set<string> {
+  const yol = new Set<string>();
+  const serit = model.seritler.find((s) => s.anahtar === anahtar);
+  if (!serit) return yol;
+  yol.add(anahtar);
+  const gelen = new Map<string, Serit[]>();
+  for (const s of model.seritler) {
+    if (s.geri) continue;
+    const liste = gelen.get(s.to) ?? [];
+    liste.push(s);
+    gelen.set(s.to, liste);
+  }
+  const gorulen = new Set<string>();
+  const kuyruk = [serit.from];
+  while (kuyruk.length > 0) {
+    const adres = kuyruk.shift()!;
+    if (gorulen.has(adres)) continue;
+    gorulen.add(adres);
+    for (const s of gelen.get(adres) ?? []) {
+      yol.add(s.anahtar);
+      kuyruk.push(s.from);
+    }
+  }
+  return yol;
+}
+

@@ -80,13 +80,15 @@ Aynı çift arasındaki hareketler tek şeritte toplanır, hepsi defterde durur.
 
 **Düğümün durumu dokudur**, renk değil: doğrulanmış borsa düz yeşil ve ✓,
 aday taralı kehribar ve ?, bizim sınırımız (bütçe/dallanma) kesik çerçeve,
-kök indigo. Renk tek başına hiçbir şey anlatmaz.
+kök indigo, **yakma adresi çapraz taralı ve ✕** (para yok edildi, iz biter,
+devam yok). Renk tek başına hiçbir şey anlatmaz.
 
 Yerleşim **deterministiktir**: aynı koşu her açılışta aynı resmi verir,
 çünkü rapora girer. En çok **100 adres** çizilir; seçim önce kökü ve iz biten
 adresleri alır, kırpılan kısım ekranda sayılır.
 
 Düğüme gelmek bağlı şeritleri yakar; tıklamak defteri o adrese süzer.
+Şeride tıklamak o şeridi ve **köke kadar geldiği yolu** öne çıkarır.
 Tam tutar ipucunda ve defterde, şerit etiketinde yalnızca kısa biçim
 ("11,1 Mn") — kısa biçim de bigint üzerinden hesaplanır.
 

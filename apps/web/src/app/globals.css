@@ -344,6 +344,7 @@ input:focus, select:focus { border-color: var(--vurgu); }
 .akis-lejant > span, .akis-lejant label { display: inline-flex; align-items: center; gap: 6px; }
 .akis-lejant-cizgi { width: 18px; height: 6px; border-radius: 1px; }
 .akis-lejant-kutu { width: 11px; height: 11px; border-radius: 2px; }
+.akis-lejant-yakma { background: repeating-linear-gradient(45deg, var(--m2) 0 1px, transparent 1px 4px), repeating-linear-gradient(-45deg, var(--m2) 0 1px, var(--zemin) 1px 4px); border: 1px solid var(--m2); }
 .akis-lejant-tarama { background: repeating-linear-gradient(45deg, var(--akis-aday) 0 2px, var(--akis-aday-zemin) 2px 5px); }
 .akis-lejant select { background: var(--yuzey-2); color: var(--m1); border: 1px solid var(--cizgi); border-radius: var(--kose); font: inherit; }
 

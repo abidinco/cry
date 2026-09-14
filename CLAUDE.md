@@ -276,6 +276,23 @@ işaret), renk kanalları ayrık, yazı tipleri build anında gömülü.
   sonra VERİTABANINDAN yeniden sayılır (bellekteki sayaç tek yürüyüşü bilir).
   Ölçüldü (koşu 8): 70 Mn USDT'lik adaydan devam → 2 çıkış, yeni adres
   dallanmada durdu; doğrulanmış Binance'ten devam reddedildi.
+- **Yakma adresi ayrı bir durma sebebidir: `yakildi`** (kullanıcı kararı
+  2026-09-14). Koşu 8'de adaydan devam edince 70 Mn USDT'nin TAMAMININ TRON
+  sıfır adresine gittiği görüldü; motor onu "dallanma" sanıp devam
+  ettirilebilir bir sınır gibi gösteriyordu. Para yok edildi — iz BİTER,
+  devam düğmesi çıkmaz, rapor "yakıldı" der. Sebep borsadan ve bütün
+  sınırlardan ÖNCE sorulur; yakma adresi taranmaz (milyonlarca hareketi var
+  ve hiçbiri bu paranın devamı değil). Koşu başlığında önceliği doğrulanmış
+  borsadan sonra, adaydan önce. Liste `packages/chain/src/yakma.ts`'e taşındı
+  (keşif, motor ve arayüz soruyor; istemci `@cry/chain/yakma` alt yolundan
+  çeker, zincir adaptörleri tarayıcı paketine girmez). Sebep eklenmeden önce
+  yazılmış koşularda sıfır adresi "dallanma" kayıtlı — o yüzden kural ve
+  arayüz sebebe ek olarak ADRESİ de sorar. Ölçüldü (koşu 9): adaydan devam
+  → sıfır adresi `yakildi`, oradan devam reddedildi.
+- **Tıklanan şerit, köke kadar geldiği yolla öne çıkar** (kullanıcı isteği).
+  "Bu para buraya hangi yoldan geldi" — şeridin kaynağına giren ileri
+  şeritler, onlarınkiler, köke kadar (`seritYolu`). Geri dönen şeritler yola
+  alınmaz: para o yoldan gelmedi, oradan döndü.
 - **Gizleme yalnızca GÖRÜNÜMDÜR.** Şerit ya da adres gizlenince diyagramın
   kalınlık ölçeği kalan akışa göre kurulur (yoğun bir aday hesabı küçük
   şeritleri okunmaz yapıyordu), ama özet ve defter koşunun tamamını söyler;

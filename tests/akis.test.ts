@@ -201,3 +201,19 @@ describe("devam edilmiş düğüm", () => {
     expect(dugumTuru(d("x", 1, null, ADAY), KOK)).toBe("aday");
   });
 });
+
+describe("şerit yolu ve yakma", () => {
+  it("tıklanan şerit köke kadar geldiği yolu taşır; geri dönüşleri almaz", async () => {
+    const { seritYolu } = await import("@/lib/akis");
+    const m = akisModeli(DUGUMLER, KENARLAR, KOK, "USDT");
+    expect([...seritYolu(m, "A>BINANCE")].sort()).toEqual([`${KOK}>A`, "A>BINANCE"].sort());
+    expect(seritYolu(m, "YOK>YOK").size).toBe(0);
+  });
+
+  it("sıfır adresi eski koşuda 'dallanma' diye kayıtlı olsa da yakıldı görünür ve özetle sayılır", () => {
+    const Z = "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb";
+    const m = akisModeli([...DUGUMLER, d(Z, 2, "dallanma")], [...KENARLAR, k("A", Z, 4, 2)], KOK, "USDT");
+    expect(m.dugumler.find((x) => x.address === Z)!.tur).toBe("yakildi");
+    expect(akisOzeti(m, KOK).yakilan).toBe(4_000_000n);
+  });
+});
