@@ -5,7 +5,7 @@
       "name": "cry-web-dev",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--workspace", "@cry/web"],
-      "port": 3000
+      "port": 3005
     }
   ]
 }
