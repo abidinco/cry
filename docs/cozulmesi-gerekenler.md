@@ -145,17 +145,18 @@ rapor bir vakaya ait olur.
 
 ---
 
-## 6. Takip koşusunun ilerlemesi görünmüyor, iptali yok
+## 6. ~~Takip koşusunun ilerlemesi görünmüyor, iptali yok~~ — YAPILDI (2026-09-15)
 
-**Ne bozuk:** koşu sırasında sayfa "çalışıyor" der ve orada kalır; kaç düğüm
-işlendiği, hangi hop'ta olunduğu görünmez. Koşu **yeniden denenmediği**
-için (`attempts: 1`, bilinçli) yarım kalan bir koşu elle temizlenir.
+Worker saniyede en çok bir kez `stats.ilerleme` yazar (işlenen adres,
+sıçrama, sırada kalan); sayfa bunu tek satırda gösterir ve 90 sn ses
+gelmezse "büyük bir adres taranıyor olabilir" diye uyarır. "durdur" düğmesi
+bekleyen işi kuyruktan kaldırır, süren işte bayrak koyar; worker bir sonraki
+adreste durur ve koşuyu **"durduruldu — graf eksik"** diye kapatır, sırada
+kalan adres sayısı `stats.durdurmalar`a yazılır. Ölçüldü: koşu 11, bayraktan
+~1 sn sonra durdu, kalan 10.
 
-**Nasıl görülür:** uzun bir taramada kullanıcı çalışıyor mu takıldı mı
-bilemez — ve tarama gerçekten dakikalarca sürüyor.
-
-**Nerede:** `apps/worker/src/takip.ts` (ilerleme yazımı) +
-`apps/web/src/app/takip/[id]/TakipGorunumu.tsx`.
+Kalan: tek bir büyük adresin indekslenmesi sürerken iptal o tarama bitene
+kadar bekler (yoklama adresler arasında).
 
 ---
 

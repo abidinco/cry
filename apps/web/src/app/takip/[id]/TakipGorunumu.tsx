@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { yuklemeIzle } from "@/lib/yukleme";
 import { DEVAM_EK_HOP, devamEdilebilir } from "@cry/motor";
 import TakipIskeleti from "./TakipIskeleti";
+import { ilerlemeMetni, type Ilerleme } from "@/lib/kosu-durum";
 import { Adres, Bos, Tarih, Tutar } from "@/components/ui";
 import { kisaTutar, sayi, tarih, tutarParcala } from "@/lib/bicim";
 import { cizilecekler } from "@/lib/graf-secim";
@@ -43,6 +44,8 @@ type Kosu = {
     durma?: Record<string, number>;
     devamlar?: { adres: string; oncekiSebep: string | null; ekHop: number; zaman: string }[];
     devamHatalari?: { adres: string; mesaj: string; zaman: string }[];
+    ilerleme?: Ilerleme;
+    durdurmalar?: { kalan?: number; devamAdres?: string; baslamadan?: boolean; zaman: string }[];
   } | null;
   params: Record<string, unknown> | null;
   startedAt: string;
@@ -162,6 +165,14 @@ export default function TakipGorunumu({ id }: { id: string }) {
     };
   }, [kosu, secilenVarlik, gizliSerit, gizliDugum]);
 
+  const [durduruluyor, setDurduruluyor] = useState(false);
+  const durdur = useCallback(async () => {
+    setDurduruluyor(true);
+    await yuklemeIzle(fetch(`/api/takip/${id}/durdur`, { method: "POST" }));
+    await yukle();
+    setDurduruluyor(false);
+  }, [id, yukle]);
+
   const devamEt = useCallback(
     async (adres: string, ekHop: number) => {
       setDevamIstek({ adres });
@@ -208,8 +219,32 @@ export default function TakipGorunumu({ id }: { id: string }) {
       <span className="veri m3">
         <Tarih deger={kosu.startedAt} metin={tarih(kosu.startedAt)} />
       </span>
-      <span className="rozet" data-ton={suruyor ? "dikkat" : kosu.stopReason === "terminal" ? "gelen" : undefined}>
-        {suruyor ? "sürüyor" : (SEBEP[kosu.stopReason ?? ""] ?? kosu.stopReason ?? kosu.status)}
+      {suruyor && (
+        <span className="takip-ilerleme" data-uyari={ilerlemeMetni(kosu.status, kosu.stats?.ilerleme, new Date()).uyari}>
+          {ilerlemeMetni(kosu.status, kosu.stats?.ilerleme, new Date()).metin}
+        </span>
+      )}
+      {suruyor && (
+        <button type="button" className="takip-gizle" disabled={durduruluyor} onClick={() => void durdur()}>
+          {durduruluyor ? "durduruluyor…" : "durdur"}
+        </button>
+      )}
+      <span
+        className="rozet"
+        data-ton={
+          suruyor || kosu.status === "durduruldu" ? "dikkat" : kosu.stopReason === "terminal" ? "gelen" : undefined
+        }
+        title={
+          kosu.status === "durduruldu"
+            ? "kullanıcı durdurdu — sırada kalan adresler taranmadı"
+            : undefined
+        }
+      >
+        {suruyor
+          ? "sürüyor"
+          : kosu.status === "durduruldu"
+            ? "durduruldu — graf eksik"
+            : (SEBEP[kosu.stopReason ?? ""] ?? kosu.stopReason ?? kosu.status)}
       </span>
     </div>
   );

@@ -49,6 +49,31 @@ function esikleriOku(p: Parametreler): Esikler {
   };
 }
 
+/**
+ * Koşu kaydına tek bir alan yazar, ÖTEKİLERİNE DOKUNMADAN. Prisma'nın Json
+ * güncellemesi alanın tamamını değiştirir; süren bir koşuda `devamlar` gibi
+ * kayıtları ezmemek için `jsonb_set` kullanılır.
+ */
+async function durumYaz(traceRunId: bigint, anahtar: string, deger: unknown): Promise<void> {
+  await prisma.$executeRaw`
+    update trace_runs
+       set stats = jsonb_set(coalesce(stats, '{}'::jsonb), ${[anahtar]}::text[], ${JSON.stringify(deger)}::jsonb)
+     where id = ${traceRunId}`;
+}
+
+/** Kullanıcı "durdur" dedi mi? (`/api/takip/[id]/durdur` bayrağı koyar.) */
+async function iptalIstendiMi(traceRunId: bigint): Promise<boolean> {
+  const satir = await prisma.$queryRaw<{ iptal: boolean | null }[]>`
+    select (stats->>'iptal')::boolean as iptal from trace_runs where id = ${traceRunId}`;
+  return satir[0]?.iptal === true;
+}
+
+/** Başlarken eski bir iptal bayrağı ya da ilerleme kalmışsa silinir. */
+async function durumuTemizle(traceRunId: bigint): Promise<void> {
+  await prisma.$executeRaw`
+    update trace_runs set stats = coalesce(stats, '{}'::jsonb) - 'iptal' - 'ilerleme' where id = ${traceRunId}`;
+}
+
 export async function takipKos(traceRunId: bigint): Promise<Ozet> {
   const kosu = await prisma.traceRun.findUniqueOrThrow({ where: { id: traceRunId } });
   const p = (kosu.params ?? {}) as Parametreler;
@@ -59,7 +84,8 @@ export async function takipKos(traceRunId: bigint): Promise<Ozet> {
   });
 
   const tohum = await tohumGirisleri(kosu.chain, kosu.rootAddress, p.tohumTx);
-  await yuru({
+  await durumuTemizle(traceRunId);
+  const sonuc = await yuru({
     traceRunId,
     zincir: kosu.chain,
     kural: kosu.taintRule as AtifKurali,
@@ -69,7 +95,7 @@ export async function takipKos(traceRunId: bigint): Promise<Ozet> {
     sira: [{ adres: kosu.rootAddress, hop: 0, girisler: tohum }],
   });
 
-  return kosuyuKapat(traceRunId);
+  return kosuyuKapat(traceRunId, undefined, sonuc.iptal ? { kalan: sonuc.kalan } : undefined);
 }
 
 /**
@@ -151,7 +177,8 @@ export async function takipDevam(
     }),
   ]);
 
-  await yuru({
+  await durumuTemizle(traceRunId);
+  const sonuc = await yuru({
     traceRunId,
     zincir: kosu.chain,
     kural: kosu.taintRule as AtifKurali,
@@ -162,14 +189,22 @@ export async function takipDevam(
     zorlaDevam: adres,
   });
 
-  return kosuyuKapat(traceRunId, devamKaydi);
+  return kosuyuKapat(
+    traceRunId,
+    sonuc.iptal ? { ...devamKaydi, yarim: true } : devamKaydi,
+    sonuc.iptal ? { kalan: sonuc.kalan, devamAdres: adres } : undefined,
+  );
 }
 
 /**
  * Koşunun özetini VERİTABANINDAN yeniden sayar. Devamlarla koşu parça parça
  * büyüdüğü için bellekteki sayaç tek bir yürüyüşü bilir, koşunun tamamını değil.
  */
-async function kosuyuKapat(traceRunId: bigint, devam?: Record<string, unknown>): Promise<Ozet> {
+async function kosuyuKapat(
+  traceRunId: bigint,
+  devam?: Record<string, unknown>,
+  durdurma?: { kalan: number; devamAdres?: string },
+): Promise<Ozet> {
   const [dugum, kenar, sebepler, onceki] = await Promise.all([
     prisma.traceNode.count({ where: { traceRunId } }),
     prisma.traceEdge.count({ where: { traceRunId } }),
@@ -182,13 +217,23 @@ async function kosuyuKapat(traceRunId: bigint, devam?: Record<string, unknown>):
   ]);
   const durma: Record<string, number> = {};
   for (const s of sebepler) if (s.terminalReason) durma[s.terminalReason] = s._count;
-  const eskiStats = (onceki.stats ?? {}) as { devamlar?: unknown[]; devamHatalari?: unknown[] };
+  const eskiStats = (onceki.stats ?? {}) as {
+    devamlar?: unknown[];
+    devamHatalari?: unknown[];
+    durdurmalar?: unknown[];
+  };
   const devamlar = [...(eskiStats.devamlar ?? []), ...(devam ? [devam] : [])];
+  // Durdurulan koşu EKSİKTİR ve bunu söylemeli: sırada kalan adres sayısı
+  // kayda geçer. "bitti" görünen yarım bir graf, tam sanılır.
+  const durdurmalar = [
+    ...(eskiStats.durdurmalar ?? []),
+    ...(durdurma ? [{ ...durdurma, zaman: new Date().toISOString() }] : []),
+  ];
 
   await prisma.traceRun.update({
     where: { id: traceRunId },
     data: {
-      status: "bitti",
+      status: durdurma ? "durduruldu" : "bitti",
       finishedAt: new Date(),
       stopReason: kosuDurmaSebebi(durma),
       stats: {
@@ -197,6 +242,7 @@ async function kosuyuKapat(traceRunId: bigint, devam?: Record<string, unknown>):
         durma,
         ...(devamlar.length ? { devamlar } : {}),
         ...(eskiStats.devamHatalari ? { devamHatalari: eskiStats.devamHatalari } : {}),
+        ...(durdurmalar.length ? { durdurmalar } : {}),
       } as object,
     },
   });
@@ -215,14 +261,33 @@ type Yuruyus = {
   zorlaDevam?: string;
 };
 
-async function yuru(y: Yuruyus): Promise<void> {
+/** İlerleme ve iptal en çok bu sıklıkta yoklanır: her düğümde sorgu atmamak için. */
+const ILERLEME_ARALIGI_MS = 1000;
+
+async function yuru(y: Yuruyus): Promise<{ iptal: boolean; kalan: number }> {
   const { traceRunId, zincir, kural, esikler, gorulen } = y;
   let sira = y.sira;
+  let islenen = 0;
+  let sonYoklama = 0;
 
   while (sira.length > 0) {
     const sonraki: Sira[] = [];
 
-    for (const dugum of sira) {
+    for (const [sirasi, dugum] of sira.entries()) {
+      if (Date.now() - sonYoklama >= ILERLEME_ARALIGI_MS) {
+        sonYoklama = Date.now();
+        const kalan = sira.length - sirasi + sonraki.length;
+        if (await iptalIstendiMi(traceRunId)) return { iptal: true, kalan };
+        await durumYaz(traceRunId, "ilerleme", {
+          islenen,
+          hop: dugum.hop,
+          sirada: kalan,
+          adres: dugum.adres,
+          zaman: new Date().toISOString(),
+        });
+      }
+      islenen++;
+
       const bilgi = await dugumBilgisi(zincir, dugum.adres);
 
       // Yakma adresi TARANMAZ: milyonlarca hareketi var ve hiçbiri bu paranın
@@ -290,6 +355,7 @@ async function yuru(y: Yuruyus): Promise<void> {
 
     sira = sonraki;
   }
+  return { iptal: false, kalan: 0 };
 }
 
 /* ---------------- veri okuma ---------------- */

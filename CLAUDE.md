@@ -299,6 +299,15 @@ işaret), renk kanalları ayrık, yazı tipleri build anında gömülü.
   "Bu para buraya hangi yoldan geldi" — şeridin kaynağına giren ileri
   şeritler, onlarınkiler, köke kadar (`seritYolu`). Geri dönen şeritler yola
   alınmaz: para o yoldan gelmedi, oradan döndü.
+- **Durdurulan koşu "bitti" DEĞİL "durduruldu"dur ve eksik olduğunu söyler.**
+  Yarım bir graf "bitti" görünürse tam sanılır. Worker ilerlemeyi ve iptal
+  bayrağını `jsonb_set` ile yazar/okur — Prisma'nın Json güncellemesi alanın
+  TAMAMINI değiştirir ve süren bir koşuda `devamlar` gibi kayıtları ezerdi.
+  Yoklama saniyede en çok bir kez (her düğümde sorgu atılmaz).
+- **Defter şerit başına TEK satırdır; şerit seçilince hareketlere açılır.**
+  Koşu 9 canlı devamlardan sonra 1.342 hareket oldu, 706'sı aynı çift
+  arasındaki küçük transferlerdi; diyagram tek şerit çizerken defter 706
+  satır basıyordu. Şimdi 98 satır.
 - **Gizleme yalnızca GÖRÜNÜMDÜR.** Şerit ya da adres gizlenince diyagramın
   kalınlık ölçeği kalan akışa göre kurulur (yoğun bir aday hesabı küçük
   şeritleri okunmaz yapıyordu), ama özet ve defter koşunun tamamını söyler;

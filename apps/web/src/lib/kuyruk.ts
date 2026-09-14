@@ -120,3 +120,20 @@ export async function takipDevamIstegi(
   return { yeni: true };
 }
 
+/**
+ * Bir koşunun kuyrukta BEKLEYEN işlerini kaldırır (ilk koşu ya da devamlar)
+ * ve o an işlenen bir iş var mı söyler. Süren iş kuyruktan çekilemez; worker
+ * iptal bayrağını görüp bir sonraki adreste durur.
+ */
+export async function takipIsleriniKaldir(traceRunId: string): Promise<{ kaldirilan: number; aktif: boolean }> {
+  const kuyruk = takipKuyrugu();
+  let kaldirilan = 0;
+  for (const is of await kuyruk.getJobs(["waiting", "delayed", "prioritized"])) {
+    if (is?.data?.traceRunId === traceRunId) {
+      await is.remove();
+      kaldirilan++;
+    }
+  }
+  const aktif = (await kuyruk.getJobs(["active"])).some((is) => is?.data?.traceRunId === traceRunId);
+  return { kaldirilan, aktif };
+}

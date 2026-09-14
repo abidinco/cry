@@ -466,3 +466,8 @@ input:focus, select:focus { border-color: var(--vurgu); }
 .takip-goz { background: none; border: 0; padding: 0; color: var(--m3); cursor: pointer; display: inline-flex; }
 .takip-goz:hover, .takip-goz[aria-pressed="true"] { color: var(--m1); }
 .takip-tablo tbody tr.gizli .takip-goz { opacity: 1; }
+
+/* --- süren koşunun ilerlemesi --- */
+.takip-ilerleme { font-family: var(--yazi-veri), monospace; font-size: 12px; color: var(--m2); }
+.takip-ilerleme[data-uyari="true"] { color: var(--dikkat); }
+
