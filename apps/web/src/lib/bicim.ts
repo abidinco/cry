@@ -69,3 +69,29 @@ export function hareketsizGun(sonHareket: string | Date | null | undefined): num
 export function sayi(n: number): string {
   return new Intl.NumberFormat("tr-TR").format(n);
 }
+
+/**
+ * Grafik etiketi için kısa tutar: "11,1 Mn", "40 B", "0,05".
+ *
+ * Yine bigint üzerinden: kısaltmak yuvarlamaktır ama sayıya çevirmek değildir.
+ * Tam tutar her zaman yanında (ipucu, tablo) durur; bu yalnızca bir işarettir.
+ */
+export function kisaTutar(ham: bigint, decimals: number): string {
+  const olcu = 10n ** BigInt(decimals);
+  const tam = ham / olcu;
+  const birimler: [bigint, string][] = [
+    [1_000_000_000n, " Mr"],
+    [1_000_000n, " Mn"],
+    [1_000n, " B"],
+  ];
+  for (const [bolen, ad] of birimler) {
+    if (tam >= bolen) {
+      const onda = (tam * 10n) / bolen;
+      const kus = onda % 10n;
+      return `${binlikAyir((onda / 10n).toString())}${kus ? `,${kus}` : ""}${ad}`;
+    }
+  }
+  const yuzde = (ham * 100n) / olcu;
+  const kus = (yuzde % 100n).toString().padStart(2, "0").replace(/0+$/, "");
+  return `${binlikAyir((yuzde / 100n).toString())}${kus ? `,${kus}` : ""}`;
+}

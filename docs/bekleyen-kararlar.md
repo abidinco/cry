@@ -54,29 +54,16 @@ bütçe/dallanma sınırında durur ve rapor "burası bir servis olabilir" diyem
 
 ---
 
-## 1b. Arayüz tasarımı elden geçirilecek — yön bekliyor
+## 1b. Arayüz tasarımı — takip sayfası karara bağlandı, gerisi bekliyor
 
-**Soru:** Kullanıcı (2026-09-14): "tasarımı elden geçirmemiz gerek."
-Neyin rahatsız ettiği henüz söylenmedi. Bir sonraki oturum kod yazmadan
-ÖNCE bunu sorar.
+**Karar (2026-09-14):** takip sayfası için üç örnek üretildi (A akış +
+defter · B geniş akış + çekmece · C kartlı sütunlar); kullanıcı **A**'yı
+seçti ve uygulandı (bkz. CLAUDE.md → Arayüz, `docs/arayuz.md` → Takip akışı).
+Kullanıcının dile getirdiği şikâyetler: para yoğunluğu görünmüyor, renk yok,
+gitti/geldi/geri döndü ayrışmıyor, borsalar belirgin değil, sayfa dağınık.
 
-**Bilinen durum:** tasarım dili [arayuz.md](arayuz.md)'de (köken oluğu,
-ayrı renk kanalları, tipografi, graf kuralları). Graf (görev 07) kullanıcı
-tarafından ilk kez 2026-09-14'te açıldı; gözle doğrulama o turda yapılmadı.
-
-**Sorulacaklar:**
-1. Hangi sayfalar — giriş, adres görünümü, takip/graf, hepsi?
-2. Sorun ne — okunaklılık, yoğunluk, estetik, akış (hangi bilgiye ulaşmak
-   zor)?
-3. Beğendiği bir referans var mı?
-4. Mevcut tasarım dilinden (arayuz.md) korunacak bir şey var mı?
-
-**Yöntem:** oturumlu sayfalar gözle doğrulanamıyor (ajan şifre girmez);
-kullanıcı giriş yapmış tarayıcıdan ekran görüntüsü paylaşır ya da
-`localhost:3005`'te oturumu kendisi açar. Dev sunucusu:
-`npm.cmd run dev` (PowerShell `npm.ps1`'i yürütme ilkesi yüzünden reddeder).
-
-**Karar yeri:** arayuz.md + ilgili bileşenler.
+**Kalan:** adres görünümü ve ana sayfa aynı gözle elden geçirilmedi.
+Kullanıcı başka sayfa için şikâyet bildirmedi; sorulacak.
 
 ---
 

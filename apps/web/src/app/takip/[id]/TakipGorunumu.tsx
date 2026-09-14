@@ -1,36 +1,28 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Adres, Bos, Kayit, Rozet, Satir, Tarih, Tutar } from "@/components/ui";
-import { sayi, tarih } from "@/lib/bicim";
+/**
+ * Takip koşusu — tek ekran (kullanıcı kararı 2026-09-14, seçenek A).
+ *
+ * Eski sayfa sıçrama başına ayrı bloklar diziyordu ve "para nereye gitti"
+ * sorusunun cevabı üç ekran aşağıdaydı. Şimdi: üstte koşunun kimliği ve
+ * metodolojisi TEK satırda, solda akış, sağda "para nereye ulaştı" özeti ve
+ * seçime göre süzülen hareket defteri. Hepsi bir dizüstü ekranında kaydırmadan.
+ */
 
-// Cytoscape tarayıcı API'lerine dokunuyor; sunucuda çizilemez.
-const Graf = dynamic(() => import("./Graf"), {
-  ssr: false,
-  loading: () => <p className="etiket">graf yükleniyor</p>,
-});
-
-type Dugum = {
-  address: string;
-  hop: number;
-  amountRaw: string | null;
-  isTerminal: boolean;
-  terminalReason: string | null;
-  etiketler: { title: string; category: string; exchange: string | null }[];
-};
-
-type Kenar = {
-  txHash: string;
-  from: string;
-  to: string;
-  symbol: string;
-  decimals: number;
-  amountRaw: string;
-  ts: string;
-  hop: number;
-  taintShare: number;
-};
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Adres, Bos, Tarih, Tutar } from "@/components/ui";
+import { kisaTutar, sayi, tarih } from "@/lib/bicim";
+import { cizilecekler } from "@/lib/graf-secim";
+import {
+  akisModeli,
+  akisOzeti,
+  anaVarlik,
+  varliklar,
+  type AkisDugumu,
+  type AkisKenari,
+  type SeritTuru,
+} from "@/lib/akis";
+import Akis, { dugumAdi, SERIT_ADI, SERIT_RENK } from "./Akis";
 
 type Kosu = {
   id: string;
@@ -44,45 +36,46 @@ type Kosu = {
   startedAt: string;
   finishedAt: string | null;
   vaka: { slug: string; title: string } | null;
-  dugumler: Dugum[];
-  kenarlar: Kenar[];
+  dugumler: (AkisDugumu & { amountRaw: string | null; isTerminal: boolean })[];
+  kenarlar: AkisKenari[];
   error?: string;
 };
 
 const KURAL_ADI: Record<string, string> = {
-  fifo: "FIFO (ilk giren ilk çıkar)",
+  fifo: "FIFO",
   orantisal: "orantısal",
   zaman_pencereli: "zaman pencereli",
 };
 
 /** Durma sebebi: kullanıcının anlayacağı cümle. */
 const SEBEP: Record<string, string> = {
-  terminal: "doğrulanmış borsa etiketine ulaşıldı",
-  // Aynı cümleyi doğrulanmamış bir etiketle kurmak, kaynağı olmayan bir
-  // hüküm olurdu; iz yine burada durur ama iddianın gücü yazılır.
+  terminal: "doğrulanmış borsaya ulaşıldı",
+  // Aynı cümleyi doğrulanmamış bir etiketle kurmak kaynağı olmayan bir hüküm olurdu.
   terminal_aday: "borsa ADAYINA ulaşıldı — etiket doğrulanmamış",
   butce: "hop bütçesi doldu",
-  dugum_siniri: "düğüm sınırına ulaşıldı",
-  dallanma: "çıkış sayısı eşiği aştı (borsa ya da mikser olabilir)",
-  esik: "tutar eşiğin altına düştü",
-  kontrat: "akıllı sözleşme — iz burada kesiliyor",
-  indekssiz: "bu adres taranamadı, veri yok",
+  dugum_siniri: "düğüm sınırı",
+  dallanma: "çıkış sayısı eşiği aştı",
+  esik: "tutar eşiğin altında",
+  kontrat: "akıllı sözleşme",
+  indekssiz: "taranamadı",
 };
+
+type Secim = { dugum?: string; serit?: string } | null;
 
 export default function TakipGorunumu({ id }: { id: string }) {
   const [kosu, setKosu] = useState<Kosu | null>(null);
   const [hata, setHata] = useState<string | null>(null);
-  const [secili, setSecili] = useState<string | null>(null);
+  const [secim, setSecim] = useState<Secim>(null);
+  const [varlik, setVarlik] = useState<string | null>(null);
 
   const yukle = useCallback(async () => {
     const yanit = await fetch(`/api/takip/${id}`);
     const govde = (await yanit.json().catch(() => ({}))) as Kosu;
     if (!yanit.ok) {
       setHata(govde.error ?? "koşu okunamadı");
-      return null;
+      return;
     }
     setKosu(govde);
-    return govde;
   }, [id]);
 
   useEffect(() => {
@@ -96,291 +89,277 @@ export default function TakipGorunumu({ id }: { id: string }) {
     return () => clearInterval(z);
   }, [kosu?.status, yukle]);
 
-  // Graf verisi kosu değişmedikçe yeniden kurulmaz: her render'da yeni bir
-  // dizi vermek Cytoscape'i baştan çizdirir ve yerleşim titrer.
-  const grafDugumleri = useMemo(
-    () =>
-      (kosu?.dugumler ?? []).map((d) => ({
-        address: d.address,
-        hop: d.hop,
-        isTerminal: d.isTerminal,
-        terminalReason: d.terminalReason,
-        etiketler: d.etiketler,
-      })),
-    [kosu?.dugumler],
-  );
-  const grafKenarlari = useMemo(
-    () =>
-      (kosu?.kenarlar ?? []).map((k) => ({
-        from: k.from,
-        to: k.to,
-        hop: k.hop,
-        taintShare: k.taintShare,
-        symbol: k.symbol,
-      })),
-    [kosu?.kenarlar],
-  );
+  const secilenVarlik = varlik ?? (kosu ? anaVarlik(kosu.kenarlar) : null);
+
+  const { model, kirpilan } = useMemo(() => {
+    if (!kosu || !secilenVarlik) return { model: null, kirpilan: 0 };
+    // Rapora giren görselin okunabilir kalması için en çok 100 düğüm; seçim
+    // deterministik ve BULGUYU kaybetmez (önce kök ve iz biten düğümler).
+    const { secilen, kirpilan } = cizilecekler(
+      kosu.dugumler.map((d) => ({ ...d, isTerminal: d.isTerminal })),
+      kosu.rootAddress,
+    );
+    const cizilen = new Set(secilen.map((d) => d.address));
+    return {
+      model: akisModeli(
+        kosu.dugumler.filter((d) => cizilen.has(d.address)),
+        kosu.kenarlar,
+        kosu.rootAddress,
+        secilenVarlik,
+      ),
+      kirpilan,
+    };
+  }, [kosu, secilenVarlik]);
 
   if (hata) return <p style={{ color: "var(--hata)" }}>{hata}</p>;
   if (!kosu) return <p className="etiket">yükleniyor</p>;
 
   const suruyor = kosu.status === "kuyrukta" || kosu.status === "calisiyor";
-  const hoplar = [...new Set(kosu.dugumler.map((d) => d.hop))].sort((a, b) => a - b);
+  const params = (kosu.params ?? {}) as Record<string, unknown>;
 
-  /**
-   * Düğüme giren izli tutar VARLIK BAŞINA hesaplanır. Toplamak yanlış olurdu:
-   * "1 TRX + 1 USDT = 2" diye bir büyüklük yok.
-   */
-  const dugumTutarlari = new Map<string, { symbol: string; decimals: number; ham: bigint }[]>();
-  for (const k of kosu.kenarlar) {
-    const liste = dugumTutarlari.get(k.to) ?? [];
-    const mevcut = liste.find((v) => v.symbol === k.symbol);
-    if (mevcut) mevcut.ham += BigInt(k.amountRaw);
-    else liste.push({ symbol: k.symbol, decimals: k.decimals, ham: BigInt(k.amountRaw) });
-    dugumTutarlari.set(k.to, liste);
+  const baslik = (
+    <div className="takip-serit">
+      <div className="takip-kimlik">
+        <span className="etiket">
+          {kosu.vaka?.title ?? "vaka yok"} · koşu {kosu.id}
+        </span>
+        <Adres deger={kosu.rootAddress} zincir={kosu.chain} kisa={false} />
+      </div>
+      <span className="takip-bosluk" />
+      <span className="veri m2" title="rapora yazılır">
+        {kosu.chain} · {KURAL_ADI[kosu.taintRule] ?? kosu.taintRule} · en çok {String(params.maxHop)} sıçrama ·{" "}
+        {String(params.maxDugum)} düğüm
+      </span>
+      <span className="veri m3">
+        {sayi(kosu.dugumler.length)} adres · {sayi(kosu.kenarlar.length)} hareket
+      </span>
+      <span className="veri m3">
+        <Tarih deger={kosu.startedAt} metin={tarih(kosu.startedAt)} />
+      </span>
+      <span className="rozet" data-ton={suruyor ? "dikkat" : kosu.stopReason === "terminal" ? "gelen" : undefined}>
+        {suruyor ? "sürüyor" : (SEBEP[kosu.stopReason ?? ""] ?? kosu.stopReason ?? kosu.status)}
+      </span>
+    </div>
+  );
+
+  if (!model || kosu.dugumler.length === 0) {
+    return (
+      <>
+        {baslik}
+        <Bos>
+          {suruyor
+            ? "Koşu başladı; adresler bulundukça burada görünecek."
+            : "Bu koşu hiç hareket üretmedi. Kök adresin indekslenmiş girişi yoksa takip edilecek para da yoktur."}
+        </Bos>
+      </>
+    );
   }
-  const borsalar = kosu.dugumler.filter((d) => d.terminalReason === "terminal");
-  const borsaAdaylari = kosu.dugumler.filter((d) => d.terminalReason === "terminal_aday");
+
+  const ozet = akisOzeti(model, kosu.rootAddress);
+  const dugumHarita = new Map(model.dugumler.map((d) => [d.address, d]));
+  const cubukEn = [
+    ...ozet.borsalar.map((b) => b.ham),
+    ...ozet.adaylar.map((a) => a.ham),
+    ozet.kokeGeri,
+  ].reduce((a, b) => (b > a ? b : a), 1n);
+
+  // Defter: seçime göre süzülür; sıçrama sırasıyla, zaman sırasıyla.
+  const seritTuru = new Map<string, SeritTuru>();
+  for (const s of model.seritler) for (const k of s.kenarlar) seritTuru.set(k.txHash + k.from + k.to, s.tur);
+  const defter = kosu.kenarlar
+    .filter((k) => k.symbol === model.varlik && dugumHarita.has(k.from) && dugumHarita.has(k.to))
+    .filter((k) =>
+      !secim
+        ? true
+        : secim.dugum
+          ? k.from === secim.dugum || k.to === secim.dugum
+          : `${k.from}>${k.to}` === secim.serit,
+    );
+  const secimAdi = secim?.dugum
+    ? dugumAdi(dugumHarita.get(secim.dugum)!)
+    : secim?.serit
+      ? (() => {
+          const [f, t] = secim.serit.split(">");
+          return `${dugumAdi(dugumHarita.get(f!)!)} → ${dugumAdi(dugumHarita.get(t!)!)}`;
+        })()
+      : null;
+  const seciliDugum = secim?.dugum ? dugumHarita.get(secim.dugum) : null;
+
+  const oran = (ham: bigint) => Number((ham * 1000n) / cubukEn) / 10;
 
   return (
     <>
-      <div style={{ marginBottom: 20 }}>
-        <h1>Takip koşusu</h1>
-        <div className="etiket" style={{ marginTop: 6 }}>
-          {kosu.vaka?.title} · {kosu.chain} · {KURAL_ADI[kosu.taintRule] ?? kosu.taintRule}
-        </div>
-      </div>
-
-      <Kayit koken="indeks" baslik="koşu">
-        <div className="panel satirlar">
-          <Satir ad="kök adres">
-            <Adres deger={kosu.rootAddress} zincir={kosu.chain} kisa={false} />
-          </Satir>
-          <Satir ad="durum">
-            <span className="veri" style={{ color: suruyor ? "var(--dikkat)" : "var(--gelen)" }}>
-              {suruyor ? "sürüyor" : kosu.status}
-            </span>
-          </Satir>
-          <Satir ad="başladı">
-            <Tarih deger={kosu.startedAt} metin={tarih(kosu.startedAt)} />
-          </Satir>
-          {kosu.finishedAt && (
-            <Satir ad="bitti">
-              <Tarih deger={kosu.finishedAt} metin={tarih(kosu.finishedAt)} />
-            </Satir>
-          )}
-          <Satir ad="graf">
-            <span className="veri">
-              {sayi(kosu.dugumler.length)} düğüm · {sayi(kosu.kenarlar.length)} kenar
-            </span>
-          </Satir>
-          {kosu.stats?.durma && (
-            <Satir ad="durma sebepleri">
-              <span className="m2">
-                {Object.entries(kosu.stats.durma)
-                  .map(([k, v]) => `${SEBEP[k] ?? k}: ${v}`)
-                  .join(" · ")}
+      {baslik}
+      <div className="takip-govde">
+        <section className="takip-sol" aria-label="para akışı">
+          <div className="akis-lejant">
+            {(["akis", "borsa", "aday", "geri"] as SeritTuru[]).map((t) => (
+              <span key={t}>
+                <i className="akis-lejant-cizgi" style={{ background: SERIT_RENK[t] }} />
+                {SERIT_ADI[t]}
               </span>
-            </Satir>
+            ))}
+            <span className="m3">·</span>
+            <span>
+              <i className="akis-lejant-kutu" style={{ background: "var(--akis-borsa)" }} />
+              borsa ✓
+            </span>
+            <span>
+              <i className="akis-lejant-kutu akis-lejant-tarama" />
+              aday ?
+            </span>
+            <span>
+              <i className="akis-lejant-kutu" style={{ border: "1px dashed var(--m3)" }} />
+              bizim sınırımız
+            </span>
+            <span className="takip-bosluk" />
+            {varliklar(kosu.kenarlar).length > 1 ? (
+              <label className="etiket">
+                kalınlık{" "}
+                <select id="akis-varlik" value={model.varlik} onChange={(e) => setVarlik(e.target.value)}>
+                  {varliklar(kosu.kenarlar).map((v) => (
+                    <option key={v}>{v}</option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <span className="etiket">kalınlık = {model.varlik}</span>
+            )}
+          </div>
+          <Akis model={model} kokAdres={kosu.rootAddress} secili={secim?.dugum ?? null} onSecim={setSecim} />
+          {(kirpilan > 0 || model.digerVarlikKenari > 0) && (
+            // Çizilmeyen kısım SESSİZCE yok sayılmaz.
+            <p className="etiket" style={{ color: "var(--dikkat)", margin: 0 }}>
+              {kirpilan > 0 && `çizilmeyen ${sayi(kirpilan)} adres (ilk 100 gösteriliyor, önce kök ve iz biten adresler)`}
+              {kirpilan > 0 && model.digerVarlikKenari > 0 && " · "}
+              {model.digerVarlikKenari > 0 &&
+                `${sayi(model.digerVarlikKenari)} hareket başka varlıkta — kalınlık seçicisinden görülür`}
+            </p>
           )}
-          <Satir ad="metodoloji" koken="kaynak" not="rapora yazılır">
-            <span className="m2">
-              {KURAL_ADI[kosu.taintRule]} · en fazla {String((kosu.params as Record<string, unknown>)?.maxHop)} hop ·{" "}
-              {String((kosu.params as Record<string, unknown>)?.maxDugum)} düğüm
-            </span>
-          </Satir>
-        </div>
-      </Kayit>
+        </section>
 
-      {kosu.dugumler.length > 0 && (
-        <Kayit
-          koken="indeks"
-          baslik="graf"
-          sag={
-            <span className="etiket m3">
-              hiyerarşik düzen — aynı koşu her açılışta aynı resmi verir
+        <aside className="takip-sag">
+          <div className="takip-ozet">
+            <div className="kayit" data-koken="kaynak">
+              <h2>para nereye ulaştı</h2>
+              <div className="ozet-cubuklar">
+                {ozet.borsalar.map((b) => (
+                  <button key={b.address} type="button" className="ozet-cubuk" onClick={() => setSecim({ dugum: b.address })}>
+                    <span className="ozet-ad" style={{ color: "var(--akis-borsa-yazi)" }}>{b.ad} ✓</span>
+                    <span className="ozet-yol"><span style={{ width: `${oran(b.ham)}%`, background: "var(--akis-borsa)" }} /></span>
+                    <span className="veri">{kisaTutar(b.ham, model.decimals)}</span>
+                  </button>
+                ))}
+                {ozet.adaylar.map((a) => (
+                  <button key={a.address} type="button" className="ozet-cubuk" onClick={() => setSecim({ dugum: a.address })}>
+                    <span className="ozet-ad" style={{ color: "var(--akis-aday-yazi)" }}>aday ?</span>
+                    <span className="ozet-yol"><span className="akis-lejant-tarama" style={{ width: `${oran(a.ham)}%` }} /></span>
+                    <span className="veri">{kisaTutar(a.ham, model.decimals)}</span>
+                  </button>
+                ))}
+                {ozet.kokeGeri > 0n && (
+                  <button type="button" className="ozet-cubuk" onClick={() => setSecim({ dugum: kosu.rootAddress })}>
+                    <span className="ozet-ad" style={{ color: "var(--akis-geri-yazi)" }}>↩ köke geri</span>
+                    <span className="ozet-yol"><span style={{ width: `${oran(ozet.kokeGeri)}%`, background: "var(--akis-geri)" }} /></span>
+                    <span className="veri">{kisaTutar(ozet.kokeGeri, model.decimals)}</span>
+                  </button>
+                )}
+                {ozet.borsalar.length === 0 && ozet.adaylar.length === 0 && (
+                  <span className="m3">İz hiçbir borsaya ya da adaya ulaşmadı.</span>
+                )}
+              </div>
+              <div className="m3" style={{ marginTop: 6 }}>
+                kökten çıkan <Tutar ham={ozet.kokCikan.toString()} ondalik={model.decimals} sembol={model.varlik} />
+              </div>
+            </div>
+            {(ozet.sinirda > 0 || ozet.taranamadi > 0) && (
+              <div className="kayit" data-koken="supheli">
+                <h2>
+                  {sayi(ozet.sinirda + ozet.taranamadi)} adreste iz bizim sınırımızda kaldı
+                </h2>
+                <div className="m3">
+                  {kosu.stats?.durma &&
+                    Object.entries(kosu.stats.durma)
+                      .filter(([k]) => k !== "terminal" && k !== "terminal_aday")
+                      .map(([k, v]) => `${SEBEP[k] ?? k} ${v}`)
+                      .join(" · ")}{" "}
+                  — sonrası taranmadı, "temiz" değil
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="takip-filtre">
+            <span className="etiket">
+              {secimAdi ? `${secimAdi} · ${sayi(defter.length)} hareket` : `tüm hareketler · ${sayi(defter.length)}`}
             </span>
-          }
-        >
-          <Graf
-            dugumler={grafDugumleri}
-            kenarlar={grafKenarlari}
-            kokAdres={kosu.rootAddress}
-            onSecim={setSecili}
-          />
-          {secili && (
-            <div className="panel satirlar" style={{ marginTop: 8 }}>
-              <Satir ad="seçilen">
-                <Adres deger={secili} zincir={kosu.chain} kisa={false} />
-              </Satir>
-              <Satir ad="durum">
-                <span className="m2">
-                  {(() => {
-                    const d = kosu.dugumler.find((x) => x.address === secili);
-                    if (!d) return "—";
-                    const sebep = d.terminalReason
-                      ? (SEBEP[d.terminalReason] ?? d.terminalReason)
-                      : "devam edildi";
-                    return `${d.hop}. sıçrama · ${sebep}`;
-                  })()}
-                </span>
-              </Satir>
+            {secim && (
+              <button type="button" onClick={() => setSecim(null)}>
+                süzgeci kaldır
+              </button>
+            )}
+          </div>
+          {seciliDugum && (
+            <div className="takip-secili">
+              <Adres deger={seciliDugum.address} zincir={kosu.chain} kisa={false} />
+              <span className="m3">
+                {seciliDugum.hop}. sıçrama ·{" "}
+                {seciliDugum.terminalReason ? (SEBEP[seciliDugum.terminalReason] ?? seciliDugum.terminalReason) : "devam edildi"}
+                {seciliDugum.etiketler.length > 0 && ` · ${seciliDugum.etiketler.map((e) => e.title).join(" · ")}`}
+              </span>
             </div>
           )}
-        </Kayit>
-      )}
-
-      {borsaAdaylari.length > 0 && (
-        <Kayit
-          koken="supheli"
-          baslik="borsa ADAYINA ulaşan iz"
-          sag={<span className="etiket m3">etiket doğrulanmamış — rapora bu ibareyle girer</span>}
-        >
-          <div className="panel">
-            {borsaAdaylari.map((d) => (
-              <div key={d.address} style={{ marginBottom: 6 }}>
-                <Adres deger={d.address} zincir={kosu.chain} />{" "}
-                {d.etiketler.map((e, i) => (
-                  <Rozet key={i}>{e.title}</Rozet>
-                ))}
-              </div>
-            ))}
-          </div>
-        </Kayit>
-      )}
-
-      {borsalar.length > 0 && (
-        <Kayit koken="kaynak" baslik="borsaya ulaşan iz">
-          <div className="panel">
-            {borsalar.map((d) => (
-              <div key={d.address} style={{ marginBottom: 6 }}>
-                <Adres deger={d.address} zincir={kosu.chain} />{" "}
-                {d.etiketler.map((e, i) => (
-                  <Rozet key={i}>{e.title}</Rozet>
-                ))}
-              </div>
-            ))}
-          </div>
-        </Kayit>
-      )}
-
-      {kosu.dugumler.length === 0 ? (
-        <Bos>
-          {suruyor
-            ? "Koşu başladı; düğümler bulundukça burada görünecek."
-            : "Bu koşu hiç düğüm üretmedi. Kök adresin indekslenmiş girişi yoksa takip edilecek para da yoktur."}
-        </Bos>
-      ) : (
-        hoplar.map((h) => {
-          const dugumler = kosu.dugumler.filter((d) => d.hop === h);
-          const kenarlar = kosu.kenarlar.filter((k) => k.hop === h);
-          return (
-            <Kayit
-              key={h}
-              koken="indeks"
-              baslik={h === 0 ? "kök" : `${h}. sıçrama · ${sayi(dugumler.length)} düğüm`}
-            >
-              <div className="tablo-sar">
-                <table className="tablo">
-                  <thead>
-                    <tr>
-                      <th>adres</th>
-                      <th className="sag" style={{ width: 170 }}>izli tutar</th>
-                      <th style={{ width: 260 }}>durum</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {dugumler.map((d) => (
-                      <tr key={d.address}>
+          <div className="takip-defter">
+            <table className="tablo takip-tablo">
+              <thead>
+                <tr>
+                  <th>kimden → kime</th>
+                  <th className="sag">{model.varlik}</th>
+                  <th className="sag" title="çıkışın ize atfedilen payı">pay</th>
+                </tr>
+              </thead>
+              <tbody>
+                {defter.map((k, i) => {
+                  const onceki = defter[i - 1];
+                  const tur = seritTuru.get(k.txHash + k.from + k.to) ?? "akis";
+                  return (
+                    <FragmentSatir
+                      key={k.txHash + k.from + k.to + i}
+                      grup={!onceki || onceki.hop !== k.hop ? `${k.hop}. sıçrama` : null}
+                    >
+                      <tr title={`${tarih(k.ts)} TSİ · ${k.txHash}`}>
                         <td>
-                          <Adres deger={d.address} zincir={kosu.chain} />
-                          {d.etiketler.map((e, i) => (
-                            <span key={i} style={{ marginLeft: 6 }}>
-                              <Rozet>{e.title}</Rozet>
-                            </span>
-                          ))}
+                          <i className="takip-tur" style={{ background: SERIT_RENK[tur] }} aria-label={SERIT_ADI[tur]} />
+                          <span className="veri">
+                            {dugumAdi(dugumHarita.get(k.from)!)} → {dugumAdi(dugumHarita.get(k.to)!)}
+                          </span>
                         </td>
-                        <td className="sag tutar-hucre">
-                          {(() => {
-                            const varliklar = (dugumTutarlari.get(d.address) ?? [])
-                              .slice()
-                              .sort((a, b) => (b.ham > a.ham ? 1 : -1));
-                            if (varliklar.length === 0) return <span className="m3">—</span>;
-                            return varliklar.slice(0, 3).map((v) => (
-                              <div key={v.symbol}>
-                                <Tutar ham={v.ham.toString()} ondalik={v.decimals} sembol={v.symbol} />
-                              </div>
-                            ));
-                          })()}
+                        <td className="sag">
+                          <Tutar ham={k.amountRaw} ondalik={k.decimals} />
                         </td>
-                        <td className="m2">
-                          {d.terminalReason ? (
-                            <span
-                              style={{
-                                color:
-                                  d.terminalReason === "terminal"
-                                    ? "var(--gelen)"
-                                    : "var(--m2)",
-                              }}
-                            >
-                              {SEBEP[d.terminalReason] ?? d.terminalReason}
-                            </span>
-                          ) : (
-                            <span className="m3">devam edildi</span>
-                          )}
-                        </td>
+                        <td className="sag veri m2">%{Math.round(k.taintShare * 100)}</td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </FragmentSatir>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </aside>
+      </div>
+    </>
+  );
+}
 
-              {kenarlar.length > 0 && (
-                <details style={{ marginTop: 8 }}>
-                  <summary className="etiket" style={{ cursor: "pointer" }}>
-                    bu sıçramanın {sayi(kenarlar.length)} hareketi
-                  </summary>
-                  <div className="tablo-sar" style={{ marginTop: 8 }}>
-                    <table className="tablo">
-                      <thead>
-                        <tr>
-                          <th style={{ width: 140 }}>tarih</th>
-                          <th>nereden</th>
-                          <th>nereye</th>
-                          <th className="sag" style={{ width: 170 }}>izli tutar</th>
-                          <th style={{ width: 60 }}>pay</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {kenarlar.slice(0, 100).map((k, i) => (
-                          <tr key={k.txHash + i}>
-                            <td>
-                              <Tarih deger={k.ts} metin={tarih(k.ts)} />
-                            </td>
-                            <td>
-                              <Adres deger={k.from} zincir={kosu.chain} />
-                            </td>
-                            <td>
-                              <Adres deger={k.to} zincir={kosu.chain} />
-                            </td>
-                            <td className="sag tutar-hucre">
-                              <Tutar ham={k.amountRaw} ondalik={k.decimals} sembol={k.symbol} />
-                            </td>
-                            <td className="veri m2">
-                              {/* Atıf oranı: çıkışın ne kadarı ize ait. */}
-                              %{Math.round(k.taintShare * 100)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </details>
-              )}
-            </Kayit>
-          );
-        })
+function FragmentSatir({ grup, children }: { grup: string | null; children: ReactNode }) {
+  return (
+    <>
+      {grup && (
+        <tr className="takip-grup">
+          <td colSpan={3}>{grup}</td>
+        </tr>
       )}
+      {children}
     </>
   );
 }

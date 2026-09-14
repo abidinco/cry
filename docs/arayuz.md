@@ -59,27 +59,36 @@ tarayıcı üçüncü bir tarafa haber vermiş olurdu.
   basılır** — büyüklük tek bakışta okunsun.
 - Tarihler ekranda **TSİ**, ipucu balonunda **UTC** (rapor UTC istiyor).
 
-## Graf
+## Takip akışı
 
-Düzen **hiyerarşik (dagre), soldan sağa hop sırasıyla**. Gerekçe estetik
-değil yeniden üretilebilirlik: kuvvet tabanlı bir düzende yerleşim her
-açılışta değişir ve aynı koşu iki farklı resim verir — rapora giren bir
-görselde bu savunulamaz. Aynı sebeple düğümler **sürüklenemez**.
+Takip sayfası **tek ekrandır** (kullanıcı kararı 2026-09-14, seçenek A):
+üstte koşunun kimliği ve metodolojisi tek satırda, solda akış, sağda "para
+nereye ulaştı" çubukları ve seçime göre süzülen hareket defteri.
 
-Grafta renk TEK BİR ŞEY anlatır: düğümün durumu. Yön rengi (gelen/giden)
-kullanılmaz, çünkü yönü okun kendisi söylüyor.
+Akış sankey benzeridir: sütunlar sıçrama, **şerit kalınlığı aktarılan
+tutar** (tek varlığın ölçeğinde; birden çok varlık varsa seçici çıkar).
+Aynı çift arasındaki hareketler tek şeritte toplanır, hepsi defterde durur.
 
-| Çerçeve | Anlam |
+**Renk şeridin ne olduğunu anlatır:**
+
+| Şerit | Anlam |
 |---|---|
-| indigo | kök (odak) |
-| yeşil | doğrulanmış borsa etiketi — iz burada tamamlandı |
-| kehribar, kesik | borsa ADAYI, etiket doğrulanmamış |
-| gri, kesik | bizim koyduğumuz sınır (bütçe, dallanma) — iz bitmedi |
-| gri, noktalı | taranamadı ("yok" değil, "bakılamadı") |
+| gri | ileri akış |
+| yeşil, oklu | doğrulanmış borsaya giriş |
+| kehribar, oklu | borsa adayına giriş |
+| pembe, alttan dolaşan | köke ya da önceki bir adrese dönen para |
 
-En çok **100 düğüm** çizilir ve seçim deterministiktir: önce kök, sonra iz
-biten düğümler, sonra hop sırası. Kırpılan kısım sessizce yok sayılmaz —
-kaç düğüm ve kaç kenar çizilmediği ekranda yazar, tamamı tablolarda durur.
+**Düğümün durumu dokudur**, renk değil: doğrulanmış borsa düz yeşil ve ✓,
+aday taralı kehribar ve ?, bizim sınırımız (bütçe/dallanma) kesik çerçeve,
+kök indigo. Renk tek başına hiçbir şey anlatmaz.
+
+Yerleşim **deterministiktir**: aynı koşu her açılışta aynı resmi verir,
+çünkü rapora girer. En çok **100 adres** çizilir; seçim önce kökü ve iz biten
+adresleri alır, kırpılan kısım ekranda sayılır.
+
+Düğüme gelmek bağlı şeritleri yakar; tıklamak defteri o adrese süzer.
+Tam tutar ipucunda ve defterde, şerit etiketinde yalnızca kısa biçim
+("11,1 Mn") — kısa biçim de bigint üzerinden hesaplanır.
 
 ## Yoğunluk ve dar ekran
 

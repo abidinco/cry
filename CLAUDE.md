@@ -240,12 +240,27 @@ Tasarım dili ve gerekçesi: [docs/arayuz.md](docs/arayuz.md). Özet: yoğun adl
 araç, imza öğesi **köken oluğu** (bilginin nereden geldiğini söyleyen sol
 işaret), renk kanalları ayrık, yazı tipleri build anında gömülü.
 
-- **Graf HİYERARŞİK çizilir (dagre), soldan sağa hop sırasıyla** (kullanıcı
-  kararı 2026-09-09). Gerekçe estetik değil YENİDEN ÜRETİLEBİLİRLİK: kuvvet
-  tabanlı düzende (fcose/cose) düğüm yerleşimi her açılışta değişir, yani
-  aynı koşu iki farklı resim üretir — rapora giren bir görselde bu
-  savunulamaz. Hop zaten bir SIRADIR; hiyerarşi o sırayı görselleştirir ve
-  "para nereden nereye" sorusu tek yönde okunur.
+- **Takip bir AKIŞ olarak çizilir, graf olarak değil** (kullanıcı kararı
+  2026-09-14, üç örnek arasından A). Kullanıcı: "aktarılan para yoğunluğunu
+  görmüyorum, renkler yok." Cytoscape grafında 40 Mn USDT ile 1 USDT aynı
+  çizgiydi ve sayfa sıçrama başına bloklarla üç ekrana dağılıyordu. Şimdi
+  sütunlar sıçrama, ŞERİT KALINLIĞI tutar (tek varlığın ölçeğinde — "1 TRX +
+  1 USDT" diye büyüklük yok), sağda "para nereye ulaştı" + seçime göre süzülen
+  defter, hepsi tek ekranda. Saf yerleşim `apps/web/src/lib/akis.ts`, testli.
+- **Yerleşim hâlâ DETERMİNİSTİK** — 2026-09-09 kararının gerekçesi (aynı koşu
+  aynı resim, rapora giren görsel) değişmedi, yalnızca çizim biçimi değişti.
+  Rastgelelik yok, eşitlikte adres sırası; test girdi sırasını ters çevirip
+  aynı resmi bekliyor.
+- **Akışta renk ŞERİDİN ne olduğunu anlatır, düğümün durumu DOKUDUR.**
+  Şerit: ileri akış (gri) · doğrulanmış borsaya giriş (yeşil) · adaya giriş
+  (kehribar) · önceki bir adrese dönüş (pembe). Düğüm: borsa düz + ✓, aday
+  taralı + ?, bizim sınırımız kesik çerçeve. Renk hiçbir şeyi tek başına
+  anlatmaz. Palet koyu zeminde renk körlüğü denetiminden geçti (ΔE ≥ 9); ilk
+  deneme kehribarı fazla açık, griyi ayırt edilemez buldu ve düzeltildi.
+- **Geri dönen para diyagramın ALTINDAN dolaşır.** Köke ya da aynı/önceki
+  sıçramadaki bir adrese giden para ileri şeritlerle karışmasın diye ayrı bir
+  alt şeritten okla döner. Koşu 7'de köke 3,85 Mn USDT geri dönmüş — eski
+  grafta bu hiç görünmüyordu.
 - **Çizilen düğüm sayısı 100 ile sınırlı, gerisi "ve N düğüm daha" diye
   SAYILIR.** Düğüm sınırı 300 ve kabaca on katı kenar okunmaz bir yumak
   verir; ama kırpılan kısım sessizce yok sayılmaz — kaç düğümün

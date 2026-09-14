@@ -9,7 +9,7 @@ export default async function TakipSayfasi({ params }: { params: Promise<{ id: s
   const { id } = await params;
 
   return (
-    <main className="sayfa">
+    <main className="sayfa sayfa-genis">
       <UstBar username={oturum.username} admin={adminMi(oturum)} />
       <TakipGorunumu id={id} />
     </main>
