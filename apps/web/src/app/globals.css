@@ -384,9 +384,16 @@ input:focus, select:focus { border-color: var(--vurgu); }
 .takip-filtre { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 14px; border-bottom: 1px solid var(--cizgi); }
 .takip-filtre button { background: none; border: 1px solid var(--cizgi); border-radius: var(--kose); color: var(--m2); font: inherit; font-size: 12px; padding: 2px 8px; cursor: pointer; }
 .takip-secili { display: grid; gap: 2px; padding: 8px 14px; border-bottom: 1px solid var(--cizgi); font-size: 12px; word-break: break-all; }
-.takip-defter { overflow: auto; min-height: 0; flex: 1; }
+.takip-defter { overflow-y: auto; overflow-x: hidden; min-height: 0; flex: 1; }
 .takip-tablo th { position: sticky; top: 0; background: var(--yuzey); z-index: 1; }
-.takip-tablo td { white-space: nowrap; }
+/* Kompakt defter: 390px'lik panele sığar, yatay kaydırma yok. */
+.takip-tablo { table-layout: fixed; font-size: 11px; }
+.takip-tablo th { padding: 5px 6px; font-size: 9px; }
+.takip-tablo td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 3px 6px; line-height: 1.35; vertical-align: middle; }
+.takip-tablo th:first-child, .takip-tablo td:first-child { padding-left: 14px; }
+.takip-tablo .veri { font-size: 11px; }
+.takip-tablo td.takip-tutar { padding-right: 4px; }
+.takip-grup td { padding-top: 6px !important; padding-bottom: 3px !important; }
 .takip-grup td { color: var(--m2); font-family: var(--yazi-veri), monospace; font-size: 10px; letter-spacing: 0.09em; text-transform: uppercase; background: var(--zemin); }
 .takip-tablo tbody tr { cursor: pointer; }
 .takip-tablo tbody tr.yanik td { background: color-mix(in srgb, var(--vurgu) 14%, transparent); }
@@ -455,7 +462,7 @@ input:focus, select:focus { border-color: var(--vurgu); }
 .gizli-hepsi { background: none; border: 0; color: var(--vurgu); padding: 3px 4px; }
 
 .takip-tablo tbody tr.gizli td { opacity: 0.45; }
-.takip-goz-hucre { width: 26px; padding-left: 0 !important; padding-right: 6px !important; }
-.takip-goz { background: none; border: 0; padding: 2px; color: var(--m3); cursor: pointer; display: inline-flex; }
+.takip-tablo td.takip-goz-hucre { padding: 0 8px 0 0 !important; text-align: right; text-overflow: clip; }
+.takip-goz { background: none; border: 0; padding: 0; color: var(--m3); cursor: pointer; display: inline-flex; }
 .takip-goz:hover, .takip-goz[aria-pressed="true"] { color: var(--m1); }
 .takip-tablo tbody tr.gizli .takip-goz { opacity: 1; }

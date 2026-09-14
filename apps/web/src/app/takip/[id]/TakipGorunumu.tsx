@@ -14,7 +14,7 @@ import { yuklemeIzle } from "@/lib/yukleme";
 import { DEVAM_EK_HOP, devamEdilebilir } from "@cry/motor";
 import TakipIskeleti from "./TakipIskeleti";
 import { Adres, Bos, Tarih, Tutar } from "@/components/ui";
-import { kisaTutar, sayi, tarih } from "@/lib/bicim";
+import { kisaTutar, sayi, tarih, tutarParcala } from "@/lib/bicim";
 import { cizilecekler } from "@/lib/graf-secim";
 import {
   akisModeli,
@@ -513,6 +513,13 @@ export default function TakipGorunumu({ id }: { id: string }) {
           )}
           <div className="takip-defter">
             <table className="tablo takip-tablo">
+              {/* Sabit kolonlar: dar panelde yatay kaydırma olmasın (kullanıcı bildirimi). */}
+              <colgroup>
+                <col />
+                <col style={{ width: 108 }} />
+                <col style={{ width: 40 }} />
+                <col style={{ width: 28 }} />
+              </colgroup>
               <thead>
                 <tr>
                   <th>kimden → kime</th>
@@ -562,7 +569,14 @@ export default function TakipGorunumu({ id }: { id: string }) {
                             {dugumAdi(dugumHarita.get(k.from)!)} → {dugumAdi(dugumHarita.get(k.to)!)}
                           </span>
                         </td>
-                        <td className="sag">
+                        <td
+                          className="sag takip-tutar"
+                          title={(() => {
+                            // Kırpılan uç tutar ipucunda tam okunur.
+                            const p = tutarParcala(k.amountRaw, k.decimals);
+                            return `${p.tam}${p.kusurat ? "," + p.kusurat : ""} ${k.symbol}`;
+                          })()}
+                        >
                           <Tutar ham={k.amountRaw} ondalik={k.decimals} />
                         </td>
                         <td className="sag veri m2">%{Math.round(k.taintShare * 100)}</td>
