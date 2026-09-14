@@ -168,11 +168,23 @@ adlarını isterdi.
   gerçek koşuyla doğrulandı: kök `TPJxc7u8…`, 21 düğüm / 33 kenar,
   `terminal_aday:1`, koşu başlığı `terminal_aday`. "Bir kapının yazılmış
   olması çalıştığını göstermez."
+- **`terminal` da gerçek koşuda ateşlendi** (2026-09-14, koşu 7 — koşu 5
+  ile aynı kök ve eşikler). Graf birebir aynı (23 düğüm / 45 kenar), yalnızca
+  sebepler değişti: `terminal_aday:2, butce:11` → `terminal:3, terminal_aday:1,
+  butce:9`, başlık `butce` → `terminal`. Üç düğümün ikisi (Okex 1, HTX 1)
+  koşu 5'te BÜTÇE sınırında kesilmişti — yani kimliksiz arşivde "biz durduk"
+  diye görünen yer aslında iz'in bittiği yerdi. Eski koşular donmuş kayıttır;
+  yeni etiketin etkisi ancak yeni koşuda görünür.
 - **Aday etiket bir İDDİADIR ve öyle girer** (kullanıcı kararı
   2026-09-09): dört borsa adresi `source: "kullanici"`, `confidence 0.3`,
   `verifiedAt` BOŞ. Adresin biçimi doğrulanmış olması etiketin doğru
   olduğunu göstermez; onayı on-chain davranış ve insan verir. Liste
   KAPALI ve her satır gerekçesini taşır (`packages/etiket/src/aday.ts`).
+- **Blockscout BSC BARINDIRMIYOR** (ölçüldü 2026-09-14: `bsc.`/`bnb.blockscout.com`
+  404, zincir listesinde 56 yok). 2026-09-09'daki "BSC → Blockscout" kararı
+  ölçülmemiş bir varsayıma dayanıyordu — TronScan'ın "ücretsiz" varsayımının
+  aynısı. BSC yedeği herkese açık RPC; adres için "var" diyebiliyor, "yok"
+  DİYEMİYOR ve bunu `hata` ile söylüyor.
 
 ## Takip ve rapor
 

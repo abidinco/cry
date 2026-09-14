@@ -53,23 +53,27 @@ olarak yazıldı; biri `Black Hole Address(0)` (bkz. aşağısı).
 
 ---
 
-## 1b. BSC yoklaması Blockscout'a devredilecek (karar verildi)
+## 1b. BSC yoklaması — Blockscout yolu YOK, herkese açık RPC'ye düşüldü
 
 **Karar (2026-09-09):** Etherscan'in ücretsiz planı BSC'yi kapsamıyor
-(`chainid=56` → "Free API access is not supported for this chain");
-BSC yoklaması **Blockscout'a** düşecek (ücretsiz, 5 RPS).
+(`chainid=56` → "Free API access is not supported for this chain"); yedek
+olarak Blockscout seçilmişti.
 
-**Nasıl görülür:** bugün EVM yoklaması üç zincirden birini hep
-"yoklanamadı" diye işaretliyor ve USDT-BEP20 Türkiye dosyalarında sık
-geçiyor.
+**Ölçüm (2026-09-14) kararın dayanağını çürüttü:** Blockscout BSC
+barındırmıyor — `bsc.blockscout.com` ve `bnb.blockscout.com` 404, zincir
+listesinde (`chains.blockscout.com/api/chains`) 56 yok.
 
-**Ölçüm:**
-```bash
-curl -s "https://api.etherscan.io/v2/api?chainid=56&module=proxy&action=eth_getTransactionByHash&txhash=0x0&apikey=$ETHERSCAN_API_KEY"
-```
+**Yapılan:** `packages/chain/src/network-probe.ts` Etherscan BSC'de hata
+verince `bsc-dataseed.bnbchain.org` RPC'sine düşüyor.
+- İşlem hash'i: `eth_getTransactionByHash` KESİN cevap veriyor.
+- Adres: geniş aralıklı `eth_getLogs` 403 (ölçüldü), yani geçmiş
+  listelenemiyor. Gönderim sayısı, BNB bakiyesi ve USDT-BEP20 bakiyesinden
+  biri varsa adres VAR; hiçbiri yoksa sonuç `hata` taşır ("kısmen
+  yoklandı") ve "yok" DENMEZ.
 
-**Nerede:** `packages/chain/src/network-probe.ts` — BSC dalı Blockscout'a
-yönlendirilir, öteki zincirler Etherscan'de kalır. Yapılmadı.
+**Kalan:** token alıp bakiyesini boşaltmış bir BSC adresi hâlâ görünmez.
+Kapatmanın yolu ücretli bir indeksleyici (Etherscan ücretli planı, NodeReal
+BSCTrace) — bir karar, bugün yok.
 
 ---
 

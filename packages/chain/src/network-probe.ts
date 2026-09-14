@@ -54,7 +54,75 @@ function etherscanHatasi(r: any): string | null {
   if (r && typeof r.error?.message === "string") return r.error.message;
   return null;
 }
-const BLOCKSCOUT_V2 = "https://eth.blockscout.com/api"; // yedek; chain başına base URL değişir
+
+/* ---------------- BSC yedeği: herkese açık RPC ---------------- */
+
+/**
+ * Etherscan'in ücretsiz planı BSC'yi kapsamıyor (`chainid=56` → "Free API
+ * access is not supported for this chain"). 2026-09-09'da yedek olarak
+ * Blockscout seçilmişti; 2026-09-14'te ölçüldü ve o yol YOK: Blockscout BSC
+ * barındırmıyor (`bsc.`/`bnb.blockscout.com` 404, zincir listesinde 56 yok).
+ *
+ * Ücretsiz ve anahtarsız çalışan yol herkese açık RPC. Ama sorabileceği
+ * soru DARDIR ve dar olduğu yazılır:
+ *
+ * - İŞLEM: `eth_getTransactionByHash` kesin cevap verir — nesne ya da null.
+ * - ADRES: geçmişi listeleyen bir çağrı yok; geniş aralıklı `eth_getLogs`
+ *   403 dönüyor (ölçüldü). Görülebilen üç iz var: gönderdiği işlem sayısı
+ *   (nonce), BNB bakiyesi, USDT-BEP20 bakiyesi. Biri varsa adres VARDIR. Hiçbiri
+ *   yoksa "yok" DENMEZ: yalnızca token almış ve bakiyesini boşaltmış bir adres
+ *   bu yoldan görünmez. Sonuç `hata` taşır, yani "bakılamadı" kovasına düşer
+ *   ve otomatik seçime girmez.
+ */
+export const BSC_RPC = "https://bsc-dataseed.bnbchain.org";
+/** Tether USD (BSC-peg) — Türkiye dosyalarında BSC'de en sık geçen varlık. */
+export const BSC_USDT = "0x55d398326f99059ff775485246999027b3197955";
+
+function rpc(fetchJson: FetchJson, method: string, params: unknown[]): Promise<any> {
+  return fetchJson(BSC_RPC, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+  });
+}
+
+function sifirDisi(hex: unknown): boolean {
+  return typeof hex === "string" && /^0x0*[1-9a-f]/i.test(hex);
+}
+
+export async function probeBscRpcTx(hash: string, fetchJson: FetchJson): Promise<ProbeHit> {
+  const r = await rpc(fetchJson, "eth_getTransactionByHash", [hash]);
+  if (r?.error) return { network: "bsc", exists: false, hata: `BSC RPC: ${r.error.message}` };
+  return { network: "bsc", exists: typeof r?.result === "object" && r.result !== null };
+}
+
+export async function probeBscRpcAddress(address: string, fetchJson: FetchJson): Promise<ProbeHit> {
+  const balanceOf = `0x70a08231${address.slice(2).toLowerCase().padStart(64, "0")}`;
+  const [nonce, bnb, usdt] = await Promise.all([
+    rpc(fetchJson, "eth_getTransactionCount", [address, "latest"]),
+    rpc(fetchJson, "eth_getBalance", [address, "latest"]),
+    rpc(fetchJson, "eth_call", [{ to: BSC_USDT, data: balanceOf }, "latest"]),
+  ]);
+  const hataMetni = nonce?.error?.message ?? bnb?.error?.message ?? usdt?.error?.message;
+  if (hataMetni) return { network: "bsc", exists: false, hata: `BSC RPC: ${hataMetni}` };
+
+  const gonderdi = sifirDisi(nonce?.result);
+  if (gonderdi || sifirDisi(bnb?.result) || sifirDisi(usdt?.result)) {
+    return {
+      network: "bsc",
+      exists: true,
+      nativeTxCount: gonderdi ? Number(BigInt(nonce.result)) : 0,
+      balanceRaw: sifirDisi(bnb?.result) ? BigInt(bnb.result).toString() : undefined,
+    };
+  }
+  return {
+    network: "bsc",
+    exists: false,
+    hata:
+      "BSC ücretsiz RPC ile kısmen yoklandı: gönderim, BNB ve USDT bakiyesi yok — " +
+      "yalnızca token alıp boşaltmış bir adres bu yoldan görünmez",
+  };
+}
 
 /**
  * Tek bir EVM zincirinde adresin aktif olup olmadığını 2 çağrıda anlar.
@@ -161,7 +229,15 @@ export async function probe(
           det.kind === "address"
             ? probeEvmAddress(det.normalized, ch, deps.etherscanKey, deps.fetchJson)
             : probeEvmTx(det.normalized, ch, deps.etherscanKey, deps.fetchJson),
-        ),
+        ).map(async (sonuc, i) => {
+          const h = await sonuc;
+          // Etherscan BSC'yi kapsamıyorsa yedek yola düşülür; öteki zincirlerin
+          // hatası olduğu gibi raporlanır.
+          if (!h.hata || evmChains[i] !== "bsc") return h;
+          return det.kind === "address"
+            ? probeBscRpcAddress(det.normalized, deps.fetchJson)
+            : probeBscRpcTx(det.normalized, deps.fetchJson);
+        }),
       );
       hits.push(...results);
       notProbed.push(
