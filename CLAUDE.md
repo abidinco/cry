@@ -289,6 +289,12 @@ işaret), renk kanalları ayrık, yazı tipleri build anında gömülü.
   yazılmış koşularda sıfır adresi "dallanma" kayıtlı — o yüzden kural ve
   arayüz sebebe ek olarak ADRESİ de sorar. Ölçüldü (koşu 9): adaydan devam
   → sıfır adresi `yakildi`, oradan devam reddedildi.
+- **Keşif adayı yazma eşiği: güven > 0,7** (kullanıcı kararı 2026-09-14).
+  14 yeni adaydan 6'sı yazıldı (keşif etiketi 11 → 17). Eşiğe yakın dört aday
+  (0,45–0,56) yazılmadı; güveni yüksek olup TronScan'da ZATEN doğrulanmış
+  borsa olan üç adres de (KuCoin 2, Okex 1, HTX 1) yazılmadı — doğrulanmış
+  kimliğin yanına zayıf bir aday etiketi eklemek bilgi katmaz. Keşif CLI'si
+  `--uygula` ile TÜM adayları yazar; eşikli yazma bu yüzden süzülerek yapıldı.
 - **Tıklanan şerit, köke kadar geldiği yolla öne çıkar** (kullanıcı isteği).
   "Bu para buraya hangi yoldan geldi" — şeridin kaynağına giren ileri
   şeritler, onlarınkiler, köke kadar (`seritYolu`). Geri dönen şeritler yola

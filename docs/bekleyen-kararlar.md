@@ -18,42 +18,6 @@ Kardeş dosyalar: karar beklemeyen eksikler
 
 ---
 
-## 1. Keşfin 14 yeni adayı yazılsın mı
-
-**Soru:** Arşiv 23 bin TRON adresine büyüyünce keşif 25 aday veriyor; 11'i
-zaten yazılı, **14'ü yeni** ve yazılmadı. Hangileri `kesif` etiketi olarak
-girsin?
-
-**Ölçüm (2026-09-14):** 14 adayın 3'ü TronScan'da ZATEN doğrulanmış borsa
-(KuCoin 2 · Okex 1 · HTX 1) — onlara keşif etiketi eklemek bilgi katmaz.
-Kalan 11'i etiketsiz; üçü güçlü (güven 0,88–0,9: 753 / 913+315 / 679 farklı
-kaynaktan toplayan), ikisi kısmi taramada alt sınırla aday
-(`TB4oXR1T…` 1.575 alıcıya dağıtıyor, `TJ7yJNWS…` iki yönde kalabalık),
-son dördü eşiğe yakın (güven 0,45–0,56). 14'ünün hepsi en az bir takip
-koşusunda düğüm.
-
-**Yeniden üretim:**
-```bash
-node --env-file=.env --env-file=apps/web/.env.local --import tsx packages/etiket/src/cli.ts --kaynak=kesif
-```
-(liste + TronScan karşılığı için geçici bir script kullanıldı; CLI yalnızca
-ilk 5'i basıyor)
-
-**Seçenekler:**
-1. **TronScan'da borsa olan 3'ü hariç 11'ini yaz** — geri alınabilir
-   (`delete from labels where source='kesif' and …`).
-2. **Yalnızca güven ≥ 0,7 olanları yaz** (5 adres) — eşiğe yakın dördü
-   "aday" bile sayılmaz.
-3. **Hiçbirini yazma, eşiği yükselt** — keşif kalabalıklaştıkça gürültü artar.
-
-**Karar verilmezse:** bu adreslere ulaşan iz `terminal_aday` yerine
-bütçe/dallanma sınırında durur ve rapor "burası bir servis olabilir" diyemez.
-
-**Karar yeri:** `packages/etiket` kuru koşu → `--uygula`; eşik değişirse
-`VARSAYILAN_KESIF` + CLAUDE.md → Etiket kaynağı.
-
----
-
 ## 1b. Arayüz tasarımı — takip sayfası karara bağlandı, gerisi bekliyor
 
 **Karar (2026-09-14):** takip sayfası için üç örnek üretildi (A akış +
