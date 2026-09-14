@@ -98,7 +98,7 @@ o sıçramanın bütün şeritlerini akışta öne çıkarır; tersine, akışta
 
 ## Yükleme
 
-- **Üst çubuk:** sayfanın en üstünde 2 piksellik indigo çizgi. Uygulama tam
+- **Üst çubuk:** sayfanın en üstünde 8 piksellik indigo çubuk. Uygulama tam
   sayfa gezinmesi yapıyor; çubuk bağlantıya tıklandığı an başlar, yeni
   sayfanın İLK veri isteği bitince tamamlanır. Arka plan yoklamaları (koşu
   sürerken 3 saniyede bir tazeleme) çubuğu yakmaz — bunu yalnızca sayfa
