@@ -5,6 +5,10 @@
  *   npx tsx packages/etiket/src/cli.ts --kaynak=ofac --uygula
  *   npx tsx packages/etiket/src/cli.ts --kaynak=aday --uygula
  *   npx tsx packages/etiket/src/cli.ts --kaynak=kesif [--esik=50]
+ *   npx tsx packages/etiket/src/cli.ts --kaynak=tronscan [--kapsam=aday|hepsi] [--sinir=N] [--tazele]
+ *
+ * TronScan `TRONSCAN_API_KEY` ister; yanıtlar `.onbellek/tronscan/` altına
+ * yazılır ve aynı adrese ikinci kez ağa çıkılmaz (`--tazele` yok sayar).
  *
  * `--dosya=<yol>` verilirse OFAC listesi ağdan değil o dosyadan okunur —
  * 83 MB'lık belgeyi her denemede yeniden indirmemek için.
@@ -17,6 +21,7 @@ import { prisma } from "@cry/db";
 import { ADAY_ETIKETLER } from "./aday";
 import { arsivdenAdaylar } from "./kesif-oku";
 import { ofacAyristir, ofacIndir } from "./ofac";
+import { tronscanEtiketleri } from "./tronscan-oku";
 import type { TohumSonucu } from "./tipler";
 import { etiketleriYaz } from "./yaz";
 
@@ -38,7 +43,18 @@ async function kaynagiOku(kaynak: string): Promise<TohumSonucu> {
     const xml = dosya ? await readFile(dosya, "utf8") : await ofacIndir();
     return ofacAyristir(xml);
   }
-  throw new Error(`bilinmeyen kaynak: ${kaynak} (ofac|aday|kesif)`);
+  if (kaynak === "tronscan") {
+    const kapsam = bayrak("kapsam") ?? "aday";
+    if (kapsam !== "aday" && kapsam !== "hepsi") throw new Error(`bilinmeyen kapsam: ${kapsam}`);
+    return tronscanEtiketleri({
+      kapsam,
+      sinir: Number(bayrak("sinir") ?? 0),
+      tazele: process.argv.includes("--tazele"),
+      onbellekDizini: ".onbellek/tronscan",
+      anahtar: process.env.TRONSCAN_API_KEY ?? "",
+    });
+  }
+  throw new Error(`bilinmeyen kaynak: ${kaynak} (ofac|aday|kesif|tronscan)`);
 }
 
 async function main() {

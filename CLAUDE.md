@@ -116,6 +116,24 @@ adlarını isterdi.
 - **Etiketlemek TARAMAK değildir.** Etiket için açılan adres
   `index_state = "bilinmiyor"` kalır; aksi hâlde 320 bakılmamış adres
   "bakıldı, temiz" görünürdü ("yok ≠ bakılamadı").
+- **TronScan anahtarla çalışıyor ve KİMLİĞİ o getiriyor** (2026-09-14).
+  `accountv2` yanıtındaki `publicTag` kaynağın küratörlü etiketidir; borsa
+  adıyla eşleşirse etiket DOĞRULANMIŞ yazılır ve motor `terminal_aday`
+  yerine `terminal` üretir. İlk ölçüm: 55 adres → 7 borsa + 1 yakma adresi.
+- **Etiket metni borsa sözlüğünden geçer; sözlükte olmayan borsa DEĞİLDİR.**
+  `publicTag` serbest metin ve borsa adı taşıyan etiketlerin bir kısmı
+  borsa cüzdanı değil ("… Bridge", "Fake …"). Sözlük kapalı, baş eşleşmesi
+  şart; tanınmayan etiket `diger` olarak yazılır ve terminal yapmaz.
+  Yanlış bir "borsaya girdi" hükmü eksik bir etiketten pahalıdır.
+- **Keşif YAKMA adresini servis cüzdanı SANDI.** TRON sıfır adresi
+  (`T9yD14Nj…`) çok adrese "gönderiyor" göründüğü için dağıtıcı adayı
+  yazılmıştı; TronScan onu "Black Hole Address(0)" diye etiketledi. Kapalı
+  liste `packages/etiket/src/yakma.ts` — keşif onu indeks durumundan ÖNCE
+  eler ve adıyla raporlar; TronScan kaynağı da onu borsa saymaz. Bir
+  yapısal ölçüt, şekli aynı ama anlamı zıt olan adresi ayırt edemez.
+- **Yanıtlar `.onbellek/tronscan/` altında durur** (gitignore'da): aynı
+  adrese ikinci kez ağa çıkılmaz, `--tazele` yok sayar. Kanıttaki
+  `olcumTarihi` yanıtın ALINDIĞI gündür.
 - **Ve tohumlamanın asıl ölçüsü "kaç etiket yazdım" değil, "arşivdeki
   hangi adrese denk geldi".** Ölçüldü: 324 etiketin arşivdeki 14.798
   adresle kesişimi **0**. Yani etiketler doğru, kaynak resmî, kod

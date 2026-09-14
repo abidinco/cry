@@ -17,12 +17,10 @@ docker exec cry-db pg_dump -U cry -d cry --format=custom > "cry-yedek-$(Get-Date
 alışkanlık yap. Rapor kanıt dondurma iddiasında; altındaki veritabanı
 yedeksizse iddia yarım kalır.
 
-**2. ~~TronScan etiketlerini tohum olarak çek.~~ — ÖLÇÜLDÜ, YOL KAPALI.**
-`apilist.tronscanapi.com` anahtarsız `401 Authorization Required` dönüyor
-(2026-09-09); "API'den ücretsiz gelir" bir varsayımdı. Zincirde de bedava
-etiket yok: arşivin en yoğun beş karşı tarafında TronGrid `account_name`
-alanını hiç döndürmüyor. Yerine geçecek iki yol bir karar bekliyor
-([bekleyen-kararlar §1](bekleyen-kararlar.md)).
+**2. ~~TronScan etiketlerini tohum olarak çek.~~ — YAPILDI (2026-09-14).**
+Anahtarsız `401` dönüyordu; kullanıcı anahtar aldı. Kaynak
+`packages/etiket/src/tronscan.ts`, borsa adı KAPALI sözlükten geçer.
+Zincirde bedava etiket hâlâ yok (TronGrid `account_name` döndürmüyor).
 
 **3. ~~OFAC yaptırım listesi.~~ — YAPILDI (2026-09-09).**
 `packages/etiket`, kaynak `SDN_ENHANCED.XML`. 320 tekil adres yazıldı

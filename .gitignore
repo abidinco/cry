@@ -20,6 +20,8 @@ data/
 pgdata/
 
 # araçlar
+.onbellek/
+.dev-*.log
 .DS_Store
 Thumbs.db
 *.log

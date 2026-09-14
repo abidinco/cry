@@ -36,10 +36,20 @@ docker exec cry-db psql -U cry -d cry -c "select stop_reason, stats->'durma' fro
 → `ofac/sanction:320 · kullanici/exchange_hot:4 · kesif/exchange_hot:12`;
 son koşu `terminal_aday`, `{"butce":8,"dallanma":2,"terminal_aday":1}`.
 
-**Nerede:** kimlik ancak bir kaynaktan gelir — TronScan ücretsiz API
-anahtarı bekleniyor (kullanıcı kaydolacak, 2026-09-09 kararı). Anahtar
-gelince `packages/etiket` içine ikinci bir kaynak olarak eklenir ve
-`source: "tronscan"` etiketleri keşif adaylarının kimliğini kapatır.
+**Nerede:** kimlik ancak bir kaynaktan gelir. **TronScan kaynağı yazıldı
+(2026-09-14)** — `npx tsx packages/etiket/src/cli.ts --kaynak=tronscan`.
+Varsayılan kapsamdaki 55 adresin 8'i etiketli çıktı: 7 borsa (Binance,
+KuCoin, OKX, HTX, Poloniex, Bitfinex, Paribu) doğrulanmış `exchange_hot`
+olarak yazıldı; biri `Black Hole Address(0)` (bkz. aşağısı).
+
+**Kalan:**
+- BtcTurk adayı `TD32z28Q…` ve keşfin 8 adayı TronScan'da etiketsiz — kimlik
+  hâlâ yok, `terminal_aday` üretmeye devam ederler.
+- Keşif bugün 25 aday veriyor (arşiv 23 bin TRON adresine büyüdü); 14'ü
+  YAZILMADI, liste okunmadan `--uygula` çalıştırılmaz.
+- Koşu 5 ve 6 donmuş kayıtlardır: Binance-Hot 1 orada hâlâ `terminal_aday`
+  görünür. Yeni etiketin etkisi ancak YENİ bir koşuda görülür, ve konteyner
+  worker'ı push edilmemiş kodu çalıştırmıyor.
 
 ---
 

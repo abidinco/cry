@@ -79,6 +79,10 @@ export async function arsivdenAdaylar(
       ham: `${sonuc.eşiginAltinda} adres`,
       sebep: `ölçüldü, eşiğin altında (karşı taraf < ${esikler.karsiTarafEsigi})`,
     },
+    ...sonuc.yakma.map((adres) => ({
+      ham: adres,
+      sebep: "yakma adresi — kalabalık görünür ama servis değil, aday yazılmaz",
+    })),
   ];
 
   return { etiketler, atlananlar, kaynakSurumu: `keşif, eşik ${esikler.karsiTarafEsigi}` };

@@ -18,31 +18,6 @@ Kardeş dosyalar: karar beklemeyen eksikler
 
 ---
 
-## 1. TronScan API anahtarı — SENİN yapman gereken tek adım
-
-**Soru:** Karar verildi (2026-09-09: "ikisi birden"). Yapısal keşif yazıldı
-ve çalışıyor; kalan yarısı senin elinde: tronscan.org'dan ücretsiz API
-anahtarı. Ajan hesap açmaz.
-
-**Ölçüm:** Keşif 12 servis cüzdanı adayı üretti ve `terminal_aday` gerçek
-koşuda ateşlendi — yani iz artık doğru yerde duruyor. Ama adayların hiçbiri
-"hangi borsa" sorusunu cevaplamıyor; keşif yapısal olarak cevaplayamaz.
-TronScan tag'leri o kimliği veren tek ücretsiz kaynak (anahtarsız `401`).
-
-**Yapılacak:** tronscan.org → hesap → API key → değer `C:\srv\cry\.env`
-ve `/srv/cry/.env` içine `TRONSCAN_API_KEY=` olarak yazılır. Sonrası bende:
-`packages/etiket` içine `tronscan.ts` eklenir, keşif adaylarının kimliği
-kapanır ve doğrulanan etiketler `terminal_aday` yerine `terminal` üretir.
-
-**Karar verilmezse:** rapor "para bir borsa ADAYINA girdi" demeye devam
-eder; borsanın adı yazılamaz.
-
-**Geri alınabilir:** evet, anahtar silinir, etiketler silinir.
-
-**Karar yeri:** `.env` + `packages/etiket` + CLAUDE.md → Etiket kaynağı.
-
----
-
 ## 2. Takip neyden başlar: adres mi, işlem mi
 
 **Soru:** Kök adresten takip başlatınca "takip edilen para" nedir?

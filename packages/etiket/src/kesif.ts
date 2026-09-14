@@ -17,6 +17,8 @@
  * - `bilinmiyor` → hiçbir şey söylenemez. Aday DEĞİL, "bakılmadı".
  */
 
+import { YAKMA_ADRESLERI } from "./yakma";
+
 export type IndeksDurumu = "tam" | "kismi" | "bilinmiyor";
 
 export type AdresIstatistigi = {
@@ -48,6 +50,8 @@ export type KesifSonucu = {
   bakilmadi: number;
   /** Ölçülebilir olup eşiği geçmeyen adres sayısı. */
   eşiginAltinda: number;
+  /** Kalabalık görünen ama yakma adresi olduğu için aday SAYILMAYANLAR. */
+  yakma: string[];
 };
 
 export type KesifEsikleri = {
@@ -77,8 +81,15 @@ export function servisAdaylari(
   const adaylar: ServisAdayi[] = [];
   let bakilmadi = 0;
   let eşiginAltinda = 0;
+  const yakma: string[] = [];
 
   for (const s of istatistikler) {
+    // Yakma adresi indeks durumundan ÖNCE sorulur: kalabalığı bir servis
+    // şekli değil, paranın yok edildiği yer.
+    if (YAKMA_ADRESLERI.has(s.address)) {
+      yakma.push(s.address);
+      continue;
+    }
     if (s.indeksDurumu === "bilinmiyor") {
       // Sayısı küçük olabilir ama bu bir bulgu değil: bakılmadı.
       bakilmadi++;
@@ -130,5 +141,5 @@ export function servisAdaylari(
   }
 
   adaylar.sort((a, b) => b.guven - a.guven || a.address.localeCompare(b.address));
-  return { adaylar, bakilmadi, eşiginAltinda };
+  return { adaylar, bakilmadi, eşiginAltinda, yakma };
 }
