@@ -20,6 +20,7 @@ import {
   akisModeli,
   akisOzeti,
   anaVarlik,
+  defterSatirlari,
   gizleneniAyikla,
   seritYolu,
   varliklar,
@@ -235,18 +236,11 @@ export default function TakipGorunumu({ id }: { id: string }) {
     ozet.yakilan,
   ].reduce((a, b) => (b > a ? b : a), 1n);
 
-  // Defter: seçime göre süzülür; sıçrama sırasıyla, zaman sırasıyla.
-  const seritTuru = new Map<string, SeritTuru>();
-  for (const s of model.seritler) for (const k of s.kenarlar) seritTuru.set(k.txHash + k.from + k.to, s.tur);
-  const defter = kosu.kenarlar
-    .filter((k) => k.symbol === model.varlik && dugumHarita.has(k.from) && dugumHarita.has(k.to))
-    .filter((k) =>
-      !secim
-        ? true
-        : secim.dugum
-          ? k.from === secim.dugum || k.to === secim.dugum
-          : `${k.from}>${k.to}` === secim.serit,
-    );
+  // Defter: seçim yokken ya da adres seçiliyken şerit başına TEK satır;
+  // şerit seçiliyse o şeridin hareketleri tek tek (lib/akis → defterSatirlari).
+  const defter = defterSatirlari(model, secim);
+  const hareketModu = Boolean(secim?.serit);
+  const toplamHareket = defter.reduce((t, x) => t + x.adet, 0);
   const secimAdi = secim?.dugum
     ? dugumAdi(dugumHarita.get(secim.dugum)!)
     : secim?.serit
@@ -434,7 +428,9 @@ export default function TakipGorunumu({ id }: { id: string }) {
 
           <div className="takip-filtre">
             <span className="etiket">
-              {secimAdi ? `${secimAdi} · ${sayi(defter.length)} hareket` : `tüm hareketler · ${sayi(defter.length)}`}
+              {hareketModu
+                ? `${secimAdi} · ${sayi(defter.length)} hareket`
+                : `${secimAdi ?? "tüm akış"} · ${sayi(defter.length)} şerit · ${sayi(toplamHareket)} hareket`}
             </span>
             {secim && (
               <button type="button" onClick={() => setSecim(null)}>
@@ -522,37 +518,48 @@ export default function TakipGorunumu({ id }: { id: string }) {
               </colgroup>
               <thead>
                 <tr>
-                  <th>kimden → kime</th>
+                  <th>{hareketModu ? "zaman (TSİ)" : "kimden → kime"}</th>
                   <th className="sag">{model.varlik}</th>
-                  <th className="sag" title="çıkışın ize atfedilen payı">pay</th>
+                  {hareketModu ? (
+                    <th className="sag" title="çıkışın ize atfedilen payı">pay</th>
+                  ) : (
+                    <th className="sag" title="bu şeritte toplanan hareket sayısı">adet</th>
+                  )}
                   <th aria-label="diyagramda göster / gizle" />
                 </tr>
               </thead>
               <tbody>
-                {defter.map((k, i) => {
+                {defter.map((satir, i) => {
                   const onceki = defter[i - 1];
-                  const tur = seritTuru.get(k.txHash + k.from + k.to) ?? "akis";
-                  const anahtar = `${k.from}>${k.to}`;
-                  const yeniGrup = !onceki || onceki.hop !== k.hop;
+                  const { anahtar } = satir;
+                  const yeniGrup = !onceki || onceki.hop !== satir.hop;
                   const vurgula = (seritler: Set<string> | null) => () => setDefterVurgu(seritler);
                   const hopSeritleri = yeniGrup
-                    ? new Set(defter.filter((x) => x.hop === k.hop).map((x) => `${x.from}>${x.to}`))
+                    ? new Set(defter.filter((x) => x.hop === satir.hop).map((x) => x.anahtar))
                     : null;
+                  const tam = (() => {
+                    const p = tutarParcala(satir.ham.toString(), model.decimals);
+                    return `${p.tam}${p.kusurat ? "," + p.kusurat : ""} ${model.varlik}`;
+                  })();
                   return (
                     <FragmentSatir
-                      key={k.txHash + k.from + k.to + i}
-                      grup={yeniGrup ? `${k.hop}. sıçrama` : null}
+                      key={satir.kimlik}
+                      grup={yeniGrup ? `${satir.hop}. sıçrama` : null}
                       grupYanik={Boolean(hopSeritleri && defterVurgu && [...hopSeritleri].every((x) => defterVurgu.has(x)) && defterVurgu.size === hopSeritleri.size)}
                       onGrupGir={vurgula(hopSeritleri)}
                       onGrupCik={vurgula(null)}
                     >
                       <tr
-                        title={`${tarih(k.ts)} TSİ · ${k.txHash}`}
+                        title={
+                          satir.txHash
+                            ? `${tarih(satir.ilk)} TSİ · ${satir.txHash}`
+                            : `${sayi(satir.adet)} hareket · ${tarih(satir.ilk)}${satir.adet > 1 ? ` – ${tarih(satir.son)}` : ""} TSİ — tıkla: hareketleri aç`
+                        }
                         tabIndex={0}
                         className={
                           [
                             akisOdak?.has(anahtar) || (defterVurgu?.size === 1 && defterVurgu.has(anahtar)) ? "yanik" : "",
-                            gizliSerit.has(anahtar) || gizliDugum.has(k.from) || gizliDugum.has(k.to) ? "gizli" : "",
+                            gizliSerit.has(anahtar) || gizliDugum.has(satir.from) || gizliDugum.has(satir.to) ? "gizli" : "",
                           ]
                             .filter(Boolean)
                             .join(" ") || undefined
@@ -564,22 +571,19 @@ export default function TakipGorunumu({ id }: { id: string }) {
                         onClick={() => setSecim({ serit: anahtar })}
                       >
                         <td>
-                          <i className="takip-tur" style={{ background: SERIT_RENK[tur] }} aria-label={SERIT_ADI[tur]} />
+                          <i className="takip-tur" style={{ background: SERIT_RENK[satir.tur] }} aria-label={SERIT_ADI[satir.tur]} />
                           <span className="veri">
-                            {dugumAdi(dugumHarita.get(k.from)!)} → {dugumAdi(dugumHarita.get(k.to)!)}
+                            {hareketModu
+                              ? tarih(satir.ilk)
+                              : `${dugumAdi(dugumHarita.get(satir.from)!)} → ${dugumAdi(dugumHarita.get(satir.to)!)}`}
                           </span>
                         </td>
-                        <td
-                          className="sag takip-tutar"
-                          title={(() => {
-                            // Kırpılan uç tutar ipucunda tam okunur.
-                            const p = tutarParcala(k.amountRaw, k.decimals);
-                            return `${p.tam}${p.kusurat ? "," + p.kusurat : ""} ${k.symbol}`;
-                          })()}
-                        >
-                          <Tutar ham={k.amountRaw} ondalik={k.decimals} />
+                        <td className="sag takip-tutar" title={tam}>
+                          <Tutar ham={satir.ham.toString()} ondalik={model.decimals} />
                         </td>
-                        <td className="sag veri m2">%{Math.round(k.taintShare * 100)}</td>
+                        <td className="sag veri m2">
+                          {satir.pay !== null ? `%${Math.round(satir.pay * 100)}` : `×${sayi(satir.adet)}`}
+                        </td>
                         <td className="takip-goz-hucre">
                           <button
                             type="button"

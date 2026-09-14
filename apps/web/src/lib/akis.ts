@@ -469,3 +469,82 @@ export function seritYolu(model: AkisModeli, anahtar: string): Set<string> {
   return yol;
 }
 
+
+/* ------------------------------------------------------------------ */
+/* Defter satırları                                                    */
+/* ------------------------------------------------------------------ */
+
+export type DefterSatiri = {
+  /** Şerit anahtarı (`from>to`) — vurgu ve gizleme bununla. */
+  anahtar: string;
+  /** Satırın kendi kimliği (React anahtarı). */
+  kimlik: string;
+  hop: number;
+  from: string;
+  to: string;
+  tur: SeritTuru;
+  ham: bigint;
+  /** Şerit satırında kaç hareketin toplandığı; hareket satırında 1. */
+  adet: number;
+  /** Yalnızca hareket satırında: çıkışın ize atfedilen payı. */
+  pay: number | null;
+  ilk: string;
+  son: string;
+  txHash: string | null;
+};
+
+/**
+ * Defter iki yoğunlukta okunur (kullanıcı bildirimi 2026-09-15: "defter
+ * dağınık"). Koşu 9'da tek bir çift arasında 706 küçük transfer vardı ve
+ * defter onları 706 satır basıyordu; diyagram zaten tek şerit çiziyor.
+ *
+ * - Bir ŞERİT seçiliyse o şeridin HAREKETLERİ tek tek (tarih, işlem, pay).
+ * - Değilse (hepsi ya da bir adres) her şerit TEK satır: toplam ve adet.
+ *
+ * Sıra: sıçrama, sonra büyükten küçüğe, sonra anahtar — deterministik.
+ */
+export function defterSatirlari(
+  model: AkisModeli,
+  secim: { dugum?: string; serit?: string } | null,
+): DefterSatiri[] {
+  if (secim?.serit) {
+    const s = model.seritler.find((x) => x.anahtar === secim.serit);
+    if (!s) return [];
+    return [...s.kenarlar]
+      .sort((a, b) => a.ts.localeCompare(b.ts) || a.txHash.localeCompare(b.txHash))
+      .map((k, i) => ({
+        anahtar: s.anahtar,
+        kimlik: `${k.txHash}-${i}`,
+        hop: k.hop,
+        from: s.from,
+        to: s.to,
+        tur: s.tur,
+        ham: BigInt(k.amountRaw),
+        adet: 1,
+        pay: k.taintShare,
+        ilk: k.ts,
+        son: k.ts,
+        txHash: k.txHash,
+      }));
+  }
+  return model.seritler
+    .filter((s) => !secim?.dugum || s.from === secim.dugum || s.to === secim.dugum)
+    .map((s) => {
+      const zamanlar = s.kenarlar.map((k) => k.ts).sort();
+      return {
+        anahtar: s.anahtar,
+        kimlik: s.anahtar,
+        hop: Math.min(...s.kenarlar.map((k) => k.hop)),
+        from: s.from,
+        to: s.to,
+        tur: s.tur,
+        ham: s.ham,
+        adet: s.kenarlar.length,
+        pay: null,
+        ilk: zamanlar[0]!,
+        son: zamanlar[zamanlar.length - 1]!,
+        txHash: null,
+      };
+    })
+    .sort((a, b) => a.hop - b.hop || (a.ham === b.ham ? a.anahtar.localeCompare(b.anahtar) : a.ham > b.ham ? -1 : 1));
+}

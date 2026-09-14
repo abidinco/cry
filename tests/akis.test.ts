@@ -217,3 +217,32 @@ describe("şerit yolu ve yakma", () => {
     expect(akisOzeti(m, KOK).yakilan).toBe(4_000_000n);
   });
 });
+
+describe("defter satırları", () => {
+  it("seçim yokken her şerit TEK satır: toplam ve adet", async () => {
+    const { defterSatirlari } = await import("@/lib/akis");
+    const m = akisModeli(DUGUMLER, KENARLAR, KOK, "USDT");
+    const s = defterSatirlari(m, null);
+    expect(s).toHaveLength(m.seritler.length);
+    const kokA = s.find((x) => x.anahtar === `${KOK}>A`)!;
+    expect(kokA.adet).toBe(2);
+    expect(kokA.ham).toBe(32_000_000n);
+    expect(kokA.pay).toBeNull();
+    // sıçramaya göre, sonra büyükten küçüğe
+    expect(s[0]!.anahtar).toBe(`${KOK}>ADAY`);
+  });
+
+  it("şerit seçiliyse o şeridin hareketleri tek tek", async () => {
+    const { defterSatirlari } = await import("@/lib/akis");
+    const m = akisModeli(DUGUMLER, KENARLAR, KOK, "USDT");
+    const s = defterSatirlari(m, { serit: `${KOK}>A` });
+    expect(s).toHaveLength(2);
+    expect(s.every((x) => x.adet === 1 && x.txHash && x.pay === 1)).toBe(true);
+  });
+
+  it("adres seçiliyse yalnızca ona değen şeritler", async () => {
+    const { defterSatirlari } = await import("@/lib/akis");
+    const m = akisModeli(DUGUMLER, KENARLAR, KOK, "USDT");
+    expect(defterSatirlari(m, { dugum: "BINANCE" }).map((x) => x.anahtar)).toEqual(["A>BINANCE"]);
+  });
+});
