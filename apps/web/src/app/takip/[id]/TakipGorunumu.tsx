@@ -10,6 +10,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { yuklemeIzle } from "@/lib/yukleme";
+import TakipIskeleti from "./TakipIskeleti";
 import { Adres, Bos, Tarih, Tutar } from "@/components/ui";
 import { kisaTutar, sayi, tarih } from "@/lib/bicim";
 import { cizilecekler } from "@/lib/graf-secim";
@@ -67,6 +69,9 @@ export default function TakipGorunumu({ id }: { id: string }) {
   const [hata, setHata] = useState<string | null>(null);
   const [secim, setSecim] = useState<Secim>(null);
   const [varlik, setVarlik] = useState<string | null>(null);
+  // Defter ↔ diyagram: birinin üzerine gelinen şerit ötekinde öne çıkar.
+  const [defterVurgu, setDefterVurgu] = useState<Set<string> | null>(null);
+  const [akisOdak, setAkisOdak] = useState<Set<string> | null>(null);
 
   const yukle = useCallback(async () => {
     const yanit = await fetch(`/api/takip/${id}`);
@@ -78,8 +83,9 @@ export default function TakipGorunumu({ id }: { id: string }) {
     setKosu(govde);
   }, [id]);
 
+  // İlk yükleme üst çubuğa bildirilir; 3 saniyelik yoklama bildirilmez.
   useEffect(() => {
-    void yukle();
+    void yuklemeIzle(yukle());
   }, [yukle]);
 
   // Koşu sürerken tazelenir, bitince yoklama DURUR.
@@ -112,7 +118,7 @@ export default function TakipGorunumu({ id }: { id: string }) {
   }, [kosu, secilenVarlik]);
 
   if (hata) return <p style={{ color: "var(--hata)" }}>{hata}</p>;
-  if (!kosu) return <p className="etiket">yükleniyor</p>;
+  if (!kosu) return <TakipIskeleti />;
 
   const suruyor = kosu.status === "kuyrukta" || kosu.status === "calisiyor";
   const params = (kosu.params ?? {}) as Record<string, unknown>;
@@ -226,7 +232,14 @@ export default function TakipGorunumu({ id }: { id: string }) {
               <span className="etiket">kalınlık = {model.varlik}</span>
             )}
           </div>
-          <Akis model={model} kokAdres={kosu.rootAddress} secili={secim?.dugum ?? null} onSecim={setSecim} />
+          <Akis
+            model={model}
+            kokAdres={kosu.rootAddress}
+            secili={secim?.dugum ?? null}
+            onSecim={setSecim}
+            disVurgu={defterVurgu}
+            onOdak={setAkisOdak}
+          />
           {(kirpilan > 0 || model.digerVarlikKenari > 0) && (
             // Çizilmeyen kısım SESSİZCE yok sayılmaz.
             <p className="etiket" style={{ color: "var(--dikkat)", margin: 0 }}>
@@ -322,12 +335,30 @@ export default function TakipGorunumu({ id }: { id: string }) {
                 {defter.map((k, i) => {
                   const onceki = defter[i - 1];
                   const tur = seritTuru.get(k.txHash + k.from + k.to) ?? "akis";
+                  const anahtar = `${k.from}>${k.to}`;
+                  const yeniGrup = !onceki || onceki.hop !== k.hop;
+                  const vurgula = (seritler: Set<string> | null) => () => setDefterVurgu(seritler);
+                  const hopSeritleri = yeniGrup
+                    ? new Set(defter.filter((x) => x.hop === k.hop).map((x) => `${x.from}>${x.to}`))
+                    : null;
                   return (
                     <FragmentSatir
                       key={k.txHash + k.from + k.to + i}
-                      grup={!onceki || onceki.hop !== k.hop ? `${k.hop}. sıçrama` : null}
+                      grup={yeniGrup ? `${k.hop}. sıçrama` : null}
+                      grupYanik={Boolean(hopSeritleri && defterVurgu && [...hopSeritleri].every((x) => defterVurgu.has(x)) && defterVurgu.size === hopSeritleri.size)}
+                      onGrupGir={vurgula(hopSeritleri)}
+                      onGrupCik={vurgula(null)}
                     >
-                      <tr title={`${tarih(k.ts)} TSİ · ${k.txHash}`}>
+                      <tr
+                        title={`${tarih(k.ts)} TSİ · ${k.txHash}`}
+                        tabIndex={0}
+                        className={akisOdak?.has(anahtar) || (defterVurgu?.size === 1 && defterVurgu.has(anahtar)) ? "yanik" : undefined}
+                        onMouseEnter={vurgula(new Set([anahtar]))}
+                        onMouseLeave={vurgula(null)}
+                        onFocus={vurgula(new Set([anahtar]))}
+                        onBlur={vurgula(null)}
+                        onClick={() => setSecim({ serit: anahtar })}
+                      >
                         <td>
                           <i className="takip-tur" style={{ background: SERIT_RENK[tur] }} aria-label={SERIT_ADI[tur]} />
                           <span className="veri">
@@ -351,11 +382,31 @@ export default function TakipGorunumu({ id }: { id: string }) {
   );
 }
 
-function FragmentSatir({ grup, children }: { grup: string | null; children: ReactNode }) {
+function FragmentSatir({
+  grup,
+  grupYanik,
+  onGrupGir,
+  onGrupCik,
+  children,
+}: {
+  grup: string | null;
+  grupYanik: boolean;
+  onGrupGir: () => void;
+  onGrupCik: () => void;
+  children: ReactNode;
+}) {
   return (
     <>
       {grup && (
-        <tr className="takip-grup">
+        // Sıçrama başlığı: üzerine gelmek o sıçramanın BÜTÜN şeritlerini öne çıkarır.
+        <tr
+          className={grupYanik ? "takip-grup yanik" : "takip-grup"}
+          tabIndex={0}
+          onMouseEnter={onGrupGir}
+          onMouseLeave={onGrupCik}
+          onFocus={onGrupGir}
+          onBlur={onGrupCik}
+        >
           <td colSpan={3}>{grup}</td>
         </tr>
       )}

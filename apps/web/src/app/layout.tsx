@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans, Space_Grotesk } from "next/font/google";
 import "./globals.css";
+import YuklemeCubugu from "@/components/YuklemeCubugu";
 
 /**
  * Yazı tipleri BUILD ANINDA kendi sunucumuza gömülür (next/font). Dışarıdan
@@ -39,7 +40,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="tr" className={`${baslik.variable} ${govde.variable} ${veri.variable}`}>
-      <body>{children}</body>
+      <body>
+        <YuklemeCubugu />
+        {children}
+      </body>
     </html>
   );
 }

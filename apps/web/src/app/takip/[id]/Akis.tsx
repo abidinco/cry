@@ -60,11 +60,17 @@ export default function Akis({
   kokAdres,
   secili,
   onSecim,
+  disVurgu,
+  onOdak,
 }: {
   model: AkisModeli;
   kokAdres: string;
   secili: string | null;
   onSecim: (secim: { dugum?: string; serit?: string } | null) => void;
+  /** Dışarıdan (defterden) öne çıkarılan şeritler. */
+  disVurgu?: Set<string> | null;
+  /** Diyagramda odaklanan şeritler — defter kendi satırlarını yakar. */
+  onOdak?: (seritler: Set<string> | null) => void;
 }) {
   const kutu = useRef<HTMLDivElement>(null);
   const [boyut, setBoyut] = useState<{ g: number; y: number } | null>(null);
@@ -97,16 +103,36 @@ export default function Akis({
   const dugumler = useMemo(() => new Map(model.dugumler.map((d) => [d.address, d])), [model]);
   const enBuyuk = Math.max(0, ...model.dugumler.map((d) => d.deger));
 
-  /** Odaktaki (ya da seçili) şeyle bağlantılı mı? */
-  const aktif = odak ?? (secili ? { dugum: secili } : null);
-  const bagli = (s: Serit) =>
-    !aktif ? true : aktif.serit ? aktif.serit === s.anahtar : s.from === aktif.dugum || s.to === aktif.dugum;
+  /**
+   * Neyin öne çıktığı, öncelik sırasıyla: diyagramın kendi imleci, defterden
+   * gelen vurgu, seçili adres. Hiçbiri yoksa her şey tam görünür.
+   */
+  const disAktif = !odak && disVurgu && disVurgu.size > 0 ? disVurgu : null;
+  const bagli = (s: Serit): boolean => {
+    if (odak?.serit) return odak.serit === s.anahtar;
+    if (odak?.dugum) return s.from === odak.dugum || s.to === odak.dugum;
+    if (disAktif) return disAktif.has(s.anahtar);
+    if (secili) return s.from === secili || s.to === secili;
+    return true;
+  };
+  const herhangiAktif = Boolean(odak || disAktif || secili);
+  const merkez = odak?.dugum ?? (disAktif ? null : secili);
   const dugumBagli = (adres: string) =>
-    !aktif
-      ? true
-      : aktif.dugum
-        ? adres === aktif.dugum || model.seritler.some((s) => bagli(s) && (s.from === adres || s.to === adres))
-        : model.seritler.some((s) => s.anahtar === aktif.serit && (s.from === adres || s.to === adres));
+    !herhangiAktif ||
+    adres === merkez ||
+    model.seritler.some((s) => bagli(s) && (s.from === adres || s.to === adres));
+
+  useEffect(() => {
+    if (!onOdak) return;
+    if (!odak) return onOdak(null);
+    onOdak(
+      new Set(
+        model.seritler
+          .filter((s) => (odak.serit ? s.anahtar === odak.serit : s.from === odak.dugum || s.to === odak.dugum))
+          .map((s) => s.anahtar),
+      ),
+    );
+  }, [odak, model, onOdak]);
 
   const tutarMetni = (ham: bigint) => {
     const p = tutarParcala(ham.toString(), model.decimals);

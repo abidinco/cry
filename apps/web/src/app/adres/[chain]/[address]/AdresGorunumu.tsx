@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { yuklemeIzle } from "@/lib/yukleme";
 import { Adres, Bos, Kayit, Rozet, Satir, Tarih, Tutar, type Koken } from "@/components/ui";
 import { hareketsizGun, kisaAdres, sayi, tarih } from "@/lib/bicim";
 
@@ -99,12 +100,13 @@ export default function AdresGorunumu({ chain, address }: { chain: string; addre
     [taban],
   );
 
+  // İlk yükleme üst çubuğa bildirilir; arka plan yoklaması bildirilmez.
   useEffect(() => {
-    void ozetYukle();
+    void yuklemeIzle(ozetYukle());
   }, [ozetYukle]);
 
   useEffect(() => {
-    void hareketYukle(sayfa, yon);
+    void yuklemeIzle(hareketYukle(sayfa, yon));
   }, [hareketYukle, sayfa, yon]);
 
   // Tarama sürerken sayfa kendini tazeler; iş bitince yoklama DURUR.

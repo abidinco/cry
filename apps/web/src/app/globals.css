@@ -387,6 +387,10 @@ input:focus, select:focus { border-color: var(--vurgu); }
 .takip-tablo th { position: sticky; top: 0; background: var(--yuzey); z-index: 1; }
 .takip-tablo td { white-space: nowrap; }
 .takip-grup td { color: var(--m2); font-family: var(--yazi-veri), monospace; font-size: 10px; letter-spacing: 0.09em; text-transform: uppercase; background: var(--zemin); }
+.takip-tablo tbody tr { cursor: pointer; }
+.takip-tablo tbody tr.yanik td { background: color-mix(in srgb, var(--vurgu) 14%, transparent); }
+.takip-tablo tbody tr:focus-visible { outline: 1px solid var(--vurgu-2); outline-offset: -1px; }
+.takip-grup:hover td, .takip-grup.yanik td { color: var(--m1); }
 .takip-tur { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; }
 
 @media (max-width: 1000px) {
@@ -394,5 +398,39 @@ input:focus, select:focus { border-color: var(--vurgu); }
   .takip-govde { grid-template-columns: 1fr; height: auto; }
   .takip-sol { height: 70vh; }
   .takip-sag { border-left: 0; border-top: 1px solid var(--cizgi); max-height: 80vh; }
+}
+
+/* --- üst yükleme çubuğu --- */
+
+.yukleme-cubugu {
+  position: fixed; inset: 0 0 auto 0; height: 2px; z-index: 1000; pointer-events: none;
+  opacity: 1; transition: opacity 250ms ease 100ms;
+}
+.yukleme-cubugu[data-gorunur="false"] { opacity: 0; }
+.yukleme-cubugu-dolu {
+  height: 100%; background: var(--vurgu-2); transform-origin: 0 50%;
+  box-shadow: 0 0 8px color-mix(in srgb, var(--vurgu-2) 70%, transparent);
+  transition: transform 200ms ease-out;
+}
+
+/* --- iskelet: içerik gelene kadar sayfanın ŞEKLİ --- */
+
+.iskelet {
+  background: linear-gradient(90deg, var(--yuzey-2) 0%, var(--cizgi) 40%, var(--yuzey-2) 80%);
+  background-size: 300% 100%;
+  animation: iskelet-parilti 1.4s ease-in-out infinite;
+  border-radius: 2px;
+}
+@keyframes iskelet-parilti {
+  0% { background-position: 100% 0; }
+  100% { background-position: 0 0; }
+}
+.iskelet-satir { height: 10px; }
+.iskelet-sutunlar { display: grid; grid-template-columns: repeat(4, 1fr); align-items: center; height: 100%; padding: 26px 150px 30px 46px; }
+.iskelet-sutunlar > div { width: 12px; display: grid; gap: 7px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .yukleme-cubugu, .yukleme-cubugu-dolu { transition: none; }
+  .iskelet { animation: none; }
 }
 

@@ -90,6 +90,25 @@ Düğüme gelmek bağlı şeritleri yakar; tıklamak defteri o adrese süzer.
 Tam tutar ipucunda ve defterde, şerit etiketinde yalnızca kısa biçim
 ("11,1 Mn") — kısa biçim de bigint üzerinden hesaplanır.
 
+**Defter ile akış birbirine bağlıdır** (kullanıcı isteği 2026-09-14): bir
+defter satırının üzerine gelmek o şeridi, sıçrama başlığının üzerine gelmek
+o sıçramanın bütün şeritlerini akışta öne çıkarır; tersine, akışta bir
+şeride ya da adrese gelmek defterdeki satırlarını yakar. Klavyeyle de
+çalışır (satırlar odaklanabilir).
+
+## Yükleme
+
+- **Üst çubuk:** sayfanın en üstünde 2 piksellik indigo çizgi. Uygulama tam
+  sayfa gezinmesi yapıyor; çubuk bağlantıya tıklandığı an başlar, yeni
+  sayfanın İLK veri isteği bitince tamamlanır. Arka plan yoklamaları (koşu
+  sürerken 3 saniyede bir tazeleme) çubuğu yakmaz — bunu yalnızca sayfa
+  bilir ve `yuklemeIzle` ile kendisi bildirir (`src/lib/yukleme.ts`).
+  İlerleme gerçek bir yüzde değildir; %90'a yaklaşır, bitişi iş söyler.
+- **İskelet:** veri gelene kadar sayfanın ŞEKLİ gösterilir ("yükleniyor"
+  yazısı değil), ki veri geldiğinde hiçbir şey yer değiştirmesin. Takip
+  sayfasında üst şerit, sıçrama sütunları, özet çubukları ve defter satırları.
+- Hareket azaltma tercihinde parıltı ve geçişler kapanır.
+
 ## Yoğunluk ve dar ekran
 
 13 piksel taban, sıkı satır aralığı. Dar ekranda **sütun gizlenmez**, tablo
