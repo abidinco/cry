@@ -89,6 +89,14 @@ adresleri alır, kırpılan kısım ekranda sayılır.
 
 Düğüme gelmek bağlı şeritleri yakar; tıklamak defteri o adrese süzer.
 Şeride tıklamak o şeridi ve **köke kadar geldiği yolu** öne çıkarır.
+
+**Kaydır ve yakınlaştır** (kullanıcı isteği 2026-09-15): tekerlek imlecin
+altındaki noktayı sabit tutarak yakınlaştırır, çift tık yakınlaştırır,
+sürüklemek kaydırır; sağ üstte + / − / sığdır ve yüzde. Dokunmatik yüzeyde
+iki parmakla yatay kaydırma kaydırmadır. Yalnızca bakış açısı değişir,
+yerleşim değişmez — aynı koşu yine aynı resmi verir. 4 pikselden kısa
+hareket sürükleme sayılmaz ve sürüklemenin sonunda gelen tıklama bir SEÇİM
+değildir.
 Tam tutar ipucunda ve defterde, şerit etiketinde yalnızca kısa biçim
 ("11,1 Mn") — kısa biçim de bigint üzerinden hesaplanır.
 

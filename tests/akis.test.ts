@@ -246,3 +246,19 @@ describe("defter satırları", () => {
     expect(defterSatirlari(m, { dugum: "BINANCE" }).map((x) => x.anahtar)).toEqual(["A>BINANCE"]);
   });
 });
+
+describe("yakınlaştırma", () => {
+  it("imlecin altındaki nokta yerinde kalır", async () => {
+    const { yakinlastir, GORUNUM_SIFIR } = await import("@/lib/akis");
+    const g = yakinlastir(GORUNUM_SIFIR, 300, 200, 2);
+    // ekrandaki (300,200) noktası diyagramda (300,200)'dü; yakınlaşınca yine orada
+    expect(((300 - g.x) / g.k)).toBeCloseTo(300);
+    expect(((200 - g.y) / g.k)).toBeCloseTo(200);
+    expect(g.k).toBe(2);
+  });
+  it("ölçek sınırda durur", async () => {
+    const { yakinlastir, GORUNUM_SIFIR, OLCEK_SINIRI } = await import("@/lib/akis");
+    expect(yakinlastir(GORUNUM_SIFIR, 0, 0, 1000).k).toBe(OLCEK_SINIRI.en_cok);
+    expect(yakinlastir(GORUNUM_SIFIR, 0, 0, 0.001).k).toBe(OLCEK_SINIRI.en_az);
+  });
+});

@@ -14,8 +14,11 @@
 
 import { useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import {
+  GORUNUM_SIFIR,
   VARSAYILAN_YERLESIM,
+  yakinlastir,
   yerlesim,
+  type Gorunum,
   type AkisModeli,
   type ModelDugumu,
   type Serit,
@@ -81,6 +84,41 @@ export default function Akis({
   const [boyut, setBoyut] = useState<{ g: number; y: number } | null>(null);
   const [odak, setOdak] = useState<{ dugum?: string; serit?: string } | null>(null);
   const [ipucu, setIpucu] = useState<Ipucu>(null);
+  // Kaydırma ve yakınlaştırma (kullanıcı isteği 2026-09-15): büyüyen koşuda
+  // sütunlar sıkışıyor. Yerleşim DEĞİŞMEZ — yalnızca bakış açısı değişir,
+  // o yüzden aynı koşu yine aynı resmi verir.
+  const [gorunum, setGorunum] = useState<Gorunum>(GORUNUM_SIFIR);
+  const surukleme = useRef<{ px: number; py: number; x: number; y: number; hareket: boolean; id: number } | null>(null);
+  /** Sürükleme bitti mi? Bitince gelen `click` bir SEÇİM değildir. */
+  const surukledi = useRef(false);
+  const [suruklemede, setSuruklemede] = useState(false);
+
+  // Tekerlek: imlecin altındaki nokta sabit kalarak yakınlaştırır. React'in
+  // onWheel'i pasif bağlandığı için sayfa kaymasını engelleyemez; dinleyici elle.
+  useEffect(() => {
+    const el = kutu.current;
+    if (!el) return;
+    const tekerlek = (e: WheelEvent) => {
+      e.preventDefault();
+      const r = el.getBoundingClientRect();
+      // Dokunmatik yüzeyde iki parmakla yatay kaydırma: yakınlaştırma değil kaydırma.
+      if (!e.ctrlKey && Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        setGorunum((g) => ({ ...g, x: g.x - e.deltaX }));
+        return;
+      }
+      const carpan = Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015));
+      setGorunum((g) => yakinlastir(g, e.clientX - r.left, e.clientY - r.top, carpan));
+    };
+    el.addEventListener("wheel", tekerlek, { passive: false });
+    return () => el.removeEventListener("wheel", tekerlek);
+  }, []);
+
+  const seciminiYap = (secim: { dugum?: string; serit?: string } | null) => {
+    if (surukledi.current) return;
+    onSecim(secim);
+  };
+  const ortadanYakinlastir = (carpan: number) =>
+    setGorunum((g) => yakinlastir(g, (boyut?.g ?? 0) / 2, (boyut?.y ?? 0) / 2, carpan));
 
   useEffect(() => {
     const el = kutu.current;
@@ -162,8 +200,49 @@ export default function Akis({
           viewBox={`0 0 ${boyut.g} ${boyut.y}`}
           role="img"
           aria-label={`Para akışı: ${hopSay} sıçrama, şerit kalınlığı ${model.varlik} tutarıyla orantılı`}
+          data-surukleniyor={suruklemede ? "evet" : undefined}
           onClick={(e) => {
-            if (e.target === e.currentTarget) onSecim(null);
+            if (e.target === e.currentTarget) seciminiYap(null);
+          }}
+          onDoubleClick={(e) => {
+            const r = kutu.current!.getBoundingClientRect();
+            setGorunum((g) => yakinlastir(g, e.clientX - r.left, e.clientY - r.top, 1.8));
+          }}
+          onPointerDown={(e) => {
+            if (e.button !== 0) return;
+            surukleme.current = { px: e.clientX, py: e.clientY, x: gorunum.x, y: gorunum.y, hareket: false, id: e.pointerId };
+          }}
+          onPointerMove={(e) => {
+            const sr = surukleme.current;
+            if (!sr) return;
+            const dx = e.clientX - sr.px;
+            const dy = e.clientY - sr.py;
+            // Birkaç piksellik titreme sürükleme sayılmaz: tıklama seçim olarak kalır.
+            if (!sr.hareket && Math.hypot(dx, dy) < 4) return;
+            if (!sr.hareket) {
+              sr.hareket = true;
+              setSuruklemede(true);
+              try {
+                (e.currentTarget as Element).setPointerCapture(sr.id);
+              } catch {
+                // İşaretçi zaten bırakılmışsa yakalama gerekmez.
+              }
+              setIpucu(null);
+            }
+            setGorunum((g) => ({ ...g, x: sr.x + dx, y: sr.y + dy }));
+          }}
+          onPointerUp={() => {
+            if (surukleme.current?.hareket) {
+              surukledi.current = true;
+              // Aynı tikte gelen click'i yut, sonra normale dön.
+              setTimeout(() => (surukledi.current = false), 0);
+            }
+            surukleme.current = null;
+            setSuruklemede(false);
+          }}
+          onPointerCancel={() => {
+            surukleme.current = null;
+            setSuruklemede(false);
           }}
         >
           <defs>
@@ -181,6 +260,7 @@ export default function Akis({
               </marker>
             ))}
           </defs>
+          <g transform={`translate(${gorunum.x},${gorunum.y}) scale(${gorunum.k})`}>
 
           {L.kolonX.map((x, i) => (
             <text key={i} x={x} y={14} className="akis-kolon">
@@ -243,7 +323,7 @@ export default function Akis({
                       setOdak(null);
                       setIpucu(null);
                     }}
-                    onClick={() => onSecim({ serit: s.anahtar })}
+                    onClick={() => seciminiYap({ serit: s.anahtar })}
                   />
                 </g>
               );
@@ -304,7 +384,7 @@ export default function Akis({
                       setOdak(null);
                       setIpucu(null);
                     }}
-                    onClick={() => onSecim({ dugum: d.address })}
+                    onClick={() => seciminiYap({ dugum: d.address })}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
@@ -358,8 +438,27 @@ export default function Akis({
                 );
               });
           })()}
+          </g>
         </svg>
       )}
+      <div className="akis-yakinlik" role="group" aria-label="görünüm">
+        <button type="button" onClick={() => ortadanYakinlastir(1.4)} aria-label="yakınlaştır" title="yakınlaştır (tekerlek / çift tık)">
+          +
+        </button>
+        <button type="button" onClick={() => ortadanYakinlastir(1 / 1.4)} aria-label="uzaklaştır" title="uzaklaştır">
+          −
+        </button>
+        <button
+          type="button"
+          onClick={() => setGorunum(GORUNUM_SIFIR)}
+          aria-label="sığdır"
+          title="tamamını göster"
+          disabled={gorunum.k === 1 && gorunum.x === 0 && gorunum.y === 0}
+        >
+          sığdır
+        </button>
+        <span className="veri m3" aria-live="polite">%{Math.round(gorunum.k * 100)}</span>
+      </div>
       {ipucu && (
         <div
           className="akis-ipucu"

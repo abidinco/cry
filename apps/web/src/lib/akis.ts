@@ -548,3 +548,24 @@ export function defterSatirlari(
     })
     .sort((a, b) => a.hop - b.hop || (a.ham === b.ham ? a.anahtar.localeCompare(b.anahtar) : a.ham > b.ham ? -1 : 1));
 }
+
+/* ------------------------------------------------------------------ */
+/* Kaydırma ve yakınlaştırma                                           */
+/* ------------------------------------------------------------------ */
+
+/** Diyagramın görünümü: önce kaydırma (x, y), sonra ölçek (k). */
+export type Gorunum = { k: number; x: number; y: number };
+
+export const GORUNUM_SIFIR: Gorunum = { k: 1, x: 0, y: 0 };
+export const OLCEK_SINIRI = { en_az: 0.5, en_cok: 8 } as const;
+
+/**
+ * İmlecin ALTINDAKİ nokta yerinde kalacak şekilde yakınlaştırır — haritalarda
+ * alışılan davranış. Aksi hâlde yakınlaşan kısım ekrandan kaçar ve kullanıcı
+ * baktığı adresi kaybeder.
+ */
+export function yakinlastir(g: Gorunum, px: number, py: number, carpan: number): Gorunum {
+  const k = Math.min(OLCEK_SINIRI.en_cok, Math.max(OLCEK_SINIRI.en_az, g.k * carpan));
+  const oran = k / g.k;
+  return { k, x: px - (px - g.x) * oran, y: py - (py - g.y) * oran };
+}
