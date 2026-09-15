@@ -79,6 +79,107 @@ Buradan dört sonuç çıkıyor:
   **iz** için kullanılmaz — iz her zaman adresin tam taramasına dayanır
   (bkz. §3, iki katman).
 
+### B0 ölçümleri (2026-09-15/16)
+
+**Yeniden üretim** (ağa yalnızca ilki çıkar; çıktı `.onbellek/b0/`, gitignore'da):
+```bash
+node --env-file=.env --env-file=apps/web/.env.local --import tsx scripts/olcum/tron-b0-ornekle.mts   # 2.261 blok, 4.523 istek, ~10 dk
+node --import tsx scripts/olcum/b0-yillar-analiz.mts
+# geçici konteynerler: betiğin başındaki iki docker run satırı; bitince docker rm -f b0-ch b0-pg
+node --import tsx scripts/olcum/b0-depolama-denemesi.mts --mod=gercek
+node --max-old-space-size=8192 --import tsx scripts/olcum/b0-depolama-denemesi.mts --mod=ayni --gun=2
+node --max-old-space-size=8192 --import tsx scripts/olcum/b0-depolama-denemesi.mts --mod=taze --gun=2
+```
+
+**Örnekleme:** ardışık 1.200 blok (86.270.497–86.271.696, 1 saat) + 2018-06'dan
+bugüne yılda 125 blok. 4.523 istek, 0 yeniden deneme — ama yalnızca 120 ms'lik
+tek hız kapısıyla: kapısız 4 eş zamanlı işçi 123 isteğin 72'sinde yeniden
+denemeye düştü (B2'deki ortak `RateGate`'in gerekçesi).
+
+**Yıla göre hacim** (yılda 125 blok; 2018 yarım yıl, 63 blok):
+
+| Yıl | USDT/blok | TRX/blok | Günlük USDT | Günlük TRX | USDT ≥100 | USDT ≥1.000 | TRX ≥1 | TRX ≥100 |
+|---|---|---|---|---|---|---|---|---|
+| 2018 | 0 | 1,5 | 0 | 42 bin | — | — | %67 | %28 |
+| 2019 | 0,0 | 3,4 | ~0,7 bin | 99 bin | (3 örnek) | | %55 | %35 |
+| 2020 | 2,0 | 7,8 | 59 bin | 225 bin | %58 | %23 | %71 | %34 |
+| 2021 | 24,5 | 35,6 | 705 bin | 1,03 Mn | %69 | %33 | %40 | %14 |
+| 2022 | 46,2 | 90,7 | 1,33 Mn | 2,61 Mn | %57 | %26 | %30 | %9,2 |
+| 2023 | 64,0 | 108,4 | 1,84 Mn | 3,12 Mn | %49 | %23 | %30 | %6,4 |
+| 2024 | 71,9 | 93,4 | 2,07 Mn | 2,69 Mn | %64 | %31 | %32 | %7,2 |
+| 2025 | 78,6 | 130,6 | 2,26 Mn | 3,76 Mn | %74 | %37 | %28 | %4,9 |
+| 2026 | 77,5 | 155,3 | 2,23 Mn | 4,47 Mn | %72 | %33 | %24 | %3,5 |
+
+- **Tam geçmişin satır sayısı (tahmin):** USDT ~3,6 Mr + TRX ~6,1 Mr = **~9,7 Mr**.
+  USDT ≥1 + TRX ≥1: ~5,1 Mr · USDT ≥100 + TRX ≥100: ~2,7 Mr · yalnız USDT ≥100:
+  ~2,3 Mr · yalnız USDT ≥1.000: ~1,1 Mr.
+- **Gün içi dalgalanma büyük:** ardışık saat blok başına 331 transfer
+  (134 USDT + 197 TRX) verdi, 2026'nın yayılmış örneği 233. Önceki 30 blokluk
+  ölçüm (239) yayılmış örneğe yakın; günlük tahminler bu yüzden yayılmış
+  örnekten alınır (**~6,7 Mn/gün eşiksiz**).
+- **Başarısız transfer 0** — bir alan eksikliği değil: `ret` her işlemde var,
+  başarısızlar yalnızca sözleşme çağrılarında (`OUT_OF_ENERGY`) ve onlar
+  Transfer olayı üretmiyor (3 blokta elle bakıldı). Aynı saatte 469 USDT onay
+  olayı atlandı.
+- **Adresin çoğu bir kez görünüyor:** 1 saatte 397.381 transferde 316.618
+  tekil adres, 203.206'sı tek kez (toz / adres zehirleme). Sıkıştırmayı
+  belirleyen asıl bu.
+
+**Depolama denemesi.** Gerçek saat 48 kez zamanda kaydırılarak 2 gün
+(19.074.288 satır) yapıldı. 2 günü TronGrid'den çekmek kotaya sığmıyor, bu
+yüzden adres tekrarı iki sınırla ölçüldü: `ayni` (adresler her kopyada aynı —
+iyimser) ve `taze` (saatte ≤2 kez görünen adres her kopyada yeni — kötümser).
+Gerçek davranış arasındadır. İki motor her sorguya BİREBİR aynı cevabı verdi
+(ör. yoğun alıcı: 560.160 hareket, 48.355 gönderen).
+
+| | ClickHouse `ayni` | ClickHouse `taze` | Postgres (iki modda aynı) |
+|---|---|---|---|
+| Disk / satır | **75,8 B** | **118,6 B** | **324,5 B** (tablo 134 + iki dizin 190) |
+| 19 Mn satır | 1,45 GB | 2,26 GB | 6,19 GB |
+| Yazma | ~1,0 Mn satır/sn | ~1,0 Mn satır/sn | ~0,4 Mn satır/sn + dizin 18 sn |
+| Yoğun alıcı özeti (560 bin satır) | 14 ms | 15 ms | 488–497 ms |
+| Yoğun alıcı: ilk 50 gönderen | 9 ms | 15 ms | 321–347 ms |
+| Yoğun gönderici özeti (62 bin satır) | 6 ms | 7 ms | 52–55 ms |
+| Seyrek adres | 3–4 ms | 3–4 ms | <1 ms |
+
+Sütun payı (ClickHouse `taze`): tx hash 582 MiB — rastgele 32 bayt, hiç
+sıkışmaz ve toplamın %26'sı; kimden 231 MiB, kime 100 MiB (sıralama anahtarı),
+kalan her şey 60 MiB. ClickHouse sayısına `kimden` projeksiyonu (ikinci
+sıralama) dâhil. Süreler sunucudan okundu (`--time`, `EXPLAIN ANALYZE`),
+önbellek sıcak; soğuk disk ölçülmedi.
+
+**Projeksiyon** (2026 günlük hacmi; eşikli alt kümede bayt/satır aynı varsayıldı —
+toz adresler elendiği için gerçekte `ayni` sınırına daha yakın olmalı, ölçülmedi):
+
+| Kapsam | Satır/gün | CH 90 gün | CH 1 yıl | PG 1 yıl | CH tam geçmiş |
+|---|---|---|---|---|---|
+| Eşiksiz | 6,7 Mn | 46–72 GB | 185–290 GB | ~790 GB | 0,74–1,15 TB |
+| USDT ≥100 + TRX ≥100 | 1,76 Mn | 12–19 GB | 49–76 GB | ~210 GB | 205–320 GB |
+| Yalnız USDT ≥1.000 | 0,74 Mn | 5–8 GB | 21–32 GB | ~88 GB | 83–130 GB |
+
+D: NVMe'de 198 GB boş.
+
+**Toplu geçmiş kaynağı:**
+- **BigQuery:** Google yönetimli TRON veri seti var, **önizleme** durumunda:
+  `blockchain-analytics-tron-mainnet-us` — `blocks`, `transactions`, `logs`,
+  `receipts`, `decoded_events`; hepsi `block_timestamp` üzerinde AYLIK bölümlü.
+  **`token_transfers` tablosu YOK** (Ethereum'da var): USDT transferi `logs`tan
+  sözleşme adresi + Transfer konusu ile süzülür. **Satır sayısı ve taranan bayt
+  BAKILAMADI** — kuru sorgu bir GCP projesi ve kimlik ister, makinede
+  `gcloud`/`bq` yok. Bu yüzden "1 TiB ücretsiz kotaya sığar mı" sorusu açık.
+- **java-tron anlık görüntüsü:** tam düğüm ~2,9 TB (iç işlemli ~3,1 TB, bakiye
+  geçmişli ~3,6 TB) — iki diskin boşuna sığmaz. Lite düğüm yalnızca güncel
+  durum + son 65.536 blok (~2,3 gün) taşır; **geçmiş kaynağı OLAMAZ.**
+  Kaynak: TRON Developer Hub "Database snapshots" sayfası (2026-09-15).
+
+**B0'dan çıkan sonuçlar:**
+1. **Depolama: ClickHouse.** Postgres aynı veride 2,7–4,3 kat disk ve yoğun
+   adreste ~35 kat yavaş; eşiksiz bir yıl D:'ye sığmıyor (790 GB).
+2. **Eşiksiz bir yıl ClickHouse'ta da sınırda** (185–290 GB ⟷ 198 GB boş).
+3. **Tam geçmiş yalnızca "yalnız USDT ≥1.000" kapsamında sığar**, o da
+   BigQuery'nin maliyeti ölçülmeden planlanamaz.
+4. **Hız kapısı şart:** kapısız paralel okuma istek başına ~%60 yeniden deneme.
+
 ## 2. Önerilen mimari — iki katman
 
 ```

@@ -182,10 +182,16 @@ turunda değiştirilir.
 varlıkları, hangi tutar eşiğinin üstünü, hangi geçmiş penceresini, hangi
 depolama motorunda ve hangi disk bütçesiyle tutsun?
 
-**Ölçüm (2026-09-15):** TRON bugün günde ~2,7 Mn USDT + ~4,2 Mn TRX transferi
-üretiyor. TRX transferlerinin %76'sı 1 TRX'in altında; USDT'nin %68'i 1.000
-USDT'nin altında. Geçmişi TronGrid'den blok blok çekmek kotayla yıllar sürer;
-canlı ucu izlemek kotanın ~%58'i. Makinede 460 GB boş SSD var (C: 262, D: 198).
+**Ölçüm (2026-09-15/16, B0 tamamlandı — ayrıntı ve komutlar yol haritası §1 "B0 ölçümleri"):**
+- 2026 hacmi günde ~2,2 Mn USDT + ~4,5 Mn TRX transferi (yılda 125 blok); tam
+  geçmiş ~9,7 Mr satır (USDT ≥100 + TRX ≥100: ~2,7 Mr; yalnız USDT ≥1.000: ~1,1 Mr).
+- 19 Mn satırlık deneme: ClickHouse **76–119 bayt/satır**, Postgres bölümlü
+  tablo **325 bayt/satır**; yoğun adres sorgusu ClickHouse 14 ms ⟷ Postgres ~490 ms.
+- Bir yıl: eşiksiz CH 185–290 GB (PG ~790 GB) · USDT ≥100 + TRX ≥100 CH 49–76 GB ·
+  yalnız USDT ≥1.000 CH 21–32 GB. D: NVMe'de 198 GB boş.
+- Tam geçmiş kaynağı: BigQuery'de Google yönetimli TRON veri seti var (önizleme,
+  `token_transfers` yok, `logs`tan süzülür) ama **satır/bayt maliyeti bakılamadı**
+  (GCP hesabı gerekiyor). Düğüm anlık görüntüsü ~2,9 TB, lite anlık görüntü geçmiş taşımıyor.
 
 **Yeniden üretim:**
 ```bash
@@ -200,15 +206,16 @@ node --env-file=.env --env-file=apps/web/.env.local --import tsx scripts/olcum/t
    keşif katmanı içindir;** iz ve rapor her zaman eşiksiz adres taramasından
    gelir (iki katman — yol haritası §2).
 3. *Geçmiş:* yalnızca bugünden ileri (canlı uç) · son N ay · tam geçmiş
-   (toplu kaynak ister: BigQuery ya da düğüm anlık görüntüsü — B0'da yoklanır).
+   (toplu kaynak: BigQuery — maliyeti bir GCP hesabıyla kuru sorgu ister).
 4. *Depolama:* ClickHouse (sütunlu, sıkıştırmalı; ayrı bir servis) ·
-   Postgres bölümlü tablo (tek veritabanı). B0'daki deneme karar verdirir.
+   Postgres bölümlü tablo (tek veritabanı). **Ölçüm ClickHouse'u gösteriyor:**
+   2,7–4,3 kat az disk, yoğun adreste ~35 kat hızlı.
 5. *Disk bütçesi:* D: NVMe'nin ne kadarı (198 GB boş).
 
 Hepsi geri alınabilir: bölüm silinir, eşik yükseltilir; eşik DÜŞÜRÜLÜRSE
 geçmişin yeniden çekilmesi gerekir (tek yönlü maliyet).
 
-**Karar verilmezse:** B0 ölçümleri yapılabilir ama B1'in şeması (eşik ve
+**Karar verilmezse:** B1'in şeması (eşik ve
 bölümleme) yazılamaz; ters sorgu ve taranmamış adreslerin keşfi kapalı kalır.
 
 **Karar yeri:** `docs/yol-haritasi-blok-indeks.md` §1 + CLAUDE.md → yeni
