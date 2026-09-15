@@ -13,7 +13,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@cry/db";
 import { apiOturum } from "@/lib/yetki";
-import { takipIsleriniKaldir } from "@/lib/kuyruk";
+import { takipIsleriniKaldir, zamanAsimi } from "@/lib/kuyruk";
 
 export async function POST(_istek: Request, ctx: { params: Promise<{ id: string }> }) {
   const { oturum, yanit: kapi } = await apiOturum();
@@ -42,7 +42,15 @@ export async function POST(_istek: Request, ctx: { params: Promise<{ id: string 
        set stats = jsonb_set(coalesce(stats, '{}'::jsonb), '{iptal}', 'true'::jsonb)
      where id = ${kosuId}`;
 
-  const { kaldirilan, aktif } = await takipIsleriniKaldir(id);
+  let kaldirilan = 0;
+  let aktif = false;
+  try {
+    ({ kaldirilan, aktif } = await zamanAsimi(takipIsleriniKaldir(id)));
+  } catch {
+    // Kuyruğa ulaşılamıyorsa bekleyen iş de İŞLENEMEZ: koşu burada kapatılır.
+    // Worker ayağa kalkıp iptal bayrağını görürse zaten duracaktır.
+    aktif = false;
+  }
 
   if (!aktif) {
     // İşlenen iş yok: worker bayrağı hiç görmeyecek, koşu burada kapanır.

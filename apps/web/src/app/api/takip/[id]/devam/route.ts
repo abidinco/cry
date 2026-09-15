@@ -10,7 +10,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@cry/db";
 import { DEVAM_EK_HOP, devamEdilebilir } from "@cry/motor";
 import { apiOturum } from "@/lib/yetki";
-import { takipDevamIstegi } from "@/lib/kuyruk";
+import { takipDevamIstegi, zamanAsimi } from "@/lib/kuyruk";
 
 export async function POST(istek: Request, ctx: { params: Promise<{ id: string }> }) {
   const { oturum, yanit: kapi } = await apiOturum();
@@ -54,8 +54,26 @@ export async function POST(istek: Request, ctx: { params: Promise<{ id: string }
   const karar = devamEdilebilir(dugum.terminalReason, govde.adres);
   if (!karar.olur) return NextResponse.json({ error: karar.neden }, { status: 400 });
 
+  // Durum ÖNCE "kuyrukta"ya çekilir: iş hemen başlarsa worker "çalışıyor"
+  // yazar ve bizim sonradan yazdığımız "kuyrukta" onu ezmez. Kuyruğa
+  // ulaşılamazsa durum GERİ ALINIR — aksi hâlde koşu takılı kalır ve
+  // "koşu sürüyor" diye bir daha devam edilemez (yaşandı, koşu 9).
   await prisma.traceRun.update({ where: { id: kosuId }, data: { status: "kuyrukta" } });
-  const { yeni } = await takipDevamIstegi(id, { adres: govde.adres, ekHop, userId: oturum.userId });
+  let yeni: boolean;
+  try {
+    ({ yeni } = await zamanAsimi(
+      takipDevamIstegi(id, { adres: govde.adres, ekHop, userId: oturum.userId }),
+    ));
+  } catch (hata) {
+    await prisma.traceRun.updateMany({
+      where: { id: kosuId, status: "kuyrukta" },
+      data: { status: kosu.status },
+    });
+    return NextResponse.json(
+      { error: hata instanceof Error ? hata.message : "devam kuyruğa atılamadı" },
+      { status: 503 },
+    );
+  }
   await prisma.auditLog.create({
     data: {
       userId: oturum.userId,

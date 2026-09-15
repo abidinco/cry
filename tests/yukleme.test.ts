@@ -44,3 +44,11 @@ describe("iş sayacı", () => {
     expect(x).toBeGreaterThan(0.89);
   });
 });
+
+describe("kuyruk süre sınırı", () => {
+  it("asılı kalan kuyruk çağrısı hataya döner — koşu takılı kalmasın", async () => {
+    const { zamanAsimi, KuyrukUlasilamadi } = await import("@/lib/kuyruk");
+    await expect(zamanAsimi(new Promise(() => {}), 20)).rejects.toBeInstanceOf(KuyrukUlasilamadi);
+    await expect(zamanAsimi(Promise.resolve(5), 20)).resolves.toBe(5);
+  });
+});

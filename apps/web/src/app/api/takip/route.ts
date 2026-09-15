@@ -9,7 +9,7 @@ import { prisma } from "@cry/db";
 import { registryFromEnv, type ChainId } from "@cry/chain";
 import { VARSAYILAN_ESIKLER } from "@cry/motor";
 import { apiOturum } from "@/lib/yetki";
-import { takipIstegi } from "@/lib/kuyruk";
+import { takipIstegi, zamanAsimi } from "@/lib/kuyruk";
 
 const registry = registryFromEnv();
 const KURALLAR = ["fifo", "orantisal", "zaman_pencereli"];
@@ -83,7 +83,17 @@ export async function POST(istek: Request) {
     },
   });
 
-  await takipIstegi(kosu.id.toString());
+  try {
+    await zamanAsimi(takipIstegi(kosu.id.toString()));
+  } catch (hata) {
+    // Kuyruğa girmeyen koşu "kuyrukta" kalmamalı: hiç işlenmeyecek.
+    const mesaj = hata instanceof Error ? hata.message : "koşu kuyruğa atılamadı";
+    await prisma.traceRun.update({
+      where: { id: kosu.id },
+      data: { status: "hata", finishedAt: new Date(), stopReason: mesaj.slice(0, 200) },
+    });
+    return NextResponse.json({ error: mesaj, traceRunId: kosu.id.toString() }, { status: 503 });
+  }
   await prisma.auditLog.create({
     data: {
       userId: oturum.userId,

@@ -137,3 +137,33 @@ export async function takipIsleriniKaldir(traceRunId: string): Promise<{ kaldiri
   const aktif = (await kuyruk.getJobs(["active"])).some((is) => is?.data?.traceRunId === traceRunId);
   return { kaldirilan, aktif };
 }
+
+/**
+ * Kuyruk çağrısını süreyle sınırlar.
+ *
+ * Yaşandı (2026-09-15): Redis'e ulaşılamayan bir ortamda (yerel geliştirme
+ * sunucusu; konteyner portu dışarı açık değil) BullMQ bağlanmayı SONSUZA
+ * kadar bekliyor — `maxRetriesPerRequest: null` bunun şartı. İstek hiç
+ * dönmedi ve koşu "kuyrukta" hâlinde takılı kaldı. Sınırlı bir bekleme, bir
+ * hata cevabına dönüşür ve çağıran durumu geri alabilir.
+ */
+export class KuyrukUlasilamadi extends Error {
+  constructor() {
+    super("kuyruğa ulaşılamadı — worker bağlantısı (Redis) yanıt vermiyor");
+  }
+}
+
+export async function zamanAsimi<T>(soz: Promise<T>, ms = 5000): Promise<T> {
+  let zamanlayici: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      soz,
+      new Promise<never>((_, reddet) => {
+        zamanlayici = setTimeout(() => reddet(new KuyrukUlasilamadi()), ms);
+      }),
+    ]);
+  } finally {
+    clearTimeout(zamanlayici);
+  }
+}
+

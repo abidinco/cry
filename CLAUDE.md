@@ -299,6 +299,16 @@ işaret), renk kanalları ayrık, yazı tipleri build anında gömülü.
   "Bu para buraya hangi yoldan geldi" — şeridin kaynağına giren ileri
   şeritler, onlarınkiler, köke kadar (`seritYolu`). Geri dönen şeritler yola
   alınmaz: para o yoldan gelmedi, oradan döndü.
+- **Kuyruk çağrısı SÜRE SINIRIYLA yapılır ve başarısızsa durum GERİ ALINIR.**
+  Yaşandı (2026-09-15): yerel geliştirme sunucusu Redis'e ulaşamıyor
+  (konteyner portu dışarı açık değil) ve BullMQ `maxRetriesPerRequest: null`
+  yüzünden SONSUZA kadar bekliyor. Devam uç noktası koşuyu önce "kuyrukta"ya
+  çekip sonra kuyruğa atıyordu; istek hiç dönmedi, koşu 9 "kuyrukta"da takılı
+  kaldı ve "koşu sürüyor" diye bir daha devam edilemez oldu. Şimdi
+  `zamanAsimi` (5 sn) → 503 "kuyruğa ulaşılamadı" ve durum eski hâline döner;
+  yeni koşu "hata" olarak kapanır. Ölçüldü: 3005'te istek 5,4 sn'de 503 döndü,
+  koşu "bitti" kaldı. **Sonuç: yerel dev sunucusundan devam/durdur/yeni koşu
+  YAPILAMAZ** — bunlar canlı yığında (1337) çalışır.
 - **Durdurulan koşu "bitti" DEĞİL "durduruldu"dur ve eksik olduğunu söyler.**
   Yarım bir graf "bitti" görünürse tam sanılır. Worker ilerlemeyi ve iptal
   bayrağını `jsonb_set` ile yazar/okur — Prisma'nın Json güncellemesi alanın
