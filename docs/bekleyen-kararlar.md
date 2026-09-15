@@ -172,3 +172,62 @@ turunda değiştirilir.
 **Geri alınabilir:** evet, ayar.
 
 **Karar yeri:** Görev 10 + `apps/watcher`.
+
+---
+
+## 8. Redis yerel geliştirmeye açılsın mı
+
+**Soru:** Yerel dev sunucusu (3005) kuyruğa ulaşamıyor; yeni koşu, devam ve
+durdur yalnızca canlı yığında (1337) denenebiliyor. Redis portu yalnızca
+makineye (`127.0.0.1`) yayınlansın mı?
+
+**Ölçüm (2026-09-15):** 3005'ten gönderilen "takibe devam et" isteği hiç
+dönmedi (BullMQ `maxRetriesPerRequest: null` ile bağlanmayı sonsuza kadar
+bekliyor) ve koşu 9 "kuyrukta"da takılı kaldı. Düzeltme sonrası aynı istek
+5,4 sn'de 503 dönüyor. `docker port cry-redis` boş.
+
+**Yeniden üretim:**
+```bash
+docker port cry-redis
+curl -s -X POST localhost:3005/api/takip/9/devam   # oturumlu tarayıcıdan
+```
+
+**Seçenekler:**
+1. **`127.0.0.1:16379:6379` yayınla** (Postgres'teki `127.0.0.1:15432` gibi) —
+   dışarı açık değil, yalnızca bu makine. `.env.local`'e `REDIS_URL` eklenir.
+   Geri alınabilir. Risk: yerel dev sunucusu CANLI kuyruğa iş atar ve canlı
+   worker onu işler — yerel deneme canlı veriyi değiştirir (zaten aynı
+   veritabanı).
+2. **Olduğu gibi kalsın** — kuyruk işleri canlıda denenir; yerel yalnızca
+   görünüm için.
+
+**Karar verilmezse:** kuyruk isteyen her değişiklik push'tan sonra ya da
+worker konteynerine betik kopyalanarak denenir.
+
+**Karar yeri:** `docker-compose.yml` + CLAUDE.md → Yerel çalışma ortamı.
+
+---
+
+## 9. Koşu 9'da sınırda kalan küçük adreslerden devam edilsin mi
+
+**Soru:** Canlıda koşu 9'un 100 bin USDT ve üstü taşıyan 4 adresinden devam
+edildi (2026-09-14). 48 adres hâlâ bütçe sınırında, 5'i dallanmada; çoğuna
+0,01–40 bin USDT gelmiş. Hangi eşiğin altı "kırıntı" sayılır?
+
+**Ölçüm:** 4 devam koşuyu 24 → 86 adrese, 47 → 1.342 harekete büyüttü ve
+yeni bir borsa buldu (KuCoin 2,77 Mn). Aynı devamlar 706 küçük transferlik
+bir çift de getirdi.
+
+**Yeniden üretim:**
+```bash
+docker exec cry-db psql -U cry -d cry -c "select n.address, n.terminal_reason, sum(e.amount_raw::numeric)/1e6 usdt from trace_nodes n left join trace_edges e on e.trace_run_id=9 and e.to_address=n.address where n.trace_run_id=9 and n.terminal_reason in ('butce','dallanma') group by 1,2 order by 3 desc nulls last"
+```
+
+**Seçenekler:** (1) tutar eşiği koy (ör. 10 bin USDT) ve üstündekilerden
+devam et; (2) yalnızca kullanıcının seçtiği adreslerden; (3) motora
+`minTutar` varsayılanı ver (bugün 0 = kapalı, bilinçli).
+
+**Karar verilmezse:** koşu 9 bugünkü hâliyle kalır; eksik kalan dallar
+"sınırda" diye görünür, "temiz" değil.
+
+**Karar yeri:** koşu 9 (arayüzden devam) ya da `VARSAYILAN_ESIKLER.minTutar`.

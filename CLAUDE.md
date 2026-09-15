@@ -32,6 +32,65 @@ güncel olduğu sorulamaz hâle gelir.
 - Ortam dosyası depoda DEĞİL: **`C:\srv\cry\.env`** (PC) ve `/srv/cry/.env`
   (sunucu). Depo public; hiçbir sır commit'e girmez.
 
+## Yerel çalışma ortamı — ölçülmüş tuzaklar (2026-09-14/15)
+
+Her madde bu oturumlarda bir kez YAŞANDI ve zaman kaybettirdi.
+
+- **Önce Docker Desktop açık mı bak.** Kapalıyken bütün yığın (db, redis,
+  worker, web:1337) düşer ve belirti "sayfa hiç açılmıyor"dur — kod değil.
+  Kontrol: `docker ps`; açmak: `Start-Process "C:\Program Files\Docker\Docker\Docker Desktop.exe"`.
+- **Yerel dev sunucusu port 3005'tir, 3000 DEĞİL.** 3000 hafıza projesinin;
+  onun service worker'ı `localhost:3000` kökenine kayıtlı kalıyor ve cry'ın
+  isteklerini yakalayıp `sw.js no-response` + webpack `'call'` hataları
+  üretiyordu. `apps/web/package.json` → `next dev -p 3005`.
+- **Dev sunucusunu preview aracıyla değil AYRIK süreç olarak başlat.**
+  Preview sunucusu turun sonunda kapanıyor; kullanıcı linke tıkladığında
+  sunucu çoktan yok. Çalışan yol:
+  `Start-Process cmd.exe -ArgumentList "/c","npm.cmd run dev > .dev-3005.log 2>&1" -WorkingDirectory <cry> -WindowStyle Minimized`.
+  Günlük `.dev-3005.log` (gitignore'da).
+- **Kullanıcının PowerShell'inde `npm` ÇALIŞMAZ**, `npm.cmd` çalışır: yürütme
+  ilkesi `npm.ps1`'i reddediyor. İlke güvenlik ayarıdır, değiştirilmez.
+  `gh` de kullanıcının PATH'inde yok: `%LOCALAPPDATA%\ghcli\bin\gh.exe`
+  (Bash aracında bulunuyor; `abidinco` hesabıyla giriş yapılı, 2026-09-15).
+- **Yerel betiklerin ortamı İKİ dosyadan:**
+  `node --env-file=.env --env-file=apps/web/.env.local --import tsx <betik>.mts`.
+  Kök `.env` konteyner adlarını taşıyor (`db:5432`); `.env.local` onları
+  `127.0.0.1:15432`'ye çeviriyor. Üst düzey `await` için dosya `.mts` olmalı.
+  **`TRONSCAN_API_KEY` depo kökündeki `.env`'de** (gitignore'da), `C:\srv\cry\.env`'de
+  YOK (ölçüldü) — değer asla ekrana basılmaz.
+- **Yerel dev sunucusu Redis'e ULAŞAMAZ** (konteyner portu yayınlanmıyor,
+  bkz. proje-devir → Port kuralları). Sonuç: 3005'ten **yeni koşu, devam ve
+  durdur çalışmaz** — 5 sn'de 503 döner. Kuyruk isteyen her şey canlı yığında
+  (1337) denenir. Karar bekliyor: bekleyen-kararlar §8.
+- **Canlı yığında bir betik çalıştırmak:** worker konteynerine kopyala ve
+  orada koş — Redis'e ve veritabanına oradan erişiliyor:
+  `docker cp x.mts cry-worker:/app/apps/worker/x.mts && docker exec -w /app/apps/worker cry-worker npx tsx x.mts`,
+  sonra dosyayı sil. **Git Bash `docker exec -w /app/...` yolunu Windows
+  yoluna çeviriyor** (`C:/Program Files/Git/app`): önce `export MSYS_NO_PATHCONV=1`.
+- **İkinci bir worker SÜRECİ başlatma** (Kuyruk ve worker → aynı kural).
+  Yeni motor kodunu push'tan önce denemek için `takipKos`/`takipDevam`
+  işlevini bir tsx betiğinden DOĞRUDAN çağır: kuyruğu tüketmez, canlı
+  worker'la yarışmaz. Kuyruğa atılmayan bir koşu kaydı açıp onun üzerinde dene.
+- **Deneme koşusu açıldıysa iş bitince SİL** (kullanıcı isteği 2026-09-15:
+  "deneme koşularını sil"). `delete from trace_runs where id in (…)` düğüm
+  ve kenarları cascade ile götürür; önce raporu olmadığını doğrula. Denetim
+  kaydındaki `takip.baslat` satırları kalır, amacı `meta.amac`ta yazılı.
+- **Oturum çerezi localhost'ta PORTLAR ARASINDA paylaşılır.** Kullanıcı
+  1337'de giriş yaptıysa aynı tarayıcıda 3005 de oturumlu açılır — oturumlu
+  sayfayı gözle doğrulamanın yolu bu (ajan parola girmez). Kullanıcı uygulama
+  içi tarayıcıda (Browser pane) giriş yapmıştı.
+- **Unutulan şifre:** cry kökünden `npm.cmd run sifre:sifirla`; kullanıcı
+  adı `abidin`. Şifre gizli girdiyle sorulur — ajan girmez, kullanıcı girer.
+- **Uzun düzenleme betiklerini kabuk heredoc'una gömme.** İçinde tırnak ve
+  `${}` olan çok satırlı bir Python düzenlemesi Bash'te "unexpected EOF"
+  verdi; betik önce scratchpad'e dosya olarak yazılıp öyle çalıştırılır.
+  Satır sonları KARIŞIK (CRLF ve LF): düzenleme betiği okurken normalleştirir,
+  yazarken dosyanın kendi satır sonunu korur — yoksa eşleşme sessizce ıskalar.
+- **Oturumlu sayfanın yerine geçen ölçüm:** giriş yoksa bileşenin saf
+  katmanı (`lib/akis.ts`) gerçek koşu verisiyle SVG'ye çizdirilip bakılır;
+  CSS değişikliği aynı sınıflarla kurulmuş statik bir kopyada ÖLÇÜLÜR
+  (`scrollWidth - clientWidth`). "Göremedim" demek yerine ne ölçüldüğü söylenir.
+
 ## Windows self-hosted runner — üç tuzak
 
 1. **`shell: bash` WSL'in bash'ine çözülüyor** (`C:\WINDOWS\system32\bash.EXE`)

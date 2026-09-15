@@ -240,3 +240,46 @@ sınırı mı kaynağın hatası mı olduğu yalnızca worker log'unda.
 
 **Nerede:** `IndeksSonucu.atlanmaSebebi` zaten taşınıyor ama kayda
 yazılmıyor; `addresses` tablosuna bir sebep alanı + adres sayfasında satır.
+
+---
+
+## 13. Ucu olmayan kenarlar: düğüm sınırında kenar yazılıyor, hedef yazılmıyor
+
+**Ne bozuk:** worker bir düğümün çıkışlarını ÖNCE kenar olarak yazıyor, sonra
+hedefleri sıraya alırken düğüm sınırına takılıp duruyor. Hedef düğüm hiç
+yazılmıyor; kenar ucu boşta kalıyor.
+
+**Nasıl görülür:** koşu 9: 1.342 kenarın 10'u grafta olmayan bir adrese
+gidiyor. Başlık "1.342 hareket", defter "1.332 hareket" diyor ve fark hiçbir
+yerde açıklanmıyor.
+
+**Ölçüm (2026-09-15):**
+```bash
+docker exec cry-db psql -U cry -d cry -c "select count(*) from trace_edges e left join trace_nodes n on n.trace_run_id=e.trace_run_id and n.address=e.to_address where e.trace_run_id=9 and n.address is null"
+```
+
+**Nerede:** `apps/worker/src/takip.ts` → `yuru` (kenar yazımı ile `maxDugum`
+kesmesinin sırası). Ya hedef "düğüm sınırı" sebebiyle yazılır ya da ekran
+farkı sayıp söyler.
+
+---
+
+## 14. Büyük koşuda defter üzerinde gezinmek bütün sayfayı yeniden çiziyor
+
+**Ne bozuk:** defter satırına gelmek `defterVurgu` durumunu değiştiriyor ve
+`TakipGorunumu` tamamen yeniden çiziliyor (98 satır + SVG). Koşu 9'da
+ölçülmedi, ama 300 düğümlük bir koşuda hover gecikmesi beklenir.
+
+**Nerede:** `apps/web/src/app/takip/[id]/TakipGorunumu.tsx` — vurgu durumu
+`Akis`'e kadar inip defter satırlarını ayrı bir bileşene almak ya da CSS
+sınıfıyla DOM düzeyinde yakmak. Önce ölçülmeli (React Profiler).
+
+---
+
+## 15. Tek bir büyük adres taranırken "durdur" beklemek zorunda
+
+**Ne bozuk:** iptal bayrağı ADRESLER ARASINDA yoklanıyor; bir adresin
+indekslenmesi (en çok 10 sayfa) sürerken iptal o tarama bitene kadar bekler.
+
+**Nerede:** `apps/worker/src/indeksle.ts` sayfa döngüsüne iptal kontrolü
+(koşu kimliği parametre olarak) — ya da kabul: en kötü durum birkaç dakika.

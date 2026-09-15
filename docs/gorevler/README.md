@@ -12,10 +12,20 @@ Her dosya **tek oturumda bitecek** büyüklükte, kendi bitiş ölçütünü ta�
 | 05 | Yoklama katmanının uç noktası + `probe_cache` | ✅ bitti (2026-09-09) |
 | 06 | Takip motoru: FIFO, durma sezgiselleri, terminal düğüm | ✅ bitti (2026-09-09) |
 | E | Etiket tohumlaması (OFAC + aday borsa adresleri) | ✅ bitti (2026-09-09) — 324 etiket; arşivle kesişim 0, bkz. bekleyen §1 |
-| 07 | Takip görünümü: akış (sankey) + tek ekran | ◐ kod bitti (2026-09-14, seçenek A), oturumlu sayfada gözle doğrulama bekliyor |
+| 07 | Takip görünümü: akış (sankey) + tek ekran | ✅ bitti (2026-09-15) — canlıda koşu 9 ile gözle doğrulandı; devam, gizleme, yakıldı, şerit yolu, kaydır/yakınlaştır, ilerleme/durdur |
 | 08 | Deposit sezgiseli + aktivasyon kümelemesi | ⏳ |
 | 09 | Fiyat/kur (TCMB) + rapor + PDF + SHA-256 | ⏳ |
 | 10 | İzleme: takip listesi arayüzü + self-hosted runner kurulumu | ⏳ |
+
+**Son durum (2026-09-15):**
+- **Push bekleyen:** `cf4c030` (kaydır/yakınlaştır) ve `df3d3b9` (kuyruk
+  süre sınırı) — canlıda (1337) henüz yok. Push yalnızca kullanıcı "PUSH"
+  deyince. Kontrol: `git log --oneline origin/main..HEAD`.
+- **Canlı veride kalan koşular:** 5, 6, 7, 9. Koşu 9 dört devamla büyütüldü
+  (86 adres); 8, 10, 11 deneme koşularıydı ve silindi.
+- **Sıradaki görev 08** (deposit sezgiseli + aktivasyon kümelemesi); karar
+  bekleyenler `bekleyen-kararlar.md` §1b ve §2–§9'da, eksikler
+  `cozulmesi-gerekenler.md` §1–§15'te.
 
 **Sıra karara bağlanmıştı ve karar verildi (2026-09-09): önce etiket,
 sonra graf.** Etiket tohumlaması yapıldı — ama ölçüm sırayı doğrulamakla
