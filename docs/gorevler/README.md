@@ -16,17 +16,18 @@ Her dosya **tek oturumda bitecek** büyüklükte, kendi bitiş ölçütünü ta�
 | 08 | Deposit sezgiseli + aktivasyon kümelemesi | ⏳ |
 | 09 | Fiyat/kur (TCMB) + rapor + PDF + SHA-256 | ⏳ |
 | 10 | İzleme: takip listesi arayüzü + self-hosted runner kurulumu | ⏳ |
+| 11 | [Yerel blok indeksi (TRON)](../yol-haritasi-blok-indeks.md) — B0 ölçüm → B7 EVM | ⏳ B0 bekliyor, kapsam kararı: bekleyen §8 |
 
 **Son durum (2026-09-15):**
-- **Push bekleyen:** `git log --oneline origin/main..HEAD` — kaydır/yakınlaştır,
-  kuyruk süre sınırı, devir dokümanları, Redis'in yerele yayınlanması, tutar
-  aralığı + geri şerit ayrışması + hash bağlantıları. Push yalnızca kullanıcı
-  "PUSH" deyince. `docker-compose.yml` değişikliği push'la canlı dağıtıma
-  girer; Redis konteyneri 2026-09-15'te elle yeniden oluşturuldu, yani
-  yayınlanmış port canlıda ŞİMDİDEN var.
+- **Push:** 2026-09-15'te yapıldı (`df6e270`, dağıtım başarılı). Sonrasında
+  açılış otomasyonu ve blok indeksi yol haritası commit'lendi, push
+  bekliyor: `git log --oneline origin/main..HEAD`.
+- **Açılış otomasyonu kurulu:** `cry-baslangic` zamanlanmış görevi +
+  Docker Desktop AutoStart (bkz. CLAUDE.md → Yerel çalışma ortamı).
 - **Canlı veride kalan koşular:** 5, 6, 7, 9. Koşu 9 dört devamla büyütüldü
   (86 adres); 8, 10, 11 deneme koşularıydı ve silindi.
-- **Sıradaki görev 08** (deposit sezgiseli + aktivasyon kümelemesi); karar
+- **Kullanıcının seçtiği yön: görev 11 (yerel blok indeksi).** Önce B0 ölçümleri, kapsam kararı bekleyen §8.
+- Görev 08 (deposit sezgiseli + aktivasyon kümelemesi); karar
   bekleyenler `bekleyen-kararlar.md` §1b ve §2–§7'da, eksikler
   `cozulmesi-gerekenler.md` §1–§15'te.
 

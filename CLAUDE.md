@@ -36,6 +36,22 @@ güncel olduğu sorulamaz hâle gelir.
 
 Her madde bu oturumlarda bir kez YAŞANDI ve zaman kaybettirdi.
 
+- **Açılış OTOMATİKTİR** (kullanıcı isteği 2026-09-15). `cry-baslangic`
+  zamanlanmış görevi oturum açılışından 30 sn sonra `deploy/pc/baslangic.ps1`'i
+  çalıştırır: Docker Desktop'ı açar ve motoru bekler, durmuş cry
+  konteynerlerini `docker start` eder (`compose up` YAPMAZ — yığını runner'ın
+  checkout'u tanımlar), runner ve WireGuard servislerini DENETLER (başlatmak
+  yönetici ister), 1337 sağlığına bakar, 3005 dev sunucusunu başlatır. Günlük:
+  `C:\srv\cry\baslangic.log`. Tekrar çalıştırmak zararsız; elle:
+  `powershell -NoProfile -ExecutionPolicy Bypass -File deploy\pc\baslangic.ps1`.
+  Kurulum/kaldırma: `deploy\pc\kur.ps1 [-Kaldir] [-GelistirmeYok]`. Kurulum
+  Docker Desktop'ın kendi `AutoStart` ayarını da açar — ölçüldü, `False`'tu;
+  "Windows başlangıcında Run anahtarı var" onun açılacağını GÖSTERMİYORDU.
+  Betik gövdeleri SAF ASCII (PS 5.1 BOM'suz dosyayı ANSI okur). Docker'ın
+  JSON ayarı metin olarak tek değer değiştirilerek, BOM'suz yazılır
+  (`ConvertTo-Json`+`Set-Content -Encoding UTF8` BOM ekler ve biçimi bozar).
+  Denendi: elle durdurulan `cry-worker` betikle geri kalktı; görev elle
+  tetiklenince sonuç 0.
 - **Önce Docker Desktop açık mı bak.** Kapalıyken bütün yığın (db, redis,
   worker, web:1337) düşer ve belirti "sayfa hiç açılmıyor"dur — kod değil.
   Kontrol: `docker ps`; açmak: `Start-Process "C:\Program Files\Docker\Docker\Docker Desktop.exe"`.
@@ -94,6 +110,22 @@ Her madde bu oturumlarda bir kez YAŞANDI ve zaman kaybettirdi.
   katmanı (`lib/akis.ts`) gerçek koşu verisiyle SVG'ye çizdirilip bakılır;
   CSS değişikliği aynı sınıflarla kurulmuş statik bir kopyada ÖLÇÜLÜR
   (`scrollWidth - clientWidth`). "Göremedim" demek yerine ne ölçüldüğü söylenir.
+
+## Blok indeksi — yol haritası
+
+Yerel blok indeksinin planı ve ölçümleri
+[docs/yol-haritasi-blok-indeks.md](docs/yol-haritasi-blok-indeks.md);
+kapsam kararı [bekleyen-kararlar §8](docs/bekleyen-kararlar.md). İki kural
+şimdiden sabit:
+
+- **İki katman: blok indeksi ADAY üretir, adres taraması HÜKÜM.** Blok
+  indeksi eşikli olabilir (TRX transferlerinin %76'sı 1 TRX'in altında —
+  ölçüldü); ama eşikli bir indeks "bu adrese başka para girmedi" dedirtirse
+  yanlıştır. İz, takip ve rapor YALNIZCA eşiksiz adres taramasından beslenir.
+- **Önce ölçüm kapısı.** Her aşama (B0–B7) bir ölçümle açılır; kapının cevabı
+  gelmeden sonraki aşamanın kodu yazılmaz. Proje devri §4'ün "arşiv düğümü
+  imkânsız" kararı hâlâ geçerli (2,5–3,5 TB ⟷ 460 GB boş); blok indeksi düğüm
+  değil, seçilmiş transferlerin kendi tablomuzdur.
 
 ## Windows self-hosted runner — üç tuzak
 

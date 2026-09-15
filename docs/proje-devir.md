@@ -115,8 +115,9 @@ yoksa modem NAT eşlemesini düşürür.
 - Docker Desktop + WSL2
 - **Postgres veri dizini WSL2'nin ext4 dosya sisteminde olmalı, `/mnt/c`
   altında değil** — Windows dosya sistemine bağlanan volume'lar 5-10 kat yavaş
-- Docker Desktop oturum açılışında başlar, servislerde
-  `restart: unless-stopped`
+- Docker Desktop oturum açılışında başlar — **2026-09-15'e kadar BAŞLAMIYORDU**
+  (kendi `AutoStart` ayarı kapalıydı); artık `deploy/pc/kur.ps1` açıyor ve
+  `cry-baslangic` görevi denetliyor. Servislerde `restart: unless-stopped`
 - WireGuard tüneli servis olarak kurulu, açılışta bağlanıyor
 - Güvenlik duvarı kuralı `cry-app-wg`: TCP 1337, kaynak `10.99.0.0/24`
 - Uyku modu kapalı
@@ -178,6 +179,11 @@ taranan bayt patlar.
 
 **c) Lokal makine — motor.**
 Node çalıştırmak için değil; uzun süren derin taramaları koşturmak için.
+
+**d) Yerel blok indeksi — keşif katmanı (2026-09-15, planlanıyor).**
+Arşiv düğümü değil: seçilmiş transferlerin (USDT-TRC20, TRX) kendi tablomuz;
+canlı uç TronGrid'den, geçmiş toplu kaynaktan. Aday üretir, hüküm üretmez.
+Plan ve ölçümler: [yol-haritasi-blok-indeks.md](yol-haritasi-blok-indeks.md).
 
 ---
 

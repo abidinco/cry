@@ -172,3 +172,44 @@ turunda değiştirilir.
 **Geri alınabilir:** evet, ayar.
 
 **Karar yeri:** Görev 10 + `apps/watcher`.
+
+---
+
+## 8. Yerel blok indeksi: kapsam, kaynak, depolama
+
+**Soru:** Blok indeksi (yol haritası:
+[yol-haritasi-blok-indeks.md](yol-haritasi-blok-indeks.md)) hangi
+varlıkları, hangi tutar eşiğinin üstünü, hangi geçmiş penceresini, hangi
+depolama motorunda ve hangi disk bütçesiyle tutsun?
+
+**Ölçüm (2026-09-15):** TRON bugün günde ~2,7 Mn USDT + ~4,2 Mn TRX transferi
+üretiyor. TRX transferlerinin %76'sı 1 TRX'in altında; USDT'nin %68'i 1.000
+USDT'nin altında. Geçmişi TronGrid'den blok blok çekmek kotayla yıllar sürer;
+canlı ucu izlemek kotanın ~%58'i. Makinede 460 GB boş SSD var (C: 262, D: 198).
+
+**Yeniden üretim:**
+```bash
+node --env-file=.env --env-file=apps/web/.env.local --import tsx scripts/olcum/tron-blok-hacmi.mts
+node --env-file=.env --env-file=apps/web/.env.local --import tsx scripts/olcum/tron-tutar-dagilimi.mts
+```
+
+**Seçenekler (her eksen ayrı):**
+1. *Varlıklar:* USDT-TRC20 + TRX (hacmin tamamına yakını) · yalnızca USDT.
+2. *Eşik:* eşiksiz (en çok disk) · USDT ≥ 100 / TRX ≥ 100 (USDT'nin %70'i,
+   TRX'in %3'ü kalır) · USDT ≥ 1.000 (USDT'nin %32'si). **Eşik yalnızca
+   keşif katmanı içindir;** iz ve rapor her zaman eşiksiz adres taramasından
+   gelir (iki katman — yol haritası §2).
+3. *Geçmiş:* yalnızca bugünden ileri (canlı uç) · son N ay · tam geçmiş
+   (toplu kaynak ister: BigQuery ya da düğüm anlık görüntüsü — B0'da yoklanır).
+4. *Depolama:* ClickHouse (sütunlu, sıkıştırmalı; ayrı bir servis) ·
+   Postgres bölümlü tablo (tek veritabanı). B0'daki deneme karar verdirir.
+5. *Disk bütçesi:* D: NVMe'nin ne kadarı (198 GB boş).
+
+Hepsi geri alınabilir: bölüm silinir, eşik yükseltilir; eşik DÜŞÜRÜLÜRSE
+geçmişin yeniden çekilmesi gerekir (tek yönlü maliyet).
+
+**Karar verilmezse:** B0 ölçümleri yapılabilir ama B1'in şeması (eşik ve
+bölümleme) yazılamaz; ters sorgu ve taranmamış adreslerin keşfi kapalı kalır.
+
+**Karar yeri:** `docs/yol-haritasi-blok-indeks.md` §1 + CLAUDE.md → yeni
+"Blok indeksi" bölümü.
