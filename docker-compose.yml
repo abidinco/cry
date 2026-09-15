@@ -34,7 +34,12 @@ services:
     container_name: cry-redis
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
-    # Port YAYINLANMIYOR — yalnızca Docker ağı içinden erişilir.
+    # Yalnızca BU MAKİNEYE yayınlanır (Postgres'teki 127.0.0.1:15432 gibi):
+    # yerel dev sunucusu (3005) kuyruğa ulaşabilsin diye (kullanıcı kararı
+    # 2026-09-15). Önce hiç yayınlanmıyordu ve 3005'ten gönderilen bir devam
+    # isteği koşuyu "kuyrukta"da takılı bırakmıştı. Dışarıya AÇIK DEĞİL.
+    ports:
+      - "127.0.0.1:16379:6379"
     volumes:
       - redisdata:/data
     healthcheck:

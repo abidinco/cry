@@ -127,7 +127,7 @@ yoksa modem NAT eşlemesini düşürür.
 |---|---|
 | Next.js | `1337:3000` — **`127.0.0.1:` öneki koyma**, tünelden erişilemez |
 | Postgres | `127.0.0.1:15432:5432` — dışarı açık değil, DBeaver için |
-| Redis | Docker ağı içinde, port yayınlanmıyor — **sonucu: yerel dev sunucusu kuyruğa ulaşamaz** (bekleyen-kararlar §8) |
+| Redis | `127.0.0.1:16379:6379` — yalnızca bu makineye, yerel dev sunucusu kuyruğa ulaşsın diye (2026-09-15). Yerel dev CANLI kuyruğa iş atar. |
 
 ### Yedekleme
 
