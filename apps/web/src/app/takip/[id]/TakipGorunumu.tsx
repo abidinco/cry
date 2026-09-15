@@ -13,6 +13,8 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { yuklemeIzle } from "@/lib/yukleme";
 import { DEVAM_EK_HOP, devamEdilebilir } from "@cry/motor";
 import TakipIskeleti from "./TakipIskeleti";
+import TutarAraligi from "./TutarAraligi";
+import { islemGezgini, kisaHash } from "@/lib/gezgin";
 import { ilerlemeMetni, type Ilerleme } from "@/lib/kosu-durum";
 import { Adres, Bos, Tarih, Tutar } from "@/components/ui";
 import { kisaTutar, sayi, tarih, tutarParcala } from "@/lib/bicim";
@@ -23,7 +25,9 @@ import {
   anaVarlik,
   defterSatirlari,
   gizleneniAyikla,
+  seritAraligi,
   seritYolu,
+  tutarAraligiylaAyikla,
   varliklar,
   type AkisDugumu,
   type AkisKenari,
@@ -89,6 +93,8 @@ export default function TakipGorunumu({ id }: { id: string }) {
   // Gizlenen şeritler ve adresler — yalnızca GÖRÜNÜM; bu tarayıcıda koşu başına saklanır.
   const [gizliSerit, setGizliSerit] = useState<Set<string>>(new Set());
   const [gizliDugum, setGizliDugum] = useState<Set<string>>(new Set());
+  // Şerit toplamına göre tutar aralığı — seçili varlığın biriminde.
+  const [aralik, setAralik] = useState<{ alt: number; ust: number } | null>(null);
   const [devamIstek, setDevamIstek] = useState<{ adres: string; hata?: string } | null>(null);
 
   const gizliAnahtar = `takip-gizli-${id}`;
@@ -141,9 +147,12 @@ export default function TakipGorunumu({ id }: { id: string }) {
   }, [kosu?.status, yukle]);
 
   const secilenVarlik = varlik ?? (kosu ? anaVarlik(kosu.kenarlar) : null);
+  // Varlık değişince aralık o varlığın kendi sınırlarına döner: 10.000 USDT
+  // ile 10.000 TRX aynı büyüklük değil.
+  useEffect(() => setAralik(null), [secilenVarlik]);
 
-  const { model, gorunurModel, kirpilan } = useMemo(() => {
-    if (!kosu || !secilenVarlik) return { model: null, gorunurModel: null, kirpilan: 0 };
+  const { model, gorunurModel, kirpilan, aralikDisi } = useMemo(() => {
+    if (!kosu || !secilenVarlik) return { model: null, gorunurModel: null, kirpilan: 0, aralikDisi: 0 };
     // Rapora giren görselin okunabilir kalması için en çok 100 düğüm; seçim
     // deterministik ve BULGUYU kaybetmez (önce kök ve iz biten düğümler).
     const { secilen, kirpilan } = cizilecekler(
@@ -158,12 +167,14 @@ export default function TakipGorunumu({ id }: { id: string }) {
       seritler: gizliSerit,
       dugumler: gizliDugum,
     });
+    const a = tutarAraligiylaAyikla(g.dugumler, g.kenarlar, kosu.rootAddress, secilenVarlik, aralik);
     return {
       model: akisModeli(dugumler, kosu.kenarlar, kosu.rootAddress, secilenVarlik),
-      gorunurModel: akisModeli(g.dugumler, g.kenarlar, kosu.rootAddress, secilenVarlik),
+      gorunurModel: akisModeli(a.dugumler, a.kenarlar, kosu.rootAddress, secilenVarlik),
       kirpilan,
+      aralikDisi: a.disarida,
     };
-  }, [kosu, secilenVarlik, gizliSerit, gizliDugum]);
+  }, [kosu, secilenVarlik, gizliSerit, gizliDugum, aralik]);
 
   const [durduruluyor, setDurduruluyor] = useState(false);
   const durdur = useCallback(async () => {
@@ -273,7 +284,10 @@ export default function TakipGorunumu({ id }: { id: string }) {
 
   // Defter: seçim yokken ya da adres seçiliyken şerit başına TEK satır;
   // şerit seçiliyse o şeridin hareketleri tek tek (lib/akis → defterSatirlari).
-  const defter = defterSatirlari(model, secim);
+  const aralikDisindakiler = new Set(
+    aralik ? model.seritler.filter((x) => x.deger < aralik.alt || x.deger > aralik.ust).map((x) => x.anahtar) : [],
+  );
+  const defter = defterSatirlari(model, secim).filter((x) => secim?.serit || !aralikDisindakiler.has(x.anahtar));
   const hareketModu = Boolean(secim?.serit);
   const toplamHareket = defter.reduce((t, x) => t + x.adet, 0);
   const secimAdi = secim?.dugum
@@ -339,6 +353,15 @@ export default function TakipGorunumu({ id }: { id: string }) {
               <span className="etiket">kalınlık = {model.varlik}</span>
             )}
           </div>
+          {seritAraligi(model) && (
+            <TutarAraligi
+              sinir={seritAraligi(model)!}
+              deger={aralik}
+              varlik={model.varlik}
+              disarida={aralikDisi}
+              onDegis={setAralik}
+            />
+          )}
           {gizliToplam > 0 && (
             <div className="gizli-serit" role="status">
               <span className="etiket">
@@ -553,7 +576,7 @@ export default function TakipGorunumu({ id }: { id: string }) {
               </colgroup>
               <thead>
                 <tr>
-                  <th>{hareketModu ? "zaman (TSİ)" : "kimden → kime"}</th>
+                  <th>{hareketModu ? "zaman (TSİ) · işlem" : "kimden → kime"}</th>
                   <th className="sag">{model.varlik}</th>
                   {hareketModu ? (
                     <th className="sag" title="çıkışın ize atfedilen payı">pay</th>
@@ -607,11 +630,36 @@ export default function TakipGorunumu({ id }: { id: string }) {
                       >
                         <td>
                           <i className="takip-tur" style={{ background: SERIT_RENK[satir.tur] }} aria-label={SERIT_ADI[satir.tur]} />
-                          <span className="veri">
-                            {hareketModu
-                              ? tarih(satir.ilk)
-                              : `${dugumAdi(dugumHarita.get(satir.from)!)} → ${dugumAdi(dugumHarita.get(satir.to)!)}`}
-                          </span>
+                          {hareketModu ? (
+                            <span className="takip-hareket">
+                              <span className="veri">{tarih(satir.ilk)}</span>
+                              {satir.txHash &&
+                                (() => {
+                                  const url = islemGezgini(kosu.chain, satir.txHash);
+                                  return url ? (
+                                    <a
+                                      className="veri takip-hash"
+                                      href={url}
+                                      target="_blank"
+                                      // Gezgin hangi soruşturma sayfasından gelindiğini görmesin.
+                                      rel="noopener noreferrer"
+                                      title={`${satir.txHash} — blok gezgininde aç`}
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      {kisaHash(satir.txHash)} ↗
+                                    </a>
+                                  ) : (
+                                    <span className="veri m3" title={satir.txHash}>
+                                      {kisaHash(satir.txHash)}
+                                    </span>
+                                  );
+                                })()}
+                            </span>
+                          ) : (
+                            <span className="veri">
+                              {`${dugumAdi(dugumHarita.get(satir.from)!)} → ${dugumAdi(dugumHarita.get(satir.to)!)}`}
+                            </span>
+                          )}
                         </td>
                         <td className="sag takip-tutar" title={tam}>
                           <Tutar ham={satir.ham.toString()} ondalik={model.decimals} />

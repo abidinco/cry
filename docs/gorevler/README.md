@@ -18,13 +18,16 @@ Her dosya **tek oturumda bitecek** büyüklükte, kendi bitiş ölçütünü ta�
 | 10 | İzleme: takip listesi arayüzü + self-hosted runner kurulumu | ⏳ |
 
 **Son durum (2026-09-15):**
-- **Push bekleyen:** `cf4c030` (kaydır/yakınlaştır) ve `df3d3b9` (kuyruk
-  süre sınırı) — canlıda (1337) henüz yok. Push yalnızca kullanıcı "PUSH"
-  deyince. Kontrol: `git log --oneline origin/main..HEAD`.
+- **Push bekleyen:** `git log --oneline origin/main..HEAD` — kaydır/yakınlaştır,
+  kuyruk süre sınırı, devir dokümanları, Redis'in yerele yayınlanması, tutar
+  aralığı + geri şerit ayrışması + hash bağlantıları. Push yalnızca kullanıcı
+  "PUSH" deyince. `docker-compose.yml` değişikliği push'la canlı dağıtıma
+  girer; Redis konteyneri 2026-09-15'te elle yeniden oluşturuldu, yani
+  yayınlanmış port canlıda ŞİMDİDEN var.
 - **Canlı veride kalan koşular:** 5, 6, 7, 9. Koşu 9 dört devamla büyütüldü
   (86 adres); 8, 10, 11 deneme koşularıydı ve silindi.
 - **Sıradaki görev 08** (deposit sezgiseli + aktivasyon kümelemesi); karar
-  bekleyenler `bekleyen-kararlar.md` §1b ve §2–§9'da, eksikler
+  bekleyenler `bekleyen-kararlar.md` §1b ve §2–§7'da, eksikler
   `cozulmesi-gerekenler.md` §1–§15'te.
 
 **Sıra karara bağlanmıştı ve karar verildi (2026-09-09): önce etiket,

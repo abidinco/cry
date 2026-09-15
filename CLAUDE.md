@@ -58,10 +58,14 @@ Her madde bu oturumlarda bir kez YAŞANDI ve zaman kaybettirdi.
   `127.0.0.1:15432`'ye çeviriyor. Üst düzey `await` için dosya `.mts` olmalı.
   **`TRONSCAN_API_KEY` depo kökündeki `.env`'de** (gitignore'da), `C:\srv\cry\.env`'de
   YOK (ölçüldü) — değer asla ekrana basılmaz.
-- **Yerel dev sunucusu Redis'e ULAŞAMAZ** (konteyner portu yayınlanmıyor,
-  bkz. proje-devir → Port kuralları). Sonuç: 3005'ten **yeni koşu, devam ve
-  durdur çalışmaz** — 5 sn'de 503 döner. Kuyruk isteyen her şey canlı yığında
-  (1337) denenir. Karar bekliyor: bekleyen-kararlar §8.
+- **Redis yalnızca bu makineye yayınlı: `127.0.0.1:16379`** (kullanıcı kararı
+  2026-09-15; önce hiç yayınlanmıyordu). Yerel dev sunucusu `.env.local` →
+  `REDIS_URL=redis://127.0.0.1:16379` ile kuyruğa ulaşır. **DİKKAT: bu CANLI
+  kuyruktur** — 3005'ten başlatılan koşu, devam ya da durdurma canlı worker
+  tarafından işlenir ve canlı veriyi değiştirir (veritabanı zaten aynı). Önce
+  Redis kapalıyken 3005'ten gönderilen bir devam koşu 9'u "kuyrukta"da takılı
+  bırakmıştı; kuyruk çağrıları bu yüzden 5 sn süre sınırlı (`zamanAsimi`).
+  Yoklama: `docker port cry-redis`.
 - **Canlı yığında bir betik çalıştırmak:** worker konteynerine kopyala ve
   orada koş — Redis'e ve veritabanına oradan erişiliyor:
   `docker cp x.mts cry-worker:/app/apps/worker/x.mts && docker exec -w /app/apps/worker cry-worker npx tsx x.mts`,
@@ -354,6 +358,30 @@ işaret), renk kanalları ayrık, yazı tipleri build anında gömülü.
   borsa olan üç adres de (KuCoin 2, Okex 1, HTX 1) yazılmadı — doğrulanmış
   kimliğin yanına zayıf bir aday etiketi eklemek bilgi katmaz. Keşif CLI'si
   `--uygula` ile TÜM adayları yazar; eşikli yazma bu yüzden süzülerek yapıldı.
+- **Tutar aralığı filtresi ŞERİT TOPLAMINA bakar, SEÇİLİ VARLIĞIN biriminde**
+  (kullanıcı kararı 2026-09-15, koşu 9'un sınırda kalan küçük değerleri
+  için). Çift kaydırıcı LOGARİTMİK (şeritler 0,01–70 Mn); elle giriş Türkçe
+  defter düzenini ("10.000", "2.500,75") ve "10b", "2,5mn" kısaltmalarını
+  anlar, çözülemeyen girdi 0 değil HATA olur. Farklı para birimleri: kalınlık
+  zaten tek varlığın ölçeğinde ve diyagram yalnızca onu çiziyor; filtre de o
+  birimde konuşur, varlık değişince o varlığın kendi en küçük–en büyük
+  şeridine sıfırlanır. Varlıklar arası ortak birim (USD) bir FİYAT ister —
+  fiyat tablosu dolunca eklenir (bekleyen-kararlar §5). Aralık dışı şerit
+  diyagramdan ve defterden çıkar, özet koşunun tamamını söyler. Sayaç yalnızca
+  ÇİZİLEBİLEN çiftleri sayar (ölçüldü: ucu grafta olmayan kenarlar sayılınca
+  koşu 9'da 49 yerine 57 çıkıyordu). Uygulaması `tutarAraligiylaAyikla`.
+- **Geri dönüş şeritleri İÇ İÇE yerleşir ve kenarlıdır** (kullanıcı
+  bildirimi: "pembe şeritler üst üste biniyor"). Alt şeritler zaten ayrıydı ama
+  aynı sütun aralığından inen/çıkan DİKEY bacaklar aynı x'e düşüyordu. Her
+  şerit bir öncekinin dışına yazılır (dıştaki şeridin bacağı da dışta, böylece
+  kesişmezler), koyu bir kenar kesişmeyi okunur kılar, alt şeritte "↩ kimden →
+  kime · tutar" etiketi durur. Ölçüldü: koşu 9'un 10 geri şeridinin 10 bacağı
+  10 ayrı x'te.
+- **Şerit ipucu ilk ve son hareketin zamanını (TSİ) söyler; şerit seçilince
+  defter her hareketin hash'ini blok gezginine bağlar.** Gezgin adresleri tek
+  yerde (`apps/web/src/lib/gezgin.ts`, adres sayfası da oradan); tanınmayan
+  zincirde bağlantı UYDURULMAZ. Gezgin bir üçüncü taraf: `rel="noopener
+  noreferrer"` ile açılır, hangi soruşturma sayfasından gelindiğini görmez.
 - **Tıklanan şerit, köke kadar geldiği yolla öne çıkar** (kullanıcı isteği).
   "Bu para buraya hangi yoldan geldi" — şeridin kaynağına giren ileri
   şeritler, onlarınkiler, köke kadar (`seritYolu`). Geri dönen şeritler yola

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { yuklemeIzle } from "@/lib/yukleme";
+import { islemGezgini } from "@/lib/gezgin";
 import { Adres, Bos, Kayit, Rozet, Satir, Tarih, Tutar, type Koken } from "@/components/ui";
 import { hareketsizGun, kisaAdres, sayi, tarih } from "@/lib/bicim";
 
@@ -318,9 +319,9 @@ export default function AdresGorunumu({ chain, address }: { chain: string; addre
                           tıklanarak gidilebilmeli. */}
                       <a
                         className="veri m3"
-                        href={`https://tronscan.org/#/transaction/${h.txHash}`}
+                        href={islemGezgini(chain, h.txHash) ?? undefined}
                         target="_blank"
-                        rel="noreferrer"
+                        rel="noopener noreferrer"
                         title={h.txHash}
                       >
                         {kisaAdres(h.txHash, 5, 4)}

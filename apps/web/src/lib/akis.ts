@@ -250,7 +250,7 @@ export type Kutu = { x: number; y: number; g: number; h: number; orta: number };
 
 export type Yerlesim = {
   kutular: Map<string, Kutu>;
-  yollar: Map<string, { d: string; kalinlik: number }>;
+  yollar: Map<string, { d: string; kalinlik: number; etiket?: { x: number; y: number } }>;
   kolonX: number[];
   /** Geri dönen şeritlerin dolaştığı alt şeridin üst kenarı. */
   geriSeritY: number | null;
@@ -367,9 +367,17 @@ export function yerlesim(model: AkisModeli, ayar: YerlesimAyari): Yerlesim {
     diz(s.giren, (x) => x.from, girisY);
   }
 
-  const yollar = new Map<string, { d: string; kalinlik: number }>();
+  const yollar = new Map<string, { d: string; kalinlik: number; etiket?: { x: number; y: number } }>();
   let serit = altSinir + 22;
   const r = 22;
+  // Geri şeritlerin DİKEY BACAKLARI da ayrı şeritlere oturur (kullanıcı
+  // bildirimi 2026-09-15: "pembe dönüş şeritleri üst üste biniyor"). Aynı
+  // sütun aralığından inen ya da çıkan her şerit bir öncekinin DIŞINA yazılır:
+  // alt şeritte daha aşağıdaki (dıştaki) şeridin bacağı da daha dışta kalır,
+  // böylece iç içe geçerler ve kesişmezler. Pay sütun aralığının yarısıyla sınırlı.
+  const inisPayi = new Map<number, number>();
+  const cikisPayi = new Map<number, number>();
+  const enCokPay = Math.max(0, adim / 2 - ayar.dugumGenisligi - r);
   for (const s of [...model.seritler].sort((a, b) => Number(a.geri) - Number(b.geri) || b.deger - a.deger || a.anahtar.localeCompare(b.anahtar))) {
     const a = kutular.get(s.from)!;
     const b = kutular.get(s.to)!;
@@ -380,6 +388,9 @@ export function yerlesim(model: AkisModeli, ayar: YerlesimAyari): Yerlesim {
     const y1 = girisY.get(s.anahtar)!;
     const yuvarla = (n: number) => Math.round(n * 10) / 10;
     let d: string;
+    let solX_ = 0;
+    let sagX_ = 0;
+    let lyEtiket = 0;
     if (!s.geri) {
       const orta = (x0 + x1) / 2;
       d = `M${yuvarla(x0)},${yuvarla(y0)} C${yuvarla(orta)},${yuvarla(y0)} ${yuvarla(orta)},${yuvarla(y1)} ${yuvarla(x1)},${yuvarla(y1)}`;
@@ -388,8 +399,15 @@ export function yerlesim(model: AkisModeli, ayar: YerlesimAyari): Yerlesim {
       // ve ileri akışın şeritleriyle karışmaz.
       const ly = serit + w / 2;
       serit += w + 6;
-      const sagX = x0 + r;
-      const solX = x1 - r;
+      const inis = inisPayi.get(Math.round(x0)) ?? 0;
+      const cikis = cikisPayi.get(Math.round(x1)) ?? 0;
+      inisPayi.set(Math.round(x0), inis + w + 4);
+      cikisPayi.set(Math.round(x1), cikis + w + 4);
+      const sagX = x0 + r + Math.min(inis + w / 2, enCokPay);
+      const solX = x1 - r - Math.min(cikis + w / 2, enCokPay);
+      solX_ = solX;
+      sagX_ = sagX;
+      lyEtiket = ly;
       d =
         `M${yuvarla(x0)},${yuvarla(y0)} L${yuvarla(sagX - r / 2)},${yuvarla(y0)} ` +
         `Q${yuvarla(sagX)},${yuvarla(y0)} ${yuvarla(sagX)},${yuvarla(y0 + r / 2)} L${yuvarla(sagX)},${yuvarla(ly - r / 2)} ` +
@@ -397,7 +415,12 @@ export function yerlesim(model: AkisModeli, ayar: YerlesimAyari): Yerlesim {
         `Q${yuvarla(solX)},${yuvarla(ly)} ${yuvarla(solX)},${yuvarla(ly - r / 2)} L${yuvarla(solX)},${yuvarla(y1 + r / 2)} ` +
         `Q${yuvarla(solX)},${yuvarla(y1)} ${yuvarla(solX + r / 2)},${yuvarla(y1)} L${yuvarla(x1)},${yuvarla(y1)}`;
     }
-    yollar.set(s.anahtar, { d, kalinlik: w });
+    yollar.set(
+      s.anahtar,
+      s.geri
+        ? { d, kalinlik: w, etiket: { x: (solX_ + sagX_) / 2, y: lyEtiket } }
+        : { d, kalinlik: w },
+    );
   }
 
   return { kutular, yollar, kolonX, geriSeritY: geriler.length ? altSinir + 10 : null };
@@ -568,4 +591,114 @@ export function yakinlastir(g: Gorunum, px: number, py: number, carpan: number):
   const k = Math.min(OLCEK_SINIRI.en_cok, Math.max(OLCEK_SINIRI.en_az, g.k * carpan));
   const oran = k / g.k;
   return { k, x: px - (px - g.x) * oran, y: py - (py - g.y) * oran };
+}
+
+/* ------------------------------------------------------------------ */
+/* Tutar aralığı filtresi                                              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Şerit TOPLAMINA göre aralık filtresi (kullanıcı isteği 2026-09-15: sınırda
+ * kalan küçük değerler diyagramı kalabalıklaştırıyor).
+ *
+ * Birim: SEÇİLİ VARLIĞIN kendi birimi. Kalınlık zaten tek varlığın ölçeğinde
+ * ("1 TRX + 1 USDT" diye bir büyüklük yok) ve diyagram yalnızca o varlığı
+ * çiziyor; filtre de aynı birimde konuşur. Farklı varlıkları tek aralıkta
+ * karşılaştırmak bir FİYAT ister ve fiyat tablosu henüz boş
+ * (bekleyen-kararlar §5). O güne kadar varlık değişince aralık o varlığın
+ * kendi en küçük–en büyük şeridine sıfırlanır.
+ *
+ * Aralık dışında kalan şeritlerin kenarları çıkar; bu varlıkta şeridi kalmayan
+ * adres de çıkar (kök hariç). Başka varlıktaki kenarlara dokunulmaz.
+ */
+export function tutarAraligiylaAyikla(
+  dugumler: AkisDugumu[],
+  kenarlar: AkisKenari[],
+  kokAdres: string,
+  varlik: string,
+  aralik: { alt: number; ust: number } | null,
+): { dugumler: AkisDugumu[]; kenarlar: AkisKenari[]; disarida: number } {
+  if (!aralik) return { dugumler, kenarlar, disarida: 0 };
+  const toplam = new Map<string, bigint>();
+  let decimals = 0;
+  // Yalnızca ÇİZİLEBİLEN çiftler sayılır: iki ucu da düğüm listesinde olan.
+  // Ucu grafta olmayan kenarlar (cozulmesi-gerekenler §13) zaten şerit değil;
+  // sayılsalardı "aralık dışında" sayacı şişerdi (ölçüldü: koşu 9'da 49 yerine 57).
+  const var_ = new Set(dugumler.map((d) => d.address));
+  for (const k of kenarlar) {
+    if (k.symbol !== varlik || !var_.has(k.from) || !var_.has(k.to)) continue;
+    decimals = k.decimals;
+    const a = `${k.from}>${k.to}`;
+    toplam.set(a, (toplam.get(a) ?? 0n) + BigInt(k.amountRaw));
+  }
+  const disari = new Set<string>();
+  for (const [a, ham] of toplam) {
+    // Tutarı SIFIR olan çift de şerit olarak çizilmiyor (akisModeli).
+    if (ham === 0n) continue;
+    const deger = Number(ham) / 10 ** decimals;
+    if (deger < aralik.alt || deger > aralik.ust) disari.add(a);
+  }
+  const kalan = kenarlar.filter((k) => k.symbol !== varlik || !disari.has(`${k.from}>${k.to}`));
+  const seridiVardi = new Set<string>();
+  const seridiKaldi = new Set<string>();
+  for (const k of kenarlar) if (k.symbol === varlik) seridiVardi.add(k.from).add(k.to);
+  for (const k of kalan) if (k.symbol === varlik) seridiKaldi.add(k.from).add(k.to);
+  return {
+    dugumler: dugumler.filter(
+      (d) => d.address === kokAdres || !seridiVardi.has(d.address) || seridiKaldi.has(d.address),
+    ),
+    kenarlar: kalan,
+    disarida: disari.size,
+  };
+}
+
+/** Seçili varlıktaki şerit toplamlarının en küçüğü ve en büyüğü. */
+export function seritAraligi(model: AkisModeli): { en_az: number; en_cok: number } | null {
+  const degerler = model.seritler.map((s) => s.deger).filter((d) => d > 0);
+  if (degerler.length === 0) return null;
+  return { en_az: Math.min(...degerler), en_cok: Math.max(...degerler) };
+}
+
+/**
+ * Kaydırıcı LOGARİTMİKTİR: koşu 9'da şeritler 0,01 ile 70.000.000 arasında —
+ * doğrusal bir kaydırıcıda 10.000'in altındaki her şey ilk pikselde kalırdı.
+ * `t` 0..1.
+ */
+export function logDeger(t: number, en_az: number, en_cok: number): number {
+  const a = Math.log10(Math.max(en_az, 1e-9));
+  const b = Math.log10(Math.max(en_cok, en_az, 1e-9));
+  return 10 ** (a + (b - a) * Math.min(1, Math.max(0, t)));
+}
+
+export function logKonum(deger: number, en_az: number, en_cok: number): number {
+  const a = Math.log10(Math.max(en_az, 1e-9));
+  const b = Math.log10(Math.max(en_cok, en_az, 1e-9));
+  if (b === a) return 0;
+  return Math.min(1, Math.max(0, (Math.log10(Math.max(deger, 1e-9)) - a) / (b - a)));
+}
+
+/**
+ * Elle girilen tutarı çözer. Türkçe defter düzeni esas: "10.000", "2.500,75".
+ * Virgül varsa nokta binlik, virgül ondalıktır. Yalnızca nokta varsa ve her
+ * noktadan sonra tam 3 rakam geliyorsa binliktir ("10.000"); değilse
+ * ondalıktır ("0.05"). "10b", "2,5mn" gibi kısaltmalar grafikteki etiket
+ * biçimidir ve kabul edilir. Çözülemeyen girdi `null` — sessizce 0 olmaz.
+ */
+export function tutarGirdisiniCoz(metin: string): number | null {
+  let s = metin.trim().toLocaleLowerCase("tr").replace(/\s+/g, "");
+  if (!s) return null;
+  let carpan = 1;
+  const kisaltma = s.match(/(mr|mn|b|k|m)$/);
+  if (kisaltma) {
+    const birimler: Record<string, number> = { mr: 1e9, mn: 1e6, m: 1e6, b: 1e3, k: 1e3 };
+    carpan = birimler[kisaltma[1]!]!;
+    s = s.slice(0, -kisaltma[1]!.length);
+  }
+  if (s.includes(",")) {
+    s = s.replace(/\./g, "").replace(",", ".");
+  } else if (/^\d{1,3}(\.\d{3})+$/.test(s)) {
+    s = s.replace(/\./g, "");
+  }
+  if (!/^\d+(\.\d+)?$/.test(s)) return null;
+  return Number(s) * carpan;
 }

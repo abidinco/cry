@@ -262,3 +262,17 @@ describe("yakınlaştırma", () => {
     expect(yakinlastir(GORUNUM_SIFIR, 0, 0, 0.001).k).toBe(OLCEK_SINIRI.en_az);
   });
 });
+
+describe("geri şeritler ayrışır", () => {
+  it("aynı sütun aralığından dönen iki şeridin dikey bacakları farklı x'tedir", async () => {
+    const { yerlesim: yer, akisModeli: model, VARSAYILAN_YERLESIM: V } = await import("@/lib/akis");
+    const D2 = [...DUGUMLER];
+    const E2 = [...KENARLAR, k("A", "YAN", 5, 2)]; // A→YAN zaten var; A→KOK ile birlikte A'dan iki geri şerit
+    const y = yer(model(D2, E2, KOK, "USDT"), { ...V, genislik: 900, yukseklik: 600 });
+    const bacakX = (d: string) => Number(d.split(" ")[2]!.split(",")[0]!.slice(1)); // Q noktasının x'i
+    const geriler = [...y.yollar.entries()].filter(([, v]) => v.etiket);
+    expect(geriler.length).toBeGreaterThanOrEqual(2);
+    const xler = geriler.map(([, v]) => bacakX(v.d));
+    expect(new Set(xler).size).toBe(xler.length);
+  });
+});

@@ -488,3 +488,34 @@ input:focus, select:focus { border-color: var(--vurgu); }
 .akis-yakinlik button:disabled { opacity: 0.4; cursor: default; }
 .akis-yakinlik .veri { padding: 0 6px; font-size: 11px; min-width: 42px; text-align: right; }
 
+/* --- tutar aralığı --- */
+.tutar-araligi { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; }
+.tutar-kutu {
+  width: 104px; font-family: var(--yazi-veri), monospace; font-size: 12px; text-align: right;
+  background: var(--yuzey-2); color: var(--m1); border: 1px solid var(--cizgi); border-radius: var(--kose); padding: 2px 6px;
+}
+.tutar-kutu:focus-visible { outline: 1px solid var(--vurgu-2); outline-offset: 0; }
+.cift-kaydirici { position: relative; flex: 1; min-width: 160px; max-width: 360px; height: 18px; }
+.cift-kaydirici::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 8px; height: 2px; background: var(--cizgi); border-radius: 1px;
+}
+.cift-kaydirici-dolu { position: absolute; top: 8px; height: 2px; background: var(--vurgu); border-radius: 1px; }
+.cift-kaydirici input[type="range"] {
+  position: absolute; inset: 0; width: 100%; margin: 0; background: none; pointer-events: none;
+  -webkit-appearance: none; appearance: none; height: 18px;
+}
+.cift-kaydirici input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; pointer-events: auto; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--m1); border: 2px solid var(--vurgu); cursor: pointer;
+}
+.cift-kaydirici input[type="range"]::-moz-range-thumb {
+  pointer-events: auto; width: 10px; height: 10px; border-radius: 50%;
+  background: var(--m1); border: 2px solid var(--vurgu); cursor: pointer;
+}
+.cift-kaydirici input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px color-mix(in srgb, var(--vurgu-2) 45%, transparent); }
+
+/* --- geri şerit etiketi ve defterdeki işlem bağlantısı --- */
+.akis-geri-etiket { font-family: var(--yazi-veri), monospace; font-size: 10px; fill: var(--akis-geri-yazi); pointer-events: none; }
+.takip-hareket { display: inline-flex; flex-direction: column; line-height: 1.25; vertical-align: middle; min-width: 0; }
+.takip-hash { font-size: 10.5px; color: var(--vurgu-2); border: 0; }
+.takip-hash:hover { text-decoration: underline; }

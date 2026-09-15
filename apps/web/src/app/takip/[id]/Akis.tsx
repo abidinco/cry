@@ -24,7 +24,7 @@ import {
   type Serit,
   type SeritTuru,
 } from "@/lib/akis";
-import { kisaAdres, kisaTutar, tutarParcala } from "@/lib/bicim";
+import { kisaAdres, kisaTutar, tarih, tutarParcala } from "@/lib/bicim";
 
 export const SERIT_RENK: Record<SeritTuru, string> = {
   borsa: "var(--akis-borsa)",
@@ -291,6 +291,25 @@ export default function Akis({
                     <dd className="veri">{tutarMetni(s.ham)}</dd>
                     <dt>hareket</dt>
                     <dd className="veri">{s.kenarlar.length}</dd>
+                    {(() => {
+                      // Ekranda TSİ (docs/arayuz.md → Sayı ve tarih).
+                      const zamanlar = s.kenarlar.map((k) => k.ts).sort();
+                      const ilk = zamanlar[0]!;
+                      const son = zamanlar[zamanlar.length - 1]!;
+                      return ilk === son ? (
+                        <>
+                          <dt>zaman</dt>
+                          <dd className="veri">{tarih(ilk)}</dd>
+                        </>
+                      ) : (
+                        <>
+                          <dt>ilk</dt>
+                          <dd className="veri">{tarih(ilk)}</dd>
+                          <dt>son</dt>
+                          <dd className="veri">{tarih(son)}</dd>
+                        </>
+                      );
+                    })()}
                     <dt>tür</dt>
                     <dd>{SERIT_ADI[s.tur]}</dd>
                   </dl>
@@ -298,6 +317,19 @@ export default function Akis({
               );
               return (
                 <g key={s.anahtar}>
+                  {s.geri && (
+                    // Koyu kenar: iki pembe şerit kesişince hangisinin üstte
+                    // olduğu okunur (kullanıcı bildirimi: "üst üste biniyor").
+                    <path
+                      d={y.d}
+                      fill="none"
+                      style={{
+                        stroke: "var(--zemin)",
+                        strokeWidth: y.kalinlik + 3,
+                        strokeOpacity: acik ? 0.9 : 0.07,
+                      }}
+                    />
+                  )}
                   <path
                     d={y.d}
                     fill="none"
@@ -309,6 +341,11 @@ export default function Akis({
                       transition: "stroke-opacity 120ms",
                     }}
                   />
+                  {s.geri && y.etiket && acik && (
+                    <text x={y.etiket.x} y={y.etiket.y - y.kalinlik / 2 - 3} className="akis-geri-etiket" textAnchor="middle">
+                      ↩ {dugumAdi(dugumler.get(s.from)!)} → {dugumAdi(dugumler.get(s.to)!)} · {kisaTutar(s.ham, model.decimals)}
+                    </text>
+                  )}
                   <path
                     d={y.d}
                     fill="none"

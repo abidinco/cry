@@ -90,6 +90,18 @@ adresleri alır, kırpılan kısım ekranda sayılır.
 Düğüme gelmek bağlı şeritleri yakar; tıklamak defteri o adrese süzer.
 Şeride tıklamak o şeridi ve **köke kadar geldiği yolu** öne çıkarır.
 
+**Tutar aralığı:** lejantın altında "tutar (USDT) [en az] ═●══●═ [en çok]".
+Kaydırıcı logaritmik, kutulara elle yazılabilir ("10.000", "2,5mn"). Şerit
+toplamı aralık dışındaysa şerit diyagramdan ve defterden çıkar; kaç şeridin
+dışarıda kaldığı yanında yazar. Birim seçili varlığınkidir.
+
+**Geri dönüş şeritleri** iç içe dolaşır, koyu kenarlıdır ve alt şeritte
+"↩ kimden → kime · tutar" etiketini taşır.
+
+**Şerit ipucu** toplamı, hareket sayısını ve ilk–son zamanı (TSİ) gösterir.
+Şerit seçilince defter hareketlere açılır: her satırda zaman ve işlem
+hash'i; hash'e tıklamak işlemi blok gezgininde yeni sekmede açar.
+
 **Kaydır ve yakınlaştır** (kullanıcı isteği 2026-09-15): tekerlek imlecin
 altındaki noktayı sabit tutarak yakınlaştırır, çift tık yakınlaştırır,
 sürüklemek kaydırır; sağ üstte + / − / sığdır ve yüzde. Dokunmatik yüzeyde
