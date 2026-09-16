@@ -461,3 +461,27 @@ model Alert {
   @@index([watchId, createdAt])
   @@map("alerts")
 }
+
+/// Blok indeksinin okuma kursörü. VERİ ClickHouse'ta durur (ölçüm: yol haritası §1);
+/// burada yalnızca "nereye kadar okundu" durumu var — tek satırlık, sık güncellenen bir
+/// kayıt ClickHouse'un işi değildir.
+model BlockCursor {
+  chain String @id
+
+  /// Yazılmış en yüksek KESİNLEŞMİŞ blok. Yeniden düzenlenebilir uç yazılmaz:
+  /// yazıp sonra silmek, "yazılmış ama yanlış" bir indeks demektir.
+  lastFinalBlock Int? @map("last_final_block")
+
+  /// Yarım kalan/atlanan aralıklar: [{ bas, son }]. Bir tur ölürse iş burada DURUR;
+  /// "yok" ile "bakılamadı" ayrımının blok tarafı.
+  missingRanges Json @default("[]") @map("missing_ranges")
+
+  /// Geçmiş doldurma nereye kadar geriye indi (B3).
+  backfilledToBlock Int? @map("backfilled_to_block")
+
+  lastError   String?   @map("last_error")
+  lastRunAt   DateTime? @map("last_run_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@map("block_cursors")
+}
