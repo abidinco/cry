@@ -69,6 +69,15 @@ describe("bloktanSatirlar", () => {
     expect(() => bloktanSatirlar({ block_header: { raw_data: { number: 1 } } } as never, [])).toThrow(/blok başlığı/);
   });
 
+  it("işlem bilgisi eksik ya da yabancıysa SESSİZ KALMAZ — boş bilgi '0 USDT' diye yazılmaz", () => {
+    const { blok, bilgi } = fixture.bloklar[0]!;
+    expect(() => bloktanSatirlar(blok as never, [])).toThrow(/işlem bilgisi/);
+    expect(() => bloktanSatirlar(blok as never, bilgi.slice(1) as never)).toThrow(/işlem bilgisi/);
+    const yabanci = [...bilgi.slice(1), { ...(bilgi[0] as object), id: "ff".repeat(32) }];
+    expect(() => bloktanSatirlar(blok as never, yabanci as never)).toThrow(/işlem bilgisi/);
+    expect(() => bloktanSatirlar({ block_header: { raw_data: { number: 1, timestamp: 1 } } } as never, [])).not.toThrow();
+  });
+
   it("sabitler kaynağın yazdığı biçimde: USDT sözleşmesi 41 öneksiz, konu 32 bayt", () => {
     expect(USDT_TRC20_HEX).toHaveLength(40);
     expect(TRANSFER_KONUSU).toHaveLength(64);

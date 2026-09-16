@@ -81,6 +81,14 @@ export function bloktanSatirlar(blok: HamBlok, bilgi: HamBilgi[]): AyristirmaSon
   if (typeof no !== "number" || typeof zamanMs !== "number") throw new Error("blok başlığı okunamadı (number/timestamp yok)");
   const zaman = Math.floor(zamanMs / 1000);
 
+  // İşlem bilgisi HER işlem için bir kayıt taşır (ölçüldü, B3 kapısı: 2018–2026'ya yayılmış 180 blokta
+  // 180/180). Bir kaynak bilgiyi tutmuyorsa HTTP 200 ile BOŞ dizi döndürüyor — publicnode 92 günden
+  // eski, tronstack 2018'de bir blok — ve o blok hatasız "0 USDT" diye yazılırdı. Eşleşme şarttır.
+  const txIdler = new Set((blok.transactions ?? []).map((t) => t.txID));
+  if (bilgi.length !== txIdler.size || bilgi.some((b) => !b.id || !txIdler.has(b.id))) {
+    throw new Error(`blok ${no}: işlem bilgisi bloğun işlemleriyle eşleşmiyor (işlem ${txIdler.size}, bilgi ${bilgi.length}) — kaynak bu bloğun bilgisini tutmuyor olabilir`);
+  }
+
   const satirlar: IndeksSatiri[] = [];
   const sayac = { islem: 0, basarisizIslem: 0, transferOlmayanOlay: 0, kapsamDisiToken: 0 };
 

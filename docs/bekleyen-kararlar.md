@@ -174,3 +174,47 @@ turunda değiştirilir.
 **Karar yeri:** Görev 10 + `apps/watcher`.
 
 ---
+
+## 8. Blok indeksi geçmişi: hangi kaynaktan, ne kadar geriye
+
+**Soru:** Kapsam kararı "tam geçmiş, önce canlı uç, geriye doğru, dolan disk
+durdurur" dedi. B3 kapısı bunun **ücretsiz kaynaklarla aylar** sürdüğünü ve
+diske **2023 başına kadar** sığdığını ölçtü. Geçmiş hangi kaynaktan dolsun?
+
+**Ölçüm** (2026-09-17, [yol haritası → B3](yol-haritasi-blok-indeks.md)):
+- Tam geçmiş ~10,8 Mr satır, 52–63 B/satır → 525–630 GiB. Bütçe ~465 GB, yani
+  kabaca 2026 → 2023 başı (~8,3 Mr satır, ~39 Mn blok) sığar.
+- TronGrid + anahtar: tam geçmiş, hatasız en çok **6,14 blok/sn**. Kota adres
+  taramasıyla paylaşılır; günlük tavan ÖLÇÜLMEDİ ("~100 bin/gün" doğruysa
+  günde 50 bin blok).
+- tronstack (anahtarsız): tam geçmiş, **2,42 blok/sn**. 10 blokta 1 kez BOŞ
+  bilgi döndü; artık ayrıştırıcı bunu yakalıyor.
+- publicnode (anahtarsız): **yalnızca son ~92 gün**, ama 24,6 blok/sn ve
+  TronGrid kotasına dokunmuyor.
+- BigQuery: bakılamadı (GCP projesi ve kimlik gerekir).
+
+**Seçenekler:**
+1. **Ücretsiz kaynaklar, geriye doğru, disk durdurana kadar** (önerim). Son 92
+   gün publicnode'dan ~1,5 günde; daha eskisi tronstack + TronGrid ile. TronGrid
+   yalnızca vaka taraması yokken ve payını aşmadan kullanılır. 2023 başına
+   tahminen ~50 gün, TronGrid kotası dar çıkarsa birkaç ay. Maliyet ve hesap yok.
+   Doğrulama kapsam tablosu + `dogrula.ts` örneklemesiyle yapılır, çünkü
+   kaynağın `count(*)`'ı yok.
+2. **BigQuery.** Sen bir GCP projesi açıp `gcloud auth login` yaparsın (ben
+   kimlik girmem). Önce veri setinin boyutu ve sorgu/indirme maliyeti ölçülür
+   (ayrı bir kapı). Tutarsa geçmiş günlerle ölçülür ve `count(*)` ile birebir
+   doğrulanır. Maliyet bilinmiyor.
+3. **Derinliği şimdiden daralt:** yalnızca son 92 gün (publicnode) ve canlı uç
+   (B4). Daha eskisi vaka pencereleriyle ihtiyaç oldukça okunur. En hızlısı, ama
+   ters sorgu 92 günle sınırlı kalır.
+
+**Karar verilmezse:** B3 kodu yazılmaz. B4 (canlı uç) kaynaktan bağımsız
+olduğu için beklemeden ilerleyebilir.
+
+**Geri alınabilir:** evet. Kaynak okuyucunun arkasında değişir ve kapsam
+tablosu hangi bloğun okunduğunu kaynaktan bağımsız tutar; 1 ile başlayıp 2'ye
+geçmek yazılanı bozmaz.
+
+**Karar yeri:** CLAUDE.md → Blok indeksi + yol haritası B3.
+
+---

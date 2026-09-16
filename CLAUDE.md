@@ -148,6 +148,11 @@ Okuyucunun (B2, 2026-09-16) ölçülerek konan iki kuralı:
 - **Blok indeksini SAYAN sorgu `FINAL` kullanır.** ReplacingMergeTree mükerreri birleşmede
   siler, yazmada değil: 100 blok yeniden yazılınca ham `count()` 323.170, `FINAL` 292.641.
   `FINAL`sız bir sayım aynı transferi iki kez gösterir.
+- **Bir bloğun işlem bilgisi, işlemleriyle BİREBİR eşleşmeli; eşleşmeyen blok HATADIR** (B3 kapısı,
+  2026-09-17). Anahtarsız düğümler bilgisini tutmadıkları blokta HTTP 200 + boş dizi döndürüyor
+  (publicnode 92 günden eskide hepsinde, tronstack 2018'de bir blokta) ve o blok hatasız "0 USDT"
+  yazılırdı. TronGrid'de 180/180 blok eşleşti; kural `bloktanSatirlar`'da, testli. **Kaynağın şekli
+  doğru diye içeriği tam değildir** — bir kaynak eklenirken onu TronGrid'le satır satır karşılaştır.
 
 Sabit kalan iki kural:
 

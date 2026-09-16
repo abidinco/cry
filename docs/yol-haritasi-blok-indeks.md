@@ -373,6 +373,43 @@ bitecek büyüklükte bölünür (görev disiplini, `docs/gorevler/README.md`).
   yeniden kuyruğa girer.
 - **Bitiş:** pencere boşluksuz; satır sayısı kaynağın kendi sayımıyla
   (BigQuery'de `count(*)`) birebir.
+- **Ölçüm kapısı ✅ (2026-09-17) — cevap bir TERCİH istiyor:**
+  [bekleyen-kararlar §8](bekleyen-kararlar.md). Kaynak ve derinlik seçilmeden B3 kodu yazılmaz.
+  - **Geçmiş boyunca yoğunluk** (60 eşit aralıklı nokta × 3 ardışık blok, 2018–2026; nokta başına
+    3 blok olduğu için KABA): satır/blok 2018 4,9 · 2019 3,2 · 2020 34,8 · 2021 54,6 · 2022 141,0 ·
+    2023 265,8 · 2024 217,8 · 2025 211,3 · 2026 140,1. **Toplam ~10,8 Mr satır** (B0: 9,7 Mr).
+    Satırın ~%77'si 2023 ve sonrasında; geriye doğru birikim 2026 → 1,0 · 2025 → 3,3 ·
+    2024 → 5,6 · 2023 → 8,3 · 2022 → 9,8 Mr.
+  - **Eski bloklar ayrıştırıcıdan geçiyor:** 180/180, ayrıştırma hatası 0 (2018'in USDT'siz blokları dahil).
+  - **Gerçek bayt/satır 63,0** (bugünkü 292.641 satır, `OPTIMIZE FINAL` sonrası tek parça): tx 32 ·
+    kimden 16,2 · kime 8,2 · tutar 2,9 · blok+zaman 3,3. B0'ın 19 Mn satırlık örneği 34,5–52,1 vermişti;
+    küçük ve tek saatlik bir aralık adres tekrarını az görüyor. **Tam geçmiş 52–63 B/satırla
+    525–630 GiB** — ~465 GB bütçeyi aşar. Bütçeye kabaca **2023 başına** kadar sığar.
+  - **Kaynaklar** (aynı 10 blokta TronGrid'le satır satır karşılaştırma + kapısız/kapılı hız):
+
+    | Kaynak | Geçmiş | TronGrid'le aynı | Hız (hatasız) |
+    |---|---|---|---|
+    | TronGrid + anahtar | tam | referans | 120 ms kapı 4,16 · **80 ms 6,14** blok/sn; 60 ms'de çöküyor (192 × 429, 0,37 blok/sn) |
+    | TronGrid anahtarsız | tam | 10/10 | kapısız 4 eşzamanda 0/40 (429) |
+    | tronstack.io | tam | 9/10 — **1 blokta HTTP 200 ile BOŞ bilgi** (719.222, 2018) | 200 ms 2,42 blok/sn; 120 ms'de 503 |
+    | tatum (anahtarsız) | tam | 6/10, 4'ü 429 | kapısız 0,74 blok/sn |
+    | publicnode | **yalnızca son ~92 gün** (en eski ≈ 83.654.397) — daha eskide blok `{}`, bilgi `[]` | eskide 0/10 | kapısız 8 eşzamanda **24,6 blok/sn, 0 × 429** |
+
+  - **Sessiz boş cevap ölçüldü ve kapatıldı.** İki anahtarsız kaynak, bilgisini tutmadığı blokta
+    HTTP 200 + boş dizi döndürüyor; ayrıştırıcı bunu "0 USDT'li blok" diye yazardı. TronGrid'de işlem
+    bilgisi 180/180 blokta işlemlerle birebir eşleştiği için `bloktanSatirlar` artık eşleşmeyi ŞART
+    koşuyor, eşleşmeyen blok hata atar ve boşluk listesine düşer (`tests/blok-indeks.test.ts`). B2 aralığının
+    200 bloğu kuralla yeniden okundu: 200/200, satırlar önceki gibi 58.791.
+  - **Süre:** TronGrid'in 80 ms'lik hızıyla tam geçmiş 86,3 Mn blok / 6,14 ≈ **163 gün kesintisiz**,
+    tronstack eklenirse (8,5 blok/sn) ≈ 117 gün. Bütçeye sığan kısım (2023 başına, ~39 Mn blok):
+    son 92 gün publicnode'dan ~1,5 günde, kalanı ~50 günde. **TronGrid'in günlük kotası ÖLÇÜLMEDİ**
+    (proje devri "~100 bin/gün" diyor ve bu doğruysa TronGrid günde 50 bin blok verir, süre katlanır).
+    Yanıt başlıklarında kota/kalan bilgisi YOK. Kota ancak uzun bir koşuda kalıcı 429 olarak görünür.
+  - **BigQuery hâlâ BAKILAMADI:** makinede `gcloud`/`bq` yok, bir GCP projesi ve kimlik ister.
+
+  ```bash
+  node --env-file=.env --env-file=apps/web/.env.local --import tsx scripts/olcum/b3-kapi.mts --nokta=60 --ardisik=3
+  ```
 
 ### B4 — Canlı uç
 
