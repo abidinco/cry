@@ -109,9 +109,9 @@ services:
       # önce `tmp_insert_…` diye yazıp sonra rename ediyor ve 9p dosya sistemi bunu reddediyor:
       # "filesystem error: in rename: Permission denied". İlk INSERT'te HTTP 500. Hız da düşük
       # (bağlama 334 MB/s yazma ⟷ WSL diski 2,5 GB/s).
-      # Verinin D:'de olması Docker'ın VERİ DİSKİYLE sağlanır, bu volume'la değil: disk dosyası
-      # D:\Docker\wsl\disk'te, Docker'ın beklediği C: yolu ona NTFS junction. Arayüzdeki
-      # "Disk image location" ayarı WSL2'de işe YARAMIYOR (CLAUDE.md → "Docker'ın diski D:'de").
+      # Verinin D:'de olması Docker'ın VERİ DİSKİYLE sağlanır, bu volume'la değil: Docker Desktop
+      # ayarı CustomWslDistroDir = D:\Docker\wsl (DataFolder değil — o Hyper-V'nin anahtarı).
+      # Ayrıntı: CLAUDE.md → "Docker'ın diski D:'de".
       - chdata:/var/lib/clickhouse
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8123/ping"]

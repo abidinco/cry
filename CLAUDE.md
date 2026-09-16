@@ -160,21 +160,32 @@ Sabit kalan iki kural:
   kararı hâlâ geçerli (2,9–3,6 TB ⟷ 465 GB); blok indeksi düğüm değil,
   seçilmiş transferlerin kendi tablomuzdur.
 
-### Docker'ın diski D:'de — ve arayüz bunu YAPAMADI (2026-09-16)
+### Docker'ın diski D:'de — doğru AYAR ANAHTARIYLA (2026-09-16)
 
-- **Docker Desktop 4.79 (WSL2) "Disk image location" ayarını YOK SAYIYOR.**
-  Arayüzden de, `settings-store.json`a `DataFolder` yazarak da denendi: ayar
-  D:'yi gösteriyor, disk C:'de kalıyor. Dahası, dosyalar elle taşınıp WSL
-  kaydındaki `BasePath` D:'ye çevrildiğinde Docker açılışta kaydı C:'ye GERİ
-  yazdı ve C:'de BOŞ yeni bir veri diski açtı — yığın "yok olmuş" görünüyordu,
-  oysa veri D:'de sağlamdı.
-- **Çalışan yol: disk dosyası D:'de, Docker'ın beklediği C: yolu ona NTFS
-  JUNCTION.** `%LOCALAPPDATA%\Docker\wsl\disk` → `D:\Docker\wsl\disk`
-  (`mklink /J`, yönetici gerekmez). Docker yolu C: sanıyor, baytlar D:'ye
-  gidiyor. Ölçüldü: bağlantı sonrası `docker_data.vhdx` D:'de büyüyor
-  (9,3 → 12,0 GB), C:'de ~117 GB geri kazanıldı, 5 konteyner ve bütün
-  volume'lar yerinde. `wsl\main\ext4.vhdx` (96 MB, Docker'ın kendi sistemi)
-  C:'de kalır.
+- **WSL2'de disk yerinin anahtarı `CustomWslDistroDir`'dır, `DataFolder`
+  DEĞİL.** `DataFolder` Hyper-V motorunun anahtarı (`vm-data`); WSL2'de hiçbir
+  şey yapmaz. İlk denemede `settings-store.json`a `DataFolder` yazıldı ve
+  "Docker ayarı yok sayıyor" sanıldı — yanlış teşhisti. Backend API'si
+  (`\\.\pipe\dockerBackendApiServer`, `GET /app/settings`) iki alanı ayrı
+  gösteriyor: `vm.resources.dataFolder` ve `vm.resources.wslDataFolder`;
+  arayüzün "Disk image location"ı ikincisidir. Kontrol bu uçtan yapılır,
+  `settings-store.json`a bakarak değil.
+- **Bugünkü durum:** `"CustomWslDistroDir": "D:\\Docker\\wsl"` (Docker
+  kapalıyken, metin olarak, BOM'suz yazıldı). Ölçüldü: API
+  `wslDataFolder = D:\Docker\wsl` diyor, `D:\Docker\wsl\disk\docker_data.vhdx`
+  WSL tarafından KİLİTLİ (kullanımda), C:'de `wsl\disk` klasörü YOK ve Docker
+  yeni disk açmadı; 5 konteyner sağlıklı, veri tam (Postgres 5/86.674/31.988,
+  ClickHouse 292.641 satır / 1.000 blok). `docker-desktop` sistem dağıtımının
+  kaydı (`wsl\main`, 96 MB) C:'de kalıyor.
+- **Önceki geçici çözüm NTFS junction'dı** (`%LOCALAPPDATA%\Docker\wsl\disk`
+  → `D:\Docker\wsl\disk`) ve çalışıyordu; artık gereksiz, `disk-junction-yedek`
+  adıyla duruyor (geri dönüş: adını `disk` yapıp anahtarı silmek). Yedekler
+  `D:\Docker\yedek-202609162330\` (ayar dosyası + Lxss kaydı).
+- **Dosyalar elle taşınıp WSL kaydındaki `BasePath` değiştirilirse** Docker
+  açılışta kaydı C:'ye GERİ yazıyor ve C:'de BOŞ yeni bir veri diski açıyor —
+  yığın "yok olmuş" görünür, veri yerindedir. Başarısız `wsl --manage --move`
+  da adsız, `BasePath`'i D:'yi gösteren artık bir Lxss kaydı bırakmıştı;
+  silindi.
 - **Taşımadan ÖNCE disk KÜÇÜLTÜLÜR.** VHDX kendiliğinden küçülmüyor: içindeki
   veri 6 GB iken dosya 125 GB yer kaplıyordu. Sıra: `wsl -d docker-desktop -e
   fstrim -av` → `docker desktop stop` + `wsl --shutdown` → diskpart `compact
