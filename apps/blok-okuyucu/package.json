@@ -1,0 +1,20 @@
+{
+  "name": "@cry/blok-okuyucu",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "oku": "tsx src/oku.ts",
+    "dogrula": "tsx src/dogrula.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cry/blok-indeks": "*",
+    "@cry/chain": "*",
+    "@cry/db": "*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

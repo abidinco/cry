@@ -304,7 +304,7 @@ bitecek büyüklükte bölünür (görev disiplini, `docs/gorevler/README.md`).
   Kursör aralığı yeniden yazdığında zaman değişmediği için bu pratikte
   olmuyor; B2'nin doğrulama kapısı bunu ayrıca ölçecek.
 
-### B2 — Blok okuyucu betiği (tek aralık)
+### B2 — Blok okuyucu betiği (tek aralık) ✅ (2026-09-16)
 
 - `packages/blok-indeks` (saf: blok JSON → satırlar) + `apps/blok-okuyucu`
   (ağ, yazma, kursör). Komut: `--aralik=86000000-86001000 [--uygula]`,
@@ -320,6 +320,49 @@ bitecek büyüklükte bölünür (görev disiplini, `docs/gorevler/README.md`).
 - **Doğrulama kapısı:** aralıktaki 20 rastgele adresin transfer sayısı,
   aynı aralık için adres taramasının (Katman 2) verdiği sayıyla karşılaştırılır.
   Eşik altı fark BEKLENEN, eşik üstü fark HATA.
+- **Yapıldı.** Eşiksiz karar verildiği için beklenen fark SIFIR oldu ve sıfır ölçüldü.
+  - **Ölçüm kapısı** (`scripts/olcum/b2-kapi.mts`): `/walletsolidity/getnowblock`
+    çalışıyor, uçtan 20 blok geride. 120 ms ortak kapıyla 60 blok 14,4 sn,
+    **4,16 blok/sn, 0 yeniden deneme** — zincirin üretim hızının 12,5 katı.
+  - **Kod:** `apps/blok-okuyucu/src/oku.ts` (okuyucu), `kaynak.ts` (TronGrid; `@cry/chain`'in
+    `RateGate` + `getJson`'u, yanıt ŞEKLİ doğrulanır), `dogrula.ts` (kapı);
+    `packages/blok-indeks/src/aralik.ts` (saf aralık/boşluk hesabı, `tests/blok-aralik.test.ts`).
+    Kesinleşmiş ucun üstüne taşan aralık reddedilir.
+  - **Kapsam tablosu `blok_okundu` — plandan sapma.** Kursörün tek "en yüksek blok" sayısı
+    delikli bir geçmişi anlatamıyor (geçmiş geriye ve parça parça dolacak), ve `blok_indeks`te
+    satırı olmayan blok "transfer yok" mu "okunmadı" mı ayırt edilemiyor. Okunan HER blok
+    (0 transferli dahil) sayaçlarıyla bir satır alır; satırı transferlerden SONRA yazılır.
+    Yeniden başlatma ve boşluk listesi buradan HESAPLANIR. Postgres `block_cursors` tur sonunda
+    `missing_ranges`, `last_error`, `last_run_at` alır; `last_final_block` canlı ucun (B4)
+    işaretidir ve geçmiş aralığı onu ilerletmez. Ölümle biten turda kursör yazılmaz — doğru
+    cevap zaten kapsam tablosunda.
+  - **Aralık 86.300.000–86.300.999 yazıldı** (2026-09-16 15:22–16:12 UTC):
+    292.641 satır (TRX 173.969 · USDT 118.672; `FINAL`), 527.956 işlem, **blok başına 292,6** —
+    B0'ın yayılmış örneği (233) ile ardışık saati (331) arasında. Elenen ve SAYILAN: başarısız
+    işlem 1.690 · Transfer olmayan olay 6.054 · USDT dışı token Transfer'i 1.158.
+  - **Ölüm ve devam ölçüldü:** tur 200. blokta `Stop-Process -Force` ile öldürüldü →
+    kapsam 200 blok, `blok_indeks`te 58.791 satır = kapsamın saydığı 58.791 (yarım blok yok).
+    İkinci tur "önceden okunmuş 200 · okunacak 800" dedi ve bitirdi. Üçüncü tur: **okunacak 0**,
+    1 istek (kesinleşme sorusu).
+  - **Tekillik ölçüldü (B1'in açık ucu):** 100 blok `--yeniden` ile ikinci kez yazıldı →
+    ham `count()` 323.170, `FINAL` 292.641 = kapsamın saydığı. İki farklı zamanla yazılmış
+    anahtar 0, FINAL sonrası aynı (tx, idx, varlık) 0. **Sonuç: birleşme olana kadar
+    mükerrer satır DURUR; sayan her sorgu `FINAL` kullanır** (B5'in kuralı).
+  - **Doğrulama kapısı:** 48 adres (iki tohumda 40 rastgele + 8 yoğun), sayı VE tutar
+    toplamı motorun adres taramasıyla (`TronAdapter.listTransfers`) **48/48 birebir**. Yoğunların
+    en büyüğü 420 TRX + 38 USDT hareketi (sayfalama sınandı). Ders: düz rastgele seçim 40/40
+    tek-üç hareketli adres getirdi ve sayfalamayı hiç sınamıyordu; kapı artık yoğun adres
+    (aralıkta 20–2.000 hareket) de seçiyor.
+  - **Sınanmayan:** Ctrl+C ile zarif durdurma Windows'ta ayrık süreçte sinyal gönderilemediği
+    için DENENMEDİ (kod yolu yazılı; sert ölüm yolu denendi). B4'te konteynerde `docker stop`
+    SIGTERM gönderir — orada ölçülür.
+
+  ```bash
+  node --env-file=.env --env-file=apps/web/.env.local --import tsx scripts/olcum/b2-kapi.mts --blok=60
+  node --env-file=.env --env-file=apps/web/.env.local --import tsx apps/blok-okuyucu/src/oku.ts --aralik=86300000-86300999 --uygula
+  node --env-file=.env --env-file=apps/web/.env.local --import tsx apps/blok-okuyucu/src/dogrula.ts --aralik=86300000-86300999 --tohum=1
+  node --env-file=.env --env-file=apps/web/.env.local --import tsx apps/blok-okuyucu/src/dogrula.ts --aralik=86300000-86300999 --adres=0 --yogun=8 --tohum=3
+  ```
 
 ### B3 — Geçmiş doldurma (kararlaştırılan pencere)
 

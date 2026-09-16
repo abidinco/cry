@@ -137,6 +137,18 @@ Kullanıcının verdiği dört karar:
   desen. Varsayılan `default` kullanıcısı parolasız gelir ve kapatıldı;
   kimlik `.env`de (`CLICKHOUSE_*`), depoda değil.
 
+Okuyucunun (B2, 2026-09-16) ölçülerek konan iki kuralı:
+
+- **Blok kapsamı AYRI bir tablodadır (`blok_okundu`), kursör sayısında değil.** Okunan her
+  blok — 0 transferli olan dahil — bir satır alır ve o satır transferlerden SONRA yazılır.
+  `blok_indeks`te satırı olmayan blok tek başına "transfer yok" mu "okunmadı" mı
+  söyleyemez; yeniden başlatma ve boşluklar kapsam tablosundan HESAPLANIR. Ölçüldü: tur
+  200. blokta zorla öldürüldü, kapsam 200 blok ve satırlar kapsamın saydığıyla birebir;
+  devam turu kalan 800'ü okudu.
+- **Blok indeksini SAYAN sorgu `FINAL` kullanır.** ReplacingMergeTree mükerreri birleşmede
+  siler, yazmada değil: 100 blok yeniden yazılınca ham `count()` 323.170, `FINAL` 292.641.
+  `FINAL`sız bir sayım aynı transferi iki kez gösterir.
+
 Sabit kalan iki kural:
 
 - **İki katman: blok indeksi ADAY üretir, adres taraması HÜKÜM.** Blok

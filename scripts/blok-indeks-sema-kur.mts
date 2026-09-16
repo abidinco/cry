@@ -7,16 +7,16 @@
 // Çalıştır:
 //   node --env-file=.env --env-file=apps/web/.env.local --import tsx scripts/blok-indeks-sema-kur.mts [--duman-testi-yok]
 import { readFileSync } from "node:fs";
-import { ayarOku, ekle, sorgu, bloktanSatirlar, satirDizisi, SEMA_SQL, EKLE_SQL, TABLO } from "@cry/blok-indeks";
+import { ayarOku, ekle, sorgu, bloktanSatirlar, satirDizisi, SEMALAR, EKLE_SQL, TABLO, KAPSAM_TABLO } from "@cry/blok-indeks";
 
 const a = ayarOku();
 console.log(`ClickHouse: ${a.url} · veritabanı ${a.veritabani} · kullanıcı ${a.kullanici}`);
 console.log((await sorgu(a, "SELECT version(), currentUser(), currentDatabase() FORMAT TSV")).trim());
 
-await sorgu(a, SEMA_SQL);
-console.log(`şema kuruldu: ${TABLO}`);
+for (const sql of SEMALAR) await sorgu(a, sql);
+console.log(`şema kuruldu: ${TABLO}, ${KAPSAM_TABLO}`);
 console.log((await sorgu(a, `DESCRIBE TABLE ${TABLO} FORMAT TSV`)).trim().split("\n").map((s) => "  " + s.split("\t").slice(0, 2).join(" ")).join("\n"));
-const oncekiSatir = Number((await sorgu(a, `SELECT count() FROM ${TABLO} FORMAT TSV`)).trim());
+const oncekiSatir = Number((await sorgu(a, `SELECT count() FROM ${TABLO} FINAL FORMAT TSV`)).trim());
 console.log(`tablodaki satır: ${oncekiSatir.toLocaleString("tr")}`);
 
 if (process.argv.includes("--duman-testi-yok")) process.exit(0);
@@ -41,6 +41,6 @@ const ikinci = Number((await sorgu(a, `SELECT count() FROM ${TABLO} WHERE blok I
 console.log(`ikinci yazma sonrası: ${ikinci} satır · ${ikinci === satirlar.length ? "TEKİLLİK TUTTU" : "MÜKERRER VAR"}`);
 
 await sorgu(a, `DELETE FROM ${TABLO} WHERE blok IN (${bloklar.join(",")})`);
-const kalan = Number((await sorgu(a, `SELECT count() FROM ${TABLO} FORMAT TSV`)).trim());
+const kalan = Number((await sorgu(a, `SELECT count() FROM ${TABLO} FINAL FORMAT TSV`)).trim());
 console.log(`deneme satırları silindi; tablodaki satır: ${kalan.toLocaleString("tr")}`);
 if (!tamam || ikinci !== satirlar.length || kalan !== oncekiSatir) process.exit(1);

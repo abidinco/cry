@@ -1,3 +1,4 @@
 export * from "./ayristir.js";
 export * from "./sema.js";
 export * from "./istemci.js";
+export * from "./aralik.js";

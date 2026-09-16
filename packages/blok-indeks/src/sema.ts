@@ -16,7 +16,7 @@
  *   yazmak zararsız olmalı, çünkü kursör yarım kalan aralığı yeniden kuyruğa atar.
  * - Aylık bölüm: pencere dışını silmek tek `DROP PARTITION`.
  */
-import type { IndeksSatiri, Varlik } from "./ayristir.js";
+import type { AyristirmaSonucu, IndeksSatiri, Varlik } from "./ayristir.js";
 
 export const VARLIK_KODU: Record<Varlik, number> = { TRX: 1, USDT: 2 };
 
@@ -36,6 +36,50 @@ CREATE TABLE IF NOT EXISTS ${TABLO} (
 PARTITION BY toYYYYMM(zaman)
 ORDER BY (kime, zaman, tx, idx)
 `.trim();
+
+/**
+ * KAPSAM: okunan her blok için bir satır — 0 transferli blok DAHİL.
+ *
+ * "Yok" ile "bakılamadı" ayrı cevaplardır (CLAUDE.md). `blok_indeks`te satırı olmayan bir blok,
+ * transfer taşımadığı için mi yoksa hiç okunmadığı için mi boş, oradan anlaşılamaz. Bu tablo o
+ * soruyu cevaplar; yeniden başlatma da (atlanacak bloklar) boşluk listesi de buradan hesaplanır.
+ *
+ * Sıra kuralı: bir bloğun kapsam satırı, transfer satırları YAZILDIKTAN SONRA yazılır. Arada
+ * ölürse blok "okunmadı" kalır ve yeniden yazılır — tekillik bunu zararsız kılar. Tersi sırada
+ * ölmek, okunmamış bir bloğu okunmuş gösterirdi.
+ *
+ * Sayaçlar ayrıştırıcının sayaçlarıdır: elenen hiçbir şey sessiz kalmaz.
+ */
+export const KAPSAM_TABLO = "blok_okundu";
+
+export const KAPSAM_SEMA_SQL = `
+CREATE TABLE IF NOT EXISTS ${KAPSAM_TABLO} (
+  blok                  UInt32   CODEC(Delta, ZSTD(3)),
+  zaman                 DateTime CODEC(Delta, ZSTD(3)),
+  satir                 UInt32   CODEC(ZSTD(3)),
+  islem                 UInt32   CODEC(ZSTD(3)),
+  basarisiz_islem       UInt32   CODEC(ZSTD(3)),
+  transfer_olmayan_olay UInt32   CODEC(ZSTD(3)),
+  kapsam_disi_token     UInt32   CODEC(ZSTD(3)),
+  okundu                DateTime DEFAULT now()
+) ENGINE = ReplacingMergeTree(okundu)
+ORDER BY blok
+`.trim();
+
+/** Kurulum sırası önemli değil; ikisi de IF NOT EXISTS. */
+export const SEMALAR = [SEMA_SQL, KAPSAM_SEMA_SQL] as const;
+
+export const KAPSAM_EKLE_SQL = `
+INSERT INTO ${KAPSAM_TABLO} (blok, zaman, satir, islem, basarisiz_islem, transfer_olmayan_olay, kapsam_disi_token)
+SELECT blok, toDateTime(zaman), satir, islem, basarisiz_islem, transfer_olmayan_olay, kapsam_disi_token
+FROM input('blok UInt32, zaman UInt32, satir UInt32, islem UInt32, basarisiz_islem UInt32, transfer_olmayan_olay UInt32, kapsam_disi_token UInt32')
+FORMAT JSONCompactEachRow
+`.trim();
+
+/** Ayrıştırma sonucunu kapsam satırına çevirir — sütun sırası `KAPSAM_EKLE_SQL` ile aynı. */
+export function kapsamDizisi(r: AyristirmaSonucu): [number, number, number, number, number, number, number] {
+  return [r.blok, r.zaman, r.satirlar.length, r.sayac.islem, r.sayac.basarisizIslem, r.sayac.transferOlmayanOlay, r.sayac.kapsamDisiToken];
+}
 
 /**
  * Satırı ClickHouse'un JSONCompactEachRow biçimine çevirir.
