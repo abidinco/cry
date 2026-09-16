@@ -16,7 +16,7 @@ Her dosya **tek oturumda bitecek** büyüklükte, kendi bitiş ölçütünü ta�
 | 08 | Deposit sezgiseli + aktivasyon kümelemesi | ⏳ |
 | 09 | Fiyat/kur (TCMB) + rapor + PDF + SHA-256 | ⏳ |
 | 10 | İzleme: takip listesi arayüzü + self-hosted runner kurulumu | ⏳ |
-| 11 | [Yerel blok indeksi (TRON)](../yol-haritasi-blok-indeks.md) — B0 ölçüm → B7 EVM | ⏳ B0+B1+B2 bitti (2026-09-16) — motor ClickHouse; B3 doldurucusu yazıldı ve doğrulandı (2026-09-17), geçmiş geriye doğru doluyor; sırada B4 (canlı uç) |
+| 11 | [Yerel blok indeksi (TRON)](../yol-haritasi-blok-indeks.md) — B0 ölçüm → B7 EVM | ⏳ B0+B1+B2 bitti (2026-09-16) — motor ClickHouse; B3 geçmiş geriye doğru doluyor; B4 canlı uç yazıldı ve doğrulandı (2026-09-17), 24 saat ölçütü sürüyor; sırada B5 |
 
 **Son durum (2026-09-15):**
 - **Push:** 2026-09-15'te yapıldı (`df6e270`, dağıtım başarılı). Sonrasında
@@ -26,7 +26,7 @@ Her dosya **tek oturumda bitecek** büyüklükte, kendi bitiş ölçütünü ta�
   Docker Desktop AutoStart (bkz. CLAUDE.md → Yerel çalışma ortamı).
 - **Canlı veride kalan koşular:** 5, 6, 7, 9. Koşu 9 dört devamla büyütüldü
   (86 adres); 8, 10, 11 deneme koşularıydı ve silindi.
-- **Kullanıcının seçtiği yön: görev 11 (yerel blok indeksi).** B0 ölçümleri, B1 (şema + ayrıştırıcı + kursör) ve B2 (blok okuyucu + doğrulama kapısı) bitti; kapsam kararı verildi (CLAUDE.md → Blok indeksi). B3: geçmiş doldurucu (`apps/blok-okuyucu/src/doldur.ts`) ücretsiz kaynaklardan geriye doğru dolduruyor, disk dolunca durur. Sırada B4: canlı uç.
+- **Kullanıcının seçtiği yön: görev 11 (yerel blok indeksi).** B0 ölçümleri, B1 (şema + ayrıştırıcı + kursör) ve B2 (blok okuyucu + doğrulama kapısı) bitti; kapsam kararı verildi (CLAUDE.md → Blok indeksi). B3: geçmiş doldurucu (`apps/blok-okuyucu/src/doldur.ts`) ücretsiz kaynaklardan geriye doğru dolduruyor, disk dolunca durur. B4: canlı uç okuyucusu (`cry-blok-okuyucu`) yazıldı ve konteynerde doğrulandı; 24 saat boşluksuz ölçütü sürüyor. Sırada B5: motor ve arayüz.
 - Görev 08 (deposit sezgiseli + aktivasyon kümelemesi); karar
   bekleyenler `bekleyen-kararlar.md` §1b ve §2–§7'da, eksikler
   `cozulmesi-gerekenler.md` §1–§15'te.

@@ -169,6 +169,23 @@ Geçmiş doldurma (B3) — kullanıcı kararı 2026-09-17:
 - **İki kaynak aynı bloğa farklı satır verirse blok YAZILMAZ.** Hangisinin doğru olduğu bilinemez;
   boşluk kalır ve raporlanır (her 500. blok çapraz denetlenir).
 
+Canlı uç (B4) — ölçülerek konanlar (2026-09-17):
+
+- **Canlı uç konteynerdir (`cry-blok-okuyucu`), kaynağı publicnode'dur, TronGrid yedektir.** 10 dk'lık kapıda
+  publicnode'un ucu hiç geri gitmedi ve 188 blok TronGrid'le satır satır aynıydı. tronstack uçta işe yaramıyor:
+  yeni blokların bilgisi 30 sn sonra da eksikti.
+- **Yeni kesinleşen blokta işlem bilgisi EKSİK gelebilir** (188'de 4, 3–13 sn'de tamamlandı). Bu bir boşluk
+  değildir; okuyucu bekleyip aynı bloğu yeniden okur. **Canlı uç kursörü okunmamış bloğun üstüne ATLAMAZ**
+  (`bitisikKursor`): ilerleme durur, gecikme büyür ve günlükte görünür.
+- **Her PUSH deploy'u yığını ClickHouse ve Postgres DAHİL yeniden oluşturuyor** (ölçüldü: makinedeki
+  doldurucu "fetch failed" ile durdu). Bu yüzden blok indeksine yazan her süreç bağlantı ve 5xx hatalarını
+  10 dk yeniden dener (`geciciyseTekrarla`, `Yazici`); kalıcı hata (4xx) hâlâ durdurur.
+- **Yerelde imaj derlerken depo köküyle `docker build` YAPMA.** `.dockerignore` yok ve `COPY . .` Windows
+  `node_modules`'ünü (Windows yollu sembolik bağlar) imaja taşıyor; paket bulunamıyor. Temiz kopya:
+  `git ls-files -co --exclude-standard -z | tar --null -T - -cf - | tar -xf - -C <klasör>`. Depo kökündeki
+  `.env` de konteynere UYMAZ (Postgres bağlantısı farklı, TronGrid anahtarı yok); deneme konteyneri
+  `--env-file C:\srv\cry\.env`, `--network cry_default` ve `-e CLICKHOUSE_URL=http://clickhouse:8123` ile koşar.
+
 Sabit kalan iki kural:
 
 - **İki katman: blok indeksi ADAY üretir, adres taraması HÜKÜM.** Blok

@@ -30,7 +30,7 @@ import {
 import { prisma } from "@cry/db";
 import { KUYRUK, KUYRUK_ONEKI } from "@cry/kuyruk";
 import { KAYNAKLAR, TronBlokKaynagi } from "./kaynak.js";
-import { Yazici } from "./yazici.js";
+import { Yazici, geciciyseTekrarla } from "./yazici.js";
 
 const deger = (ad: string) => process.argv.find((x) => x.startsWith(`--${ad}=`))?.split("=").slice(1).join("=");
 const sayi = (ad: string, vars: number) => {
@@ -150,9 +150,11 @@ let durmaSebebi: "taban" | "disk" | "sinyal" | "yazma" | "kaynak" = "taban";
 const diskBos = () => { const d = statfsSync(DISK); return d.bavail * d.bsize; };
 
 async function okunanlar(r: Aralik): Promise<Set<number>> {
-  if ((await sorgu(a, `EXISTS TABLE ${KAPSAM_TABLO} FORMAT TSV`)).trim() !== "1") return new Set();
-  const tsv = await sorgu(a, `SELECT blok FROM ${KAPSAM_TABLO} WHERE blok BETWEEN ${r.bas} AND ${r.son} FORMAT TSV`);
-  return new Set(tsv.split("\n").filter(Boolean).map(Number));
+  return geciciyseTekrarla("kapsam sorgusu", async () => {
+    if ((await sorgu(a, `EXISTS TABLE ${KAPSAM_TABLO} FORMAT TSV`)).trim() !== "1") return new Set<number>();
+    const tsv = await sorgu(a, `SELECT blok FROM ${KAPSAM_TABLO} WHERE blok BETWEEN ${r.bas} AND ${r.son} FORMAT TSV`);
+    return new Set(tsv.split("\n").filter(Boolean).map(Number));
+  });
 }
 
 const ilerleme = setInterval(() => {
@@ -275,12 +277,14 @@ for (const parca of geriyeParcalar(UST, TABAN, PARCA)) {
 
   if (UYGULA && !yazici.hata) {
     const eksik = eksikAraliklar(parca, await okunanlar(parca));
-    const onceki = await prisma.blockCursor.findUnique({ where: { chain: "tron" } });
-    const liste = eksikleriGuncelle(onceki ? eksikListesiOku(onceki.missingRanges) : [], parca, eksik);
-    await prisma.blockCursor.upsert({
-      where: { chain: "tron" },
-      create: { chain: "tron", missingRanges: liste, lastError: hatalar.at(-1) ?? null, lastRunAt: new Date() },
-      update: { missingRanges: liste, lastError: eksik.length ? hatalar.at(-1) ?? null : undefined, lastRunAt: new Date() },
+    await geciciyseTekrarla("kursör", async () => {
+      const onceki = await prisma.blockCursor.findUnique({ where: { chain: "tron" } });
+      const liste = eksikleriGuncelle(onceki ? eksikListesiOku(onceki.missingRanges) : [], parca, eksik);
+      await prisma.blockCursor.upsert({
+        where: { chain: "tron" },
+        create: { chain: "tron", missingRanges: liste, lastError: hatalar.at(-1) ?? null, lastRunAt: new Date() },
+        update: { missingRanges: liste, lastError: eksik.length ? hatalar.at(-1) ?? null : undefined, lastRunAt: new Date() },
+      });
     });
   }
   if (hatali > 10 && hatali / bekleyen.length > HATA_ORANI_SINIRI) {

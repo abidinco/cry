@@ -453,13 +453,60 @@ bitecek büyüklükte bölünür (görev disiplini, `docs/gorevler/README.md`).
   node --env-file=.env --env-file=apps/web/.env.local --import tsx apps/blok-okuyucu/src/doldur.ts --uygula --ilerlemeSn=60
   ```
 
-### B4 — Canlı uç
+### B4 — Canlı uç ✅ kod + doğrulama (2026-09-17) · 24 saat ölçütü sürüyor
 
 - Okuyucu sürekli çalışır: her ~3 sn kesinleşmiş yeni blokları yazar.
   Başlangıç betiğine (`deploy/pc/baslangic.ps1`) eklenir; worker gibi
   konteyner olur, `restart: unless-stopped`.
 - **Bitiş:** 24 saat boşluksuz; gecikme (uç − kursör) kayıt altında ve
   izleme servisine (görev 10) bağlanabilir.
+- **Ölçüm kapısı ✅** (`scripts/olcum/b4-kapi.mts`, 10 dk, 3 sn'de bir yoklama, 188 yeni blok):
+
+  | Kaynak | Uç geri gitti mi | Uç − TronGrid | Zincire gecikme p50/p95 | Yeni blok ilk okumada tam | TronGrid'le aynı |
+  |---|---|---|---|---|---|
+  | TronGrid | 0 | referans | 58,7 / 59,4 sn | 183/183 | referans |
+  | **publicnode** | **0** | +1,3 blok | **55,2 / 56,0 sn** | 184/188 — **4'ü eksik, 3–13 sn'de tamamlandı** | **188/188** |
+  | tronstack | 0 | +1,3 blok | 55,2 / 56,0 sn | **0/178** — 30 sn sonra da 176'sı eksik | (2/2) |
+
+  Sonuç: **birincil publicnode** (TronGrid kotasına dokunmuyor, uçta en hızlı), **yedek TronGrid**; tronstack
+  uçta kullanılmaz. Yeni blokta bilginin eksik gelmesi BEKLENEN bir durumdur: eşleşme kuralı yakalar,
+  okuyucu bekleyip aynı bloğu yeniden okur.
+- **Yapıldı:** `apps/blok-okuyucu/src/canli.ts` (okuyucu), `Dockerfile`, compose servisi `blok-okuyucu`
+  (`cry-blok-okuyucu`), `canli-denetle.ts` (bitiş ölçütü: aralıkta boşluk, satır = kapsam, kursörün uca uzaklığı).
+  - **Kursör yalnızca KESİNTİSİZ okunmuş bloklar kadar ilerler** (`bitisikKursor`, testli). Okunamayan blok
+    atlanmaz; publicnode 5 kez (3 sn arayla), sonra TronGrid, sonra artan beklemeyle baştan. Gecikme büyür
+    ve günlükte görünür, ama boşluk oluşmaz.
+  - İlk açılış: `last_final_block` boşsa kapsamın en yüksek bloğundan, yani B3'ün başladığı yerden devam eder.
+  - Nabız dosyası + compose sağlık denetimi (2 dk nabızsızsa sağlıksız). `stop_grace_period: 30s`.
+  - Deploy denetimi ve açılış betiği `cry-clickhouse` ile `cry-blok-okuyucu`yu da soruyor. B1'den beri
+    `cry-clickhouse` ikisinde de eksikti.
+- **Doğrulama (2026-09-17):**
+  - Makinede kuru deneme: 60 blok geriden 45 sn'de uca yetişti, sonra uçta 0 blok geride kaldı.
+  - **Konteyner** (`cry-blok-okuyucu-deneme`, `C:\srv\cry\.env` ile yığının ağında): kapsamın en yüksek
+    bloğundan (86.308.051) başladı, 2 dk'da 211 bloğu yetiştirdi, uçta 54 sn gecikme.
+  - **`docker stop` → 2 sn, çıkış 0, kursör kaydedildi** (86.308.267). B2'den açık kalan zarif durdurma
+    böylece ölçüldü. `docker start` → "kursör 86.308.267 (block_cursors.last_final_block)" ile devam.
+  - `canli-denetle --bas=86308052`: 256 blok, **boşluk 0**, satır 33.679 = kapsam, kursör uçtan 3 blok geride.
+  - `dogrula.ts` aynı aralıkta adres taramasıyla **20/20** uyuştu.
+- **Deploy yığını ClickHouse DAHİL yeniden oluşturuyor — ölçüldü.** B3 push'unda ClickHouse 3 sn kapandı ve
+  makinedeki doldurucu "fetch failed" ile durdu. Durması kurala uygundu ve veri tutarlıydı (satır = kapsam,
+  3.538.755). Artık yazıcı, kapsam sorgusu ve kursör yazımı bağlantı ve 5xx hatalarını 10 dk boyunca yeniden
+  deniyor. Denendi: yazma sırasında `docker restart cry-clickhouse` → "yazma 2 denemeden sonra geçti",
+  1.000 blok, boşluk 0, satır = kapsam.
+- **Yerel imaj tuzağı:** depoda `.dockerignore` yok ve `COPY . .` bu makinedeki Windows `node_modules`'ünü
+  (Windows yolu gösteren sembolik bağlar) imaja taşıyor: `Cannot find package '@cry/blok-indeks'`. Runner'ın
+  temiz checkout'unda `node_modules` olmadığı için deploy etkilenmiyor. Yerel deneme, git'in bildiği
+  dosyalardan kurulmuş temiz bir kopyadan derlenir.
+- **Kalan:** 24 saat boşluksuz ölçütü. Servis bir sonraki deploy'la `cry-blok-okuyucu` olarak gelir; deploy
+  adımı deneme konteynerini kaldırır. Kursör Postgres'te olduğu için yeni konteyner kaldığı yerden sürer.
+  Ölçüt: `canli-denetle --bas=86308052`, aralık ≥ 24 saat, boşluk 0.
+
+  ```bash
+  node --env-file=.env --env-file=apps/web/.env.local --import tsx scripts/olcum/b4-kapi.mts --dakika=10
+  node --env-file=.env --env-file=apps/web/.env.local --import tsx apps/blok-okuyucu/src/canli-denetle.ts --bas=86308052
+  node --env-file=.env --env-file=apps/web/.env.local --import tsx apps/blok-okuyucu/src/dogrula.ts --aralik=86308052-86308307 --tohum=11
+  docker logs --tail 5 cry-blok-okuyucu
+  ```
 
 ### B5 — Motor ve arayüz entegrasyonu
 

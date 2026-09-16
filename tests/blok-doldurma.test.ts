@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { bloktanSatirlar, geriyeParcalar, kaynakUygunMu, satirIzi } from "@cry/blok-indeks";
+import { bitisikKursor, bloktanSatirlar, geriyeParcalar, kaynakUygunMu, satirIzi } from "@cry/blok-indeks";
 
 const fixture = JSON.parse(readFileSync(new URL("./fixtures/tron-bloklar.json", import.meta.url), "utf8")) as {
   bloklar: { blok: unknown; bilgi: unknown[] }[];
@@ -55,5 +55,13 @@ describe("satirIzi", () => {
     b.satirlar[0] = { ...b.satirlar[0]!, tutar: b.satirlar[0]!.tutar + 1n };
     expect(b.satirlar).toHaveLength(a.satirlar.length);
     expect(satirIzi(b)).not.toBe(satirIzi(a));
+  });
+});
+
+describe("bitisikKursor", () => {
+  it("yalnızca kesintisiz okunmuş bloklar kadar ilerler; boşluğun üstüne atlamaz", () => {
+    expect(bitisikKursor(100, new Set([101, 102, 104]))).toBe(102);
+    expect(bitisikKursor(100, new Set([102, 103]))).toBe(100);
+    expect(bitisikKursor(100, new Set())).toBe(100);
   });
 });

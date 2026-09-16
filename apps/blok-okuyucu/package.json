@@ -7,7 +7,8 @@
     "oku": "tsx src/oku.ts",
     "dogrula": "tsx src/dogrula.ts",
     "typecheck": "tsc --noEmit",
-    "doldur": "tsx src/doldur.ts"
+    "doldur": "tsx src/doldur.ts",
+    "canli": "tsx src/canli.ts"
   },
   "dependencies": {
     "@cry/blok-indeks": "*",

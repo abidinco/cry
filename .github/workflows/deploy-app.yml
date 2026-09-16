@@ -90,6 +90,11 @@ jobs:
 
       - name: Derle ve ayaga kaldir
         run: |
+          # B4 canli uc okuyucusu elle "cry-blok-okuyucu-deneme" adiyla denendi (2026-09-17); servis
+          # gelince ikinci bir okuyucu kalmasin. Konteyner yoksa bir sey yapmaz (stderr'e yazan bir
+          # komut PS 5.1'de adimi dusurebilir; docker ps yazmaz).
+          $deneme = docker ps -aq --filter "name=^cry-blok-okuyucu-deneme$"
+          if ($deneme) { docker rm -f $deneme | Out-Null }
           docker compose build
           if ($LASTEXITCODE -ne 0) { exit 1 }
           docker compose up -d
@@ -115,7 +120,7 @@ jobs:
           # deploy YESILE DONDU (bir kez yasandi). Her servis ayri sorulur.
           Start-Sleep -Seconds 10
           $kotu = @()
-          foreach ($ad in "cry-db", "cry-redis", "cry-web", "cry-worker") {
+          foreach ($ad in "cry-db", "cry-redis", "cry-web", "cry-worker", "cry-clickhouse", "cry-blok-okuyucu") {
             $durum = (docker inspect -f "{{.State.Status}}" $ad 2>$null)
             $yeniden = (docker inspect -f "{{.RestartCount}}" $ad 2>$null)
             Write-Host ($ad + " : " + $durum + " (restart: " + $yeniden + ")")

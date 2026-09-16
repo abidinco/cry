@@ -35,3 +35,15 @@ export function kaynakUygunMu(k: KaynakSiniri, blok: number): boolean {
 export function satirIzi(r: AyristirmaSonucu): string {
   return r.satirlar.map((s) => `${s.tx}:${s.idx}:${s.varlik}:${s.kimden}:${s.kime}:${s.tutar}`).sort().join("|");
 }
+
+/**
+ * Canlı uç (B4) kursörü: `kursor`un üstünde, okunmuş bloklarla KESİNTİSİZ ulaşılabilen en yüksek blok.
+ * Arada okunmamış bir blok varsa kursör onun üstüne ATLAMAZ — atlarsa o blok hiçbir zaman okunmaz ve
+ * "canlı uç boşluksuz" iddiası sessizce bozulur. Üstteki okunmuşlar zararsızdır: yeniden okunup
+ * tekillikle birleşir.
+ */
+export function bitisikKursor(kursor: number, okunan: ReadonlySet<number>): number {
+  let k = kursor;
+  while (okunan.has(k + 1)) k++;
+  return k;
+}

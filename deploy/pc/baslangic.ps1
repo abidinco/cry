@@ -5,7 +5,7 @@
   oldugunu dogrular. Tekrar tekrar calistirilabilir: ayakta olana dokunmaz.
 
     1. Docker Desktop (motor hazir olana kadar bekler)
-    2. Konteynerler: cry-db, cry-redis, cry-web, cry-worker
+    2. Konteynerler: cry-db, cry-redis, cry-clickhouse, cry-web, cry-worker, cry-blok-okuyucu
     3. Servisler: GitHub runner + WireGuard tuneli (yalnizca DENETLER;
        servis baslatmak yonetici ister, gorev kullanici haklariyla calisir)
     4. Saglik: http://localhost:1337/giris
@@ -77,7 +77,7 @@ if (-not (DockerHazirMi)) {
 # Konteynerleri runner'in dagitimi olusturur (restart: unless-stopped). Burada
 # `compose up` YAPILMAZ: yigini tanimlayan checkout runner'in klasorunde ve
 # ortam dosyasi C:\srv\cry\.env. Durmus olan konteyner yalnizca baslatilir.
-$konteynerler = @("cry-db", "cry-redis", "cry-web", "cry-worker")
+$konteynerler = @("cry-db", "cry-redis", "cry-clickhouse", "cry-web", "cry-worker", "cry-blok-okuyucu")
 foreach ($ad in $konteynerler) {
   $durum = (& docker inspect -f "{{.State.Status}}" $ad 2>$null)
   if (-not $durum) {

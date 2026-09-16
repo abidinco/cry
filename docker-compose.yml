@@ -119,6 +119,35 @@ services:
       timeout: 5s
       retries: 10
 
+  # Blok indeksi CANLI UÇ okuyucusu (B4): kesinleşen her yeni TRON bloğunu ClickHouse'a yazar.
+  # Kaynak publicnode (TronGrid kotasına dokunmaz), yedek TronGrid. Ölçüm ve kurallar:
+  # docs/yol-haritasi-blok-indeks.md → B4, apps/blok-okuyucu/src/canli.ts.
+  blok-okuyucu:
+    build:
+      context: .
+      dockerfile: apps/blok-okuyucu/Dockerfile
+    container_name: cry-blok-okuyucu
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      # .env'deki CLICKHOUSE_URL makinenin kendisini (127.0.0.1:18123) gösteriyor; konteynerden servis adı.
+      CLICKHOUSE_URL: http://clickhouse:8123
+    # SIGTERM'de eldeki bloklar yazılıp kursör kaydediliyor; okuyucu kendi kendine 25 sn'de çıkar.
+    stop_grace_period: 30s
+    depends_on:
+      db:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    healthcheck:
+      # Nabız: her başarılı uç yoklamasında yazılır (3 sn'de bir). 2 dakikadır yazılmadıysa takılmıştır.
+      test: ["CMD-SHELL", "test -f /tmp/canli-nabiz && test $$(( $$(date +%s) - $$(stat -c %Y /tmp/canli-nabiz) )) -lt 120"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
 volumes:
   pgdata:
   redisdata:
