@@ -111,21 +111,55 @@ Her madde bu oturumlarda bir kez YAŞANDI ve zaman kaybettirdi.
   CSS değişikliği aynı sınıflarla kurulmuş statik bir kopyada ÖLÇÜLÜR
   (`scrollWidth - clientWidth`). "Göremedim" demek yerine ne ölçüldüğü söylenir.
 
-## Blok indeksi — yol haritası
+## Blok indeksi — kapsam ve motor KARARA BAĞLANDI (2026-09-16)
 
-Yerel blok indeksinin planı ve ölçümleri
-[docs/yol-haritasi-blok-indeks.md](docs/yol-haritasi-blok-indeks.md);
-kapsam kararı [bekleyen-kararlar §8](docs/bekleyen-kararlar.md). İki kural
-şimdiden sabit:
+Plan, ölçümler ve aşamalar
+[docs/yol-haritasi-blok-indeks.md](docs/yol-haritasi-blok-indeks.md).
+Kullanıcının verdiği dört karar:
+
+- **Motor: ClickHouse** — kendi makinede, Docker'da; Apache 2.0 ve ÜCRETSİZ
+  (ücretli olan yalnızca ClickHouse *Cloud*'dur, ve bu bir kez yanlış
+  bilindiği için buraya yazılıyor). Ölçümde Parquet'le başa baş
+  (34,5–52,1 ⟷ 39,2–55,6 bayt/satır, ikisi de 10–70 ms); kararı İŞLETİM
+  verdi: her şey tek makinede kalıyor, uzaktaki site tünelden sorguluyor,
+  canlı uç sürekli yazıyor ve ek servis sorun değil. Postgres 324,5
+  bayt/satır ve yoğun adreste ~490 ms ile elendi.
+- **Eşiksiz** ve **tam geçmiş** hedefleniyor (9,7 Mr satır, 335–505 GB);
+  disk D:'nin tamamı. Bugün 198 GB boş, kullanıcı ~267 GB daha açacak.
+  Kötümser sınırda bu bütçe de yetmez, o yüzden sıra **önce canlı uç,
+  geçmiş geriye doğru** ve **dolan disk bir DURMA ölçütüdür.**
+- **Veri D:'de tutulur** ama bunu volume DEĞİL, Docker Desktop'ın disk
+  imajı konumu sağlar (Settings → Resources → Advanced → Disk image
+  location). ÖLÇÜLDÜ: Windows klasörünü bağlamak ClickHouse'u tamamen
+  kırıyor — parçayı `tmp_insert_…` diye yazıp rename ediyor, 9p
+  reddediyor, ilk INSERT HTTP 500. (Hız da 334 MB/s ⟷ 2,5 GB/s.)
+  Ayar dosyasına elle `DataFolder` yazmak taşımayı YAPTIRMIYOR; arayüzden
+  yapılır.
+- **18123 (HTTP) yalnızca WireGuard ağına açık**: `cry-clickhouse-wg`
+  güvenlik duvarı kuralı, kaynak 10.99.0.0/24 — web'in 1337'siyle aynı
+  desen. Varsayılan `default` kullanıcısı parolasız gelir ve kapatıldı;
+  kimlik `.env`de (`CLICKHOUSE_*`), depoda değil.
+
+Sabit kalan iki kural:
 
 - **İki katman: blok indeksi ADAY üretir, adres taraması HÜKÜM.** Blok
-  indeksi eşikli olabilir (TRX transferlerinin %76'sı 1 TRX'in altında —
-  ölçüldü); ama eşikli bir indeks "bu adrese başka para girmedi" dedirtirse
-  yanlıştır. İz, takip ve rapor YALNIZCA eşiksiz adres taramasından beslenir.
-- **Önce ölçüm kapısı.** Her aşama (B0–B7) bir ölçümle açılır; kapının cevabı
-  gelmeden sonraki aşamanın kodu yazılmaz. Proje devri §4'ün "arşiv düğümü
-  imkânsız" kararı hâlâ geçerli (2,5–3,5 TB ⟷ 460 GB boş); blok indeksi düğüm
-  değil, seçilmiş transferlerin kendi tablomuzdur.
+  indeksi eşikli olabilir; ama eşikli bir indeks "bu adrese başka para
+  girmedi" dedirtirse yanlıştır. İz, takip ve rapor YALNIZCA eşiksiz adres
+  taramasından beslenir.
+- **Önce ölçüm kapısı.** Her aşama (B0–B7) bir ölçümle açılır; kapının
+  cevabı gelmeden sonraki aşamanın kodu yazılmaz. "Arşiv düğümü imkânsız"
+  kararı hâlâ geçerli (2,9–3,6 TB ⟷ 465 GB); blok indeksi düğüm değil,
+  seçilmiş transferlerin kendi tablomuzdur.
+
+### Sessiz yanlış cevap: DuckDB'nin Parquet BLOB bloom filtresi
+
+Motor seçilmese de bu ölçüm kalıcı bir ders: DuckDB 1.5.5, BLOB sütunu için
+Parquet'e bozuk bir bloom filtresi yazıyor. 19 Mn satırda `kime = <adres>`
+süzgeci 165 satır grubunun 165'ini eliyor ve **hatasız 0 satır** dönüyor;
+aynı değer aralık süzgeciyle 560.160 satır veriyor. 397 binlik küçük
+dosyada hata GÖRÜNMÜYOR. Bu yüzden bir motor seçilince ilk yazılacak test,
+bilinen bir adresin sayısını **iki farklı yoldan** (süzgeçli ve süzgeçsiz)
+alıp karşılaştıran testtir.
 
 ## Windows self-hosted runner — üç tuzak
 

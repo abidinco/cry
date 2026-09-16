@@ -4,8 +4,9 @@ Kullanıcı hedefi (2026-09-15): *"nihai olarak bu blokların lokalde
 indekslenmesi işi için betikler yazma aşamasına geçelim."*
 
 Bu dosya bir PLANDIR ve her aşama bir **ölçüm kapısıyla** açılır: kapının
-cevabı gelmeden bir sonraki aşamanın kodu yazılmaz. Kapsamı belirleyen karar
-kullanıcıda ([bekleyen-kararlar §8](bekleyen-kararlar.md)).
+cevabı gelmeden bir sonraki aşamanın kodu yazılmaz. **Kapsam kararı
+2026-09-16'da verildi** (ClickHouse · eşiksiz · tam geçmiş · D:'nin tamamı):
+gerekçesi ve sabit kuralları [CLAUDE.md → Blok indeksi](../CLAUDE.md).
 
 Yan dosyalar: [kurallar](../CLAUDE.md) · [proje devri §4 — veri kaynakları](proje-devir.md) ·
 [görevler](gorevler/README.md) · [çözülmesi gerekenler](cozulmesi-gerekenler.md).
@@ -278,7 +279,7 @@ bitecek büyüklükte bölünür (görev disiplini, `docs/gorevler/README.md`).
 - **Kapı:** kullanıcı §8'i cevaplar — varlıklar, eşik, geçmiş penceresi,
   depolama motoru, disk bütçesi.
 
-### B1 — Şema ve kursör
+### B1 — Şema ve kursör ✅ (2026-09-16)
 
 - `blok_indeks` şeması: blok no, zaman, tx hash, log index, varlık, from,
   to, tutar (ham tam sayı METİN/Decimal — `Number` YOK), işlem başarılı mı.
@@ -292,6 +293,16 @@ bitecek büyüklükte bölünür (görev disiplini, `docs/gorevler/README.md`).
   fixture: TRX transferi, USDT Transfer olayı, başarısız işlem, onay/approve
   olayı — sonuncusu transfer SAYILMAZ, CLAUDE.md'deki "sonsuz onay" dersi).
 - **Kapı:** migration PUSH ister (canlı veritabanına uygulanır).
+- **Yapıldı:** `packages/blok-indeks` (saf ayrıştırıcı + şema + HTTP istemcisi),
+  `tests/blok-indeks.test.ts` (iki GERÇEK bloktan kurulmuş fixture, 11 test —
+  beş vakanın üçü satır ÜRETMEMELİ), `block_cursors` migration'ı, ve
+  `scripts/blok-indeks-sema-kur.mts`: şemayı kurar, gerçek satırları yazar,
+  geri okur, ikinci yazmanın tekilliği bozmadığını gösterir, sonra siler.
+  Ölçüldü: 3 yazıldı / 3 okundu / ikinci yazmadan sonra yine 3.
+- **Kalan uç:** tekillik `(tx, idx)` değil `(kime, zaman, tx, idx)` sıralaması
+  üzerinden çalışır — aynı hareket iki FARKLI zamanla yazılırsa ikisi de kalır.
+  Kursör aralığı yeniden yazdığında zaman değişmediği için bu pratikte
+  olmuyor; B2'nin doğrulama kapısı bunu ayrıca ölçecek.
 
 ### B2 — Blok okuyucu betiği (tek aralık)
 
