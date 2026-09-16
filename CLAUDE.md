@@ -128,13 +128,10 @@ Kullanıcının verdiği dört karar:
   disk D:'nin tamamı. Bugün 198 GB boş, kullanıcı ~267 GB daha açacak.
   Kötümser sınırda bu bütçe de yetmez, o yüzden sıra **önce canlı uç,
   geçmiş geriye doğru** ve **dolan disk bir DURMA ölçütüdür.**
-- **Veri D:'de tutulur** ama bunu volume DEĞİL, Docker Desktop'ın disk
-  imajı konumu sağlar (Settings → Resources → Advanced → Disk image
-  location). ÖLÇÜLDÜ: Windows klasörünü bağlamak ClickHouse'u tamamen
+- **Veri D:'de tutulur** — volume ile DEĞİL, Docker'ın veri diskini D:'ye
+  alarak (aşağıda). ÖLÇÜLDÜ: Windows klasörünü bağlamak ClickHouse'u tamamen
   kırıyor — parçayı `tmp_insert_…` diye yazıp rename ediyor, 9p
   reddediyor, ilk INSERT HTTP 500. (Hız da 334 MB/s ⟷ 2,5 GB/s.)
-  Ayar dosyasına elle `DataFolder` yazmak taşımayı YAPTIRMIYOR; arayüzden
-  yapılır.
 - **18123 (HTTP) yalnızca WireGuard ağına açık**: `cry-clickhouse-wg`
   güvenlik duvarı kuralı, kaynak 10.99.0.0/24 — web'in 1337'siyle aynı
   desen. Varsayılan `default` kullanıcısı parolasız gelir ve kapatıldı;
@@ -150,6 +147,35 @@ Sabit kalan iki kural:
   cevabı gelmeden sonraki aşamanın kodu yazılmaz. "Arşiv düğümü imkânsız"
   kararı hâlâ geçerli (2,9–3,6 TB ⟷ 465 GB); blok indeksi düğüm değil,
   seçilmiş transferlerin kendi tablomuzdur.
+
+### Docker'ın diski D:'de — ve arayüz bunu YAPAMADI (2026-09-16)
+
+- **Docker Desktop 4.79 (WSL2) "Disk image location" ayarını YOK SAYIYOR.**
+  Arayüzden de, `settings-store.json`a `DataFolder` yazarak da denendi: ayar
+  D:'yi gösteriyor, disk C:'de kalıyor. Dahası, dosyalar elle taşınıp WSL
+  kaydındaki `BasePath` D:'ye çevrildiğinde Docker açılışta kaydı C:'ye GERİ
+  yazdı ve C:'de BOŞ yeni bir veri diski açtı — yığın "yok olmuş" görünüyordu,
+  oysa veri D:'de sağlamdı.
+- **Çalışan yol: disk dosyası D:'de, Docker'ın beklediği C: yolu ona NTFS
+  JUNCTION.** `%LOCALAPPDATA%\Docker\wsl\disk` → `D:\Docker\wsl\disk`
+  (`mklink /J`, yönetici gerekmez). Docker yolu C: sanıyor, baytlar D:'ye
+  gidiyor. Ölçüldü: bağlantı sonrası `docker_data.vhdx` D:'de büyüyor
+  (9,3 → 12,0 GB), C:'de ~117 GB geri kazanıldı, 5 konteyner ve bütün
+  volume'lar yerinde. `wsl\main\ext4.vhdx` (96 MB, Docker'ın kendi sistemi)
+  C:'de kalır.
+- **Taşımadan ÖNCE disk KÜÇÜLTÜLÜR.** VHDX kendiliğinden küçülmüyor: içindeki
+  veri 6 GB iken dosya 125 GB yer kaplıyordu. Sıra: `wsl -d docker-desktop -e
+  fstrim -av` → `docker desktop stop` + `wsl --shutdown` → diskpart `compact
+  vdisk` (YÖNETİCİ) → 125 → 9,3 GB. `wsl --manage … --set-sparse`
+  `--allow-unsafe` istiyor, kullanılmadı.
+- **Docker'ı ZORLA kapatma.** `Stop-Process -Force`, `%LOCALAPPDATA%\Docker\run`
+  altında silinemeyen soket dosyaları bırakıyor ve Docker "Inference manager"
+  hatasıyla açılıp kapanıyor. Onarım klasörü yeniden adlandırmak (silinmiyor).
+  Kapatma `docker desktop stop`, açma `docker desktop start`.
+- **Duraklatılmış Docker deploy'u DÜŞÜRÜR.** Push anında Docker "manually
+  paused" idi; deploy 17 sn'de "Docker motoruna ulaşılamıyor" diye bitti, kod
+  sağlamdı. `gh run rerun <id>` aynı commit'i yeniden dağıtır — push zaten
+  onaylanıp yapıldığı için ayrı bir PUSH gerekmez.
 
 ### Sessiz yanlış cevap: DuckDB'nin Parquet BLOB bloom filtresi
 
