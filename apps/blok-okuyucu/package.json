@@ -6,12 +6,16 @@
   "scripts": {
     "oku": "tsx src/oku.ts",
     "dogrula": "tsx src/dogrula.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "doldur": "tsx src/doldur.ts"
   },
   "dependencies": {
     "@cry/blok-indeks": "*",
     "@cry/chain": "*",
-    "@cry/db": "*"
+    "@cry/db": "*",
+    "@cry/kuyruk": "*",
+    "bullmq": "^5.34.5",
+    "ioredis": "^5.4.2"
   },
   "devDependencies": {
     "tsx": "^4.19.2",

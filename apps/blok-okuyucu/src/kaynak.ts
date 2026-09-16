@@ -10,39 +10,90 @@
  *
  * Kaynağın hatası veri gibi görünebilir (CLAUDE.md): TronGrid hız sınırını kimi zaman HTTP 200
  * gövdesinde yazıyor. Yanıtın ŞEKLİ doğrulanır, bozuksa yeniden denenir, sonunda HATA atılır —
- * bozuk yanıt asla "0 transferli blok" diye yazılmaz.
+ * bozuk yanıt asla "0 transferli blok" diye yazılmaz. Şekli doğru ama İÇERİĞİ eksik yanıtı (bilgisini
+ * tutmadığı blokta boş dizi) ayrıştırıcı yakalar: işlem bilgisi işlemlerle birebir eşleşmeli.
+ *
+ * Kaynaklar (B3 kapısı, 2026-09-17): TronGrid (anahtarlı, tam geçmiş), tronstack (anahtarsız, tam
+ * geçmiş, 200 ms'de hatasız), publicnode (anahtarsız, yalnızca son ~92 gün; kısa patlamada 24,6 blok/sn ama SÜREKLİ yükte 60 ms × 4 eşzaman 5,9 blok/sn hatasız, 25 ms × 8 ise 7,7 blok/sn ve 800 blokta 3 hata).
  */
 import { getJson, RateGate } from "@cry/chain";
 
 const TRONGRID = "https://api.trongrid.io";
 const SEKIL_DENEME = 6;
 
+export type KaynakTanimi = {
+  ad: string;
+  url: string;
+  basliklar?: Record<string, string>;
+  aralikMs: number;
+  /** Şekli bozuk yanıtta toplam deneme. Geçmişi kısa kaynakta düşük tutulur: yok olan blok beklemekle gelmez. */
+  sekilDeneme?: number;
+};
+
+/** Bilinen kaynaklar ve B3 kapısında hatasız ölçülen hızları. */
+export const KAYNAKLAR = {
+  trongrid: (apiKey?: string, aralikMs = 120): KaynakTanimi => ({ ad: "trongrid", url: TRONGRID, aralikMs, basliklar: apiKey ? { "TRON-PRO-API-KEY": apiKey } : {} }),
+  tronstack: (aralikMs = 200): KaynakTanimi => ({ ad: "tronstack", url: "https://api.tronstack.io", aralikMs, sekilDeneme: 3 }),
+  publicnode: (aralikMs = 60): KaynakTanimi => ({ ad: "publicnode", url: "https://tron-rpc.publicnode.com", aralikMs, sekilDeneme: 2 }),
+};
+
 const uyu = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export type KaynakSayac = { istek: number; sekilHatasi: number };
 
 export class TronBlokKaynagi {
+  readonly ad: string;
+  private readonly url: string;
   private readonly kapi: RateGate;
   private readonly basliklar: Record<string, string>;
+  private readonly sekilDeneme: number;
   readonly sayac: KaynakSayac = { istek: 0, sekilHatasi: 0 };
 
-  constructor(opts: { apiKey?: string; aralikMs?: number } = {}) {
-    this.kapi = new RateGate(opts.aralikMs ?? 120);
-    this.basliklar = { "Content-Type": "application/json", ...(opts.apiKey ? { "TRON-PRO-API-KEY": opts.apiKey } : {}) };
+  /** Tanımsız çağrı TronGrid'dir (B2'nin okuyucusu). */
+  constructor(opts: { apiKey?: string; aralikMs?: number } | KaynakTanimi = {}) {
+    const t = "url" in opts ? opts : KAYNAKLAR.trongrid(opts.apiKey, opts.aralikMs);
+    this.ad = t.ad;
+    this.url = t.url;
+    this.kapi = new RateGate(t.aralikMs);
+    this.basliklar = { "Content-Type": "application/json", ...t.basliklar };
+    this.sekilDeneme = t.sekilDeneme ?? SEKIL_DENEME;
   }
 
   private async post<T>(yol: string, govde: unknown, sekilTamam: (j: unknown) => boolean): Promise<T> {
     let son: unknown;
-    for (let d = 0; d < SEKIL_DENEME; d++) {
+    for (let d = 0; d < this.sekilDeneme; d++) {
       await this.kapi.gec();
       this.sayac.istek++;
-      const j = await getJson<unknown>(`${TRONGRID}${yol}`, { chain: "tron", method: "POST", headers: this.basliklar, body: JSON.stringify(govde) });
+      const j = await getJson<unknown>(`${this.url}${yol}`, { chain: "tron", method: "POST", headers: this.basliklar, body: JSON.stringify(govde) });
       if (sekilTamam(j)) return j as T;
       this.sayac.sekilHatasi++;
       son = j;
-      await uyu(500 * 2 ** d);
+      if (d < this.sekilDeneme - 1) await uyu(500 * 2 ** d);
     }
-    throw new Error(`TronGrid ${yol} ${JSON.stringify(govde)}: ${SEKIL_DENEME} denemede şekli bozuk yanıt — ${JSON.stringify(son).slice(0, 200)}`);
+    throw new Error(`${this.ad} ${yol} ${JSON.stringify(govde)}: ${this.sekilDeneme} denemede şekli bozuk yanıt — ${JSON.stringify(son).slice(0, 200)}`);
+  }
+
+  /** Bu blok kaynakta var mı — tek istek, yeniden deneme yok. Geçmişi kısa kaynağın sınırını bulmak için. */
+  async blokVarMi(no: number): Promise<boolean> {
+    await this.kapi.gec();
+    this.sayac.istek++;
+    const j = await getJson<unknown>(`${this.url}/wallet/getblockbynum`, { chain: "tron", method: "POST", headers: this.basliklar, body: JSON.stringify({ num: no }) });
+    return blokSekli(j);
+  }
+
+  /**
+   * Kaynağın tuttuğu en eski bloğu ikili aramayla bulur (±`hassasiyet`), `null` = blok 1 de var.
+   * Sonuç YUKARI yuvarlanır: sınır zamanla ilerliyor ve fazladan bir blok sormak boş cevap riskidir.
+   */
+  async enEskiBlok(ust: number, hassasiyet = 1_000): Promise<number | null> {
+    if (await this.blokVarMi(1)) return null;
+    if (!(await this.blokVarMi(ust))) throw new Error(`${this.ad}: ${ust} bloğu da yok`);
+    let yok = 1, var_ = ust;
+    while (var_ - yok > hassasiyet) {
+      const orta = Math.floor((yok + var_) / 2);
+      (await this.blokVarMi(orta)) ? (var_ = orta) : (yok = orta);
+    }
+    return var_;
   }
 
   /** KESİNLEŞMİŞ (solidified) en yüksek blok. Okuyucu bunun üstünü yazmaz. */
@@ -57,7 +108,7 @@ export class TronBlokKaynagi {
       this.post<{ block_header: { raw_data: { number: number } } }>("/wallet/getblockbynum", { num: no }, blokSekli),
       this.post<unknown[]>("/wallet/gettransactioninfobyblocknum", { num: no }, Array.isArray),
     ]);
-    if (blok.block_header.raw_data.number !== no) throw new Error(`TronGrid ${no} istendi, ${blok.block_header.raw_data.number} geldi`);
+    if (blok.block_header.raw_data.number !== no) throw new Error(`${this.ad}: ${no} istendi, ${blok.block_header.raw_data.number} geldi`);
     return { blok, bilgi };
   }
 }

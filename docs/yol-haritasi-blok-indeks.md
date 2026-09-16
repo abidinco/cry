@@ -364,7 +364,7 @@ bitecek büyüklükte bölünür (görev disiplini, `docs/gorevler/README.md`).
   node --env-file=.env --env-file=apps/web/.env.local --import tsx apps/blok-okuyucu/src/dogrula.ts --aralik=86300000-86300999 --adres=0 --yogun=8 --tohum=3
   ```
 
-### B3 — Geçmiş doldurma (kararlaştırılan pencere)
+### B3 — Geçmiş doldurma ✅ kod + doğrulama (2026-09-17) · koşu sürüyor
 
 - Kaynak B0'ın cevabına göre: toplu dışa aktarım (BigQuery → dosya → yerel
   yükleme) ya da yalnızca vaka tarih pencereleri için blok blok.
@@ -373,8 +373,8 @@ bitecek büyüklükte bölünür (görev disiplini, `docs/gorevler/README.md`).
   yeniden kuyruğa girer.
 - **Bitiş:** pencere boşluksuz; satır sayısı kaynağın kendi sayımıyla
   (BigQuery'de `count(*)`) birebir.
-- **Ölçüm kapısı ✅ (2026-09-17) — cevap bir TERCİH istiyor:**
-  [bekleyen-kararlar §8](bekleyen-kararlar.md). Kaynak ve derinlik seçilmeden B3 kodu yazılmaz.
+- **Ölçüm kapısı ✅ (2026-09-17).** Cevabı kullanıcı verdi: **ücretsiz kaynaklar, geriye doğru,
+  dolan disk durdurur** (BigQuery ve "yalnızca son 92 gün" seçilmedi; CLAUDE.md → Blok indeksi).
   - **Geçmiş boyunca yoğunluk** (60 eşit aralıklı nokta × 3 ardışık blok, 2018–2026; nokta başına
     3 blok olduğu için KABA): satır/blok 2018 4,9 · 2019 3,2 · 2020 34,8 · 2021 54,6 · 2022 141,0 ·
     2023 265,8 · 2024 217,8 · 2025 211,3 · 2026 140,1. **Toplam ~10,8 Mr satır** (B0: 9,7 Mr).
@@ -409,6 +409,48 @@ bitecek büyüklükte bölünür (görev disiplini, `docs/gorevler/README.md`).
 
   ```bash
   node --env-file=.env --env-file=apps/web/.env.local --import tsx scripts/olcum/b3-kapi.mts --nokta=60 --ardisik=3
+  ```
+- **Plandan sapma: kuyruk YOK.** Plan pencere başına BullMQ işi diyordu. Tek bir tüketici aylarca
+  aynı işi yapıyor ve kaldığı yeri zaten kapsam tablosu biliyor, yani kuyruk bir şey katmıyor. Üstelik
+  tüketicisi ikinci bir worker süreci olurdu (CLAUDE.md → Kuyruk ve worker). Doldurucu tek bir süreçtir.
+  Eksik aralık dedektörü de kapsamın kendisi: her parça bitince boşluklar hesaplanıp `missing_ranges`e
+  yazılır, bir sonraki koşu kapsamda olmayanı okur.
+- **Yapıldı:** `apps/blok-okuyucu/src/doldur.ts` (doldurucu), `yazici.ts` (okuyucuyla ortak tamponlu
+  yazıcı), `kaynak.ts` çok kaynaklı (TronGrid · tronstack · publicnode, en eski blok ikili aramayla),
+  saf katman `packages/blok-indeks/src/doldurma.ts` (`tests/blok-doldurma.test.ts`, 7 test).
+  - Uçtan geriye, 10.000 bloklük parçalarla ilerler. Bir kaynakta hata veren blok başka kaynağa
+    gider; 20 ardışık hata veren kaynak 60 sn bekletilir.
+  - publicnode'a sınırının (+1 gün pay) altında hiç sorulmaz.
+  - **TronGrid yalnızca worker'ın `adres-indeksle` ve `takip-kosusu` kuyrukları boşken kullanılır**
+    (10 sn'de bir yoklanır; kuyruk okunamazsa kullanılmaz).
+  - Her 500. blok ikinci bir kaynaktan okunup satır satır karşılaştırılır. Uyuşmazsa blok yazılmaz.
+  - Her parçadan önce D:'nin boş alanına bakılır; `--minBosGB` (50) altında çıkış kodu 3 ile durur.
+  - Bir parçada okunamayan blok %1'i ve 10'u aşarsa boşlukla ilerlemek yerine durur.
+- **Doğrulama (2026-09-17):**
+  - **Uç bölgesi** 86.305.001–86.307.000 (2.000 blok, üç kaynak birlikte): 366.994 satır, 12,43 blok/sn.
+    Boşluk 0; çapraz denetim 40/40 uyuştu. publicnode'un 6 hatası başka kaynaklardan okundu.
+  - **2021 bölgesi** 30.000.000–30.000.299 (publicnode'a hiç sorulmadı): 25.139 satır, 5,92 blok/sn,
+    boşluk 0, çapraz 14/14.
+  - Yeniden koşu: okunan 0, önceden okunmuş 2.000.
+  - **Adres taramasıyla kapı (`dogrula.ts`): iki aralıkta 25/25 ve 23/23 uyuştu.** Her iki aralıkta
+    ham = FINAL = kapsamın saydığı; iki zamanlı anahtar 0.
+  - **publicnode'un sürekli hızı kısa ölçümden düşük:** 800 blokta 25 ms × 8 eşzaman 7,71 blok/sn ve
+    3 boşluk, 60 ms × 4 eşzaman **5,90 blok/sn ve 0 hata** (varsayılan bu), 120 ms × 2 eşzaman 4,12.
+    Kapıdaki 24,6 yalnızca 40 bloklük bir patlamaydı.
+  - Aynı dakikalarda publicnode'un en eski bloğu 83.683.124 ile 83.683.741 arasında değişti: arkada
+    sınırları farklı düğümler var. 1 günlük pay bunu karşılıyor; payın içine düşen boş cevabı eşleşme
+    kuralı yakalar.
+- **Beklenen süre:** uçtan 92 gün geriye üç kaynakla ~12 blok/sn (~2,5 gün). Daha eskisi tronstack +
+  (kuyruk boşken) TronGrid ile ~6 blok/sn. 2023 başına ~70 gün, disk bugünkü 184 GiB boşla daha erken
+  durur (50 GiB eşik → ~130 GiB veri ≈ 2,1–2,6 Mr satır ≈ 2025 ortası). Kullanıcı D:'de yer açınca aynı
+  komut kaldığı yerden devam eder.
+
+  ```bash
+  # kuru deneme ve doğrulama
+  node --env-file=.env --env-file=apps/web/.env.local --import tsx apps/blok-okuyucu/src/doldur.ts --ust=30000299 --taban=30000000 --parca=150 --capraz=20
+  node --env-file=.env --env-file=apps/web/.env.local --import tsx apps/blok-okuyucu/src/dogrula.ts --aralik=86305001-86307000 --tohum=7
+  # uzun koşu (ayrık süreç; günlük C:\srv\cry\blok-doldur.log)
+  node --env-file=.env --env-file=apps/web/.env.local --import tsx apps/blok-okuyucu/src/doldur.ts --uygula --ilerlemeSn=60
   ```
 
 ### B4 — Canlı uç

@@ -154,6 +154,21 @@ Okuyucunun (B2, 2026-09-16) ölçülerek konan iki kuralı:
   yazılırdı. TronGrid'de 180/180 blok eşleşti; kural `bloktanSatirlar`'da, testli. **Kaynağın şekli
   doğru diye içeriği tam değildir** — bir kaynak eklenirken onu TronGrid'le satır satır karşılaştır.
 
+Geçmiş doldurma (B3) — kullanıcı kararı 2026-09-17:
+
+- **Geçmiş ÜCRETSİZ kaynaklardan, uçtan GERİYE doğru dolar; dolan disk durdurur.** BigQuery (hesap +
+  bilinmeyen maliyet) ve "yalnızca son 92 gün" seçilmedi. Doldurucu `apps/blok-okuyucu/src/doldur.ts`.
+  Ölçülen: tam geçmiş ~10,8 Mr satır, 63 B/satırla bütçeyi aşıyor. Hız uçtan 92 gün geriye ~12
+  blok/sn, daha eskide ~6 blok/sn. Ayrıntı yol haritası → B3.
+- **TronGrid doldurmada ÖNCELİKSİZDİR — vaka > indeks.** Kota adres taramasıyla paylaşılıyor
+  (worker 10 istek/sn, ölçülen tavan ~12,5; 60 ms kapıda 429 yağıyor). Doldurucu TronGrid'e yalnızca
+  `adres-indeksle` ve `takip-kosusu` kuyrukları boşken gider ve kuyruğu okuyamazsa hiç gitmez.
+- **Doldurucu kuyruk işi DEĞİL, tek bir ayrık süreçtir.** Kaldığı yeri kapsam tablosu biliyor. Kuyruğa
+  bağlansaydı tüketicisi ikinci bir worker süreci olurdu. Durdurmak için süreci öldürmek zararsız:
+  ölüm testi B2'de yapıldı, yarım blok kalmıyor. Aynı komut kaldığı yerden devam eder.
+- **İki kaynak aynı bloğa farklı satır verirse blok YAZILMAZ.** Hangisinin doğru olduğu bilinemez;
+  boşluk kalır ve raporlanır (her 500. blok çapraz denetlenir).
+
 Sabit kalan iki kural:
 
 - **İki katman: blok indeksi ADAY üretir, adres taraması HÜKÜM.** Blok

@@ -212,7 +212,7 @@ token cinsinden ("9.512.155.590,98 USDT"). Adli bir yazıda karşılığın TL
 olarak yazılması gerekir.
 
 **Nerede:** Görev 09. Kaynağın ve ANIN seçimi karar
-([bekleyen-kararlar](bekleyen-kararlar.md) §8).
+([bekleyen-kararlar](bekleyen-kararlar.md) §5).
 
 ---
 
