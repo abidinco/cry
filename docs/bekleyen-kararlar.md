@@ -185,10 +185,16 @@ depolama motorunda ve hangi disk bütçesiyle tutsun?
 **Ölçüm (2026-09-15/16, B0 tamamlandı — ayrıntı ve komutlar yol haritası §1 "B0 ölçümleri"):**
 - 2026 hacmi günde ~2,2 Mn USDT + ~4,5 Mn TRX transferi (yılda 125 blok); tam
   geçmiş ~9,7 Mr satır (USDT ≥100 + TRX ≥100: ~2,7 Mr; yalnız USDT ≥1.000: ~1,1 Mr).
-- 19 Mn satırlık deneme: ClickHouse **76–119 bayt/satır**, Postgres bölümlü
-  tablo **325 bayt/satır**; yoğun adres sorgusu ClickHouse 14 ms ⟷ Postgres ~490 ms.
-- Bir yıl: eşiksiz CH 185–290 GB (PG ~790 GB) · USDT ≥100 + TRX ≥100 CH 49–76 GB ·
-  yalnız USDT ≥1.000 CH 21–32 GB. D: NVMe'de 198 GB boş.
+- 19 Mn satırlık deneme, dört ücretsiz motor (bayt/satır, iyimser → kötümser
+  sınır): ClickHouse **34,5–52,1** · Parquet **39,2–55,6** · TimescaleDB
+  48,8–69,5 · DuckDB dosyası 50,9–70,5 · Postgres **324,5**. Yoğun adres
+  sorgusu: CH 13–14 ms · Parquet 8–22 ms · TimescaleDB 215–225 ms ·
+  Postgres ~490 ms.
+- Bir yıl eşiksiz: CH 84–127 GB · Parquet 96–136 GB · Postgres ~790 GB.
+  Eşiksiz TAM geçmiş (9,7 Mr satır): CH 335–505 GB, Parquet 380–540 GB.
+  D: NVMe'de bugün 198 GB boş, kullanıcı ~267 GB daha açacak (~465 GB).
+- ClickHouse'un ücretli olanı yalnızca bulut hizmetidir; sunucusu Apache 2.0.
+  TimescaleDB'nin sıkıştırması ücretsiz ama açık kaynak değil (Timescale License).
 - Tam geçmiş kaynağı: BigQuery'de Google yönetimli TRON veri seti var (önizleme,
   `token_transfers` yok, `logs`tan süzülür) ama **satır/bayt maliyeti bakılamadı**
   (GCP hesabı gerekiyor). Düğüm anlık görüntüsü ~2,9 TB, lite anlık görüntü geçmiş taşımıyor.
@@ -207,10 +213,13 @@ node --env-file=.env --env-file=apps/web/.env.local --import tsx scripts/olcum/t
    gelir (iki katman — yol haritası §2).
 3. *Geçmiş:* yalnızca bugünden ileri (canlı uç) · son N ay · tam geçmiş
    (toplu kaynak: BigQuery — maliyeti bir GCP hesabıyla kuru sorgu ister).
-4. *Depolama:* ClickHouse (sütunlu, sıkıştırmalı; ayrı bir servis) ·
-   Postgres bölümlü tablo (tek veritabanı). **Ölçüm ClickHouse'u gösteriyor:**
-   2,7–4,3 kat az disk, yoğun adreste ~35 kat hızlı.
-5. *Disk bütçesi:* D: NVMe'nin ne kadarı (198 GB boş).
+4. *Depolama:* ClickHouse (sütunlu servis) · Parquet dosyaları + DuckDB
+   (servis yok, çok yazıcı sorunu yok) · TimescaleDB · Postgres bölümlü tablo.
+   **Ölçüm ilk ikisini gösteriyor**; aralarındaki fark disk değil işletim
+   (Parquet'te yazıcı yeni dosya ekler; DuckDB tek dosyaya tek yazıcı kabul eder).
+5. *Disk bütçesi:* D: NVMe'nin ne kadarı (bugün 198 GB boş, ileride ~465 GB).
+   Eşiksiz tam geçmiş kötümser sınırda bu bütçeyi de aşar: sıra "önce canlı uç,
+   geçmiş geriye doğru" olmalı ve dolan disk bir DURMA ölçütüdür.
 
 Hepsi geri alınabilir: bölüm silinir, eşik yükseltilir; eşik DÜŞÜRÜLÜRSE
 geçmişin yeniden çekilmesi gerekir (tek yönlü maliyet).

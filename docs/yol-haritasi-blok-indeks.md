@@ -85,10 +85,12 @@ Buradan dört sonuç çıkıyor:
 ```bash
 node --env-file=.env --env-file=apps/web/.env.local --import tsx scripts/olcum/tron-b0-ornekle.mts   # 2.261 blok, 4.523 istek, ~10 dk
 node --import tsx scripts/olcum/b0-yillar-analiz.mts
-# geçici konteynerler: betiğin başındaki iki docker run satırı; bitince docker rm -f b0-ch b0-pg
+# geçici konteynerler: betiğin başındaki dört docker run satırı; bitince docker rm -f b0-ch b0-pg b0-ts b0-duck
 node --import tsx scripts/olcum/b0-depolama-denemesi.mts --mod=gercek
 node --max-old-space-size=8192 --import tsx scripts/olcum/b0-depolama-denemesi.mts --mod=ayni --gun=2
 node --max-old-space-size=8192 --import tsx scripts/olcum/b0-depolama-denemesi.mts --mod=taze --gun=2
+node --max-old-space-size=8192 --import tsx scripts/olcum/b0-depolama-denemesi.mts --mod=ayni --gun=2 --motorlar=ch --chProjeksiyonsuz
+node --max-old-space-size=8192 --import tsx scripts/olcum/b0-depolama-denemesi.mts --mod=ayni --gun=2 --motorlar=ts --tsBloom
 ```
 
 **Örnekleme:** ardışık 1.200 blok (86.270.497–86.271.696, 1 saat) + 2018-06'dan
@@ -125,39 +127,76 @@ denemeye düştü (B2'deki ortak `RateGate`'in gerekçesi).
   tekil adres, 203.206'sı tek kez (toz / adres zehirleme). Sıkıştırmayı
   belirleyen asıl bu.
 
-**Depolama denemesi.** Gerçek saat 48 kez zamanda kaydırılarak 2 gün
-(19.074.288 satır) yapıldı. 2 günü TronGrid'den çekmek kotaya sığmıyor, bu
-yüzden adres tekrarı iki sınırla ölçüldü: `ayni` (adresler her kopyada aynı —
-iyimser) ve `taze` (saatte ≤2 kez görünen adres her kopyada yeni — kötümser).
-Gerçek davranış arasındadır. İki motor her sorguya BİREBİR aynı cevabı verdi
-(ör. yoğun alıcı: 560.160 hareket, 48.355 gönderen).
+**Depolama denemesi — dört ücretsiz motor.** Gerçek saat 48 kez zamanda
+kaydırılarak 2 gün (19.074.288 satır) yapıldı. 2 günü TronGrid'den çekmek
+kotaya sığmıyor, bu yüzden adres tekrarı iki sınırla ölçüldü: `ayni` (adresler
+her kopyada aynı — iyimser) ve `taze` (saatte ≤2 kez görünen adres her kopyada
+yeni — kötümser). Gerçek davranış arasındadır. Üretim **deterministiktir**
+(yeni adres/tx = `sha256(kopya:eski)`), yani her motor BİREBİR aynı dosyayı
+okudu ve hepsi her sorguya aynı cevabı verdi (yoğun alıcı: 560.160 hareket).
 
-| | ClickHouse `ayni` | ClickHouse `taze` | Postgres (iki modda aynı) |
-|---|---|---|---|
-| Disk / satır | **75,8 B** | **118,6 B** | **324,5 B** (tablo 134 + iki dizin 190) |
-| 19 Mn satır | 1,45 GB | 2,26 GB | 6,19 GB |
-| Yazma | ~1,0 Mn satır/sn | ~1,0 Mn satır/sn | ~0,4 Mn satır/sn + dizin 18 sn |
-| Yoğun alıcı özeti (560 bin satır) | 14 ms | 15 ms | 488–497 ms |
-| Yoğun alıcı: ilk 50 gönderen | 9 ms | 15 ms | 321–347 ms |
-| Yoğun gönderici özeti (62 bin satır) | 6 ms | 7 ms | 52–55 ms |
-| Seyrek adres | 3–4 ms | 3–4 ms | <1 ms |
+Adaylar ve lisansları: **ClickHouse** (Apache 2.0 — ücretli olan yalnızca
+ClickHouse Cloud, kendi makinende çalıştırmak ücretsiz), **Postgres**
+(PostgreSQL lisansı), **TimescaleDB** (eklenti; sıkıştırma "Timescale License"
+altında — ücretsiz kullanılır, açık kaynak değil), **DuckDB** (MIT) ve onun
+yazdığı **Parquet** dosyaları (Apache 2.0 biçim).
 
-Sütun payı (ClickHouse `taze`): tx hash 582 MiB — rastgele 32 bayt, hiç
-sıkışmaz ve toplamın %26'sı; kimden 231 MiB, kime 100 MiB (sıralama anahtarı),
-kalan her şey 60 MiB. ClickHouse sayısına `kimden` projeksiyonu (ikinci
-sıralama) dâhil. Süreler sunucudan okundu (`--time`, `EXPLAIN ANALYZE`),
-önbellek sıcak; soğuk disk ölçülmedi.
+Bayt/satır ve sorgu süreleri (`ayni` → `taze`; süreler ortanca, sunucudan
+okundu, önbellek sıcak):
 
-**Projeksiyon** (2026 günlük hacmi; eşikli alt kümede bayt/satır aynı varsayıldı —
-toz adresler elendiği için gerçekte `ayni` sınırına daha yakın olmalı, ölçülmedi):
+| Motor | B/satır | 19 Mn satır | Yazma | Yoğun alıcı özeti | İlk 50 gönderen | `kimden` sorgusu |
+|---|---|---|---|---|---|---|
+| **ClickHouse** (projeksiyonsuz) | **34,5 → 52,1** | 0,66–0,99 GB | 12 sn | 14 → 13 ms | 14 → 13 ms | 18 → 34 ms |
+| **Parquet** (ZSTD, kime sıralı) | **39,2 → 55,6** | 0,75–1,06 GB | 2–6 sn | 8 → 22 ms | 6 → 11 ms | 24 → 70 ms |
+| TimescaleDB (sıkıştırılmış) | 48,8 → 69,5 | 0,93–1,33 GB | 40 sn + 34 sn sıkıştırma | 220 → 221 ms | 87 → 106 ms | 748 → 1.014 ms |
+| TimescaleDB + `bloom(kimden)` | 49,0 → 70,0 | 0,93–1,33 GB | aynı | 225 → 215 ms | 89 → 103 ms | **371 → 732 ms** |
+| DuckDB kendi dosyası | 50,9 → 70,5 | 0,97–1,35 GB | 17 sn | 13 → 62 ms | 8 → 27 ms | 8 → 24 ms |
+| ClickHouse + `kimden` projeksiyonu | 75,8 → 117,1 | 1,45–2,23 GB | 17–19 sn | 13 → 18 ms | 10 → 16 ms | 5 → 7 ms |
+| Postgres bölümlü tablo | 324,5 | 6,19 GB | 52–57 sn + dizin 18 sn | 489 → 503 ms | 311 → 345 ms | 52 ms |
 
-| Kapsam | Satır/gün | CH 90 gün | CH 1 yıl | PG 1 yıl | CH tam geçmiş |
-|---|---|---|---|---|---|
-| Eşiksiz | 6,7 Mn | 46–72 GB | 185–290 GB | ~790 GB | 0,74–1,15 TB |
-| USDT ≥100 + TRX ≥100 | 1,76 Mn | 12–19 GB | 49–76 GB | ~210 GB | 205–320 GB |
-| Yalnız USDT ≥1.000 | 0,74 Mn | 5–8 GB | 21–32 GB | ~88 GB | 83–130 GB |
+- **Projeksiyon İKİNCİ bir sıralı kopyadır** ve öbür motorlarda karşılığı yok;
+  adil sıra projeksiyonsuz hâldir. Projeksiyon `kimden` sorgusunu 18 ms'den
+  5 ms'ye indiriyor ama diski iki katına çıkarıyor — bu kapsamda gerekmiyor.
+- **Postgres'in dizinleri tablosundan büyük** (190 ⟷ 134 B/satır) ve yoğun
+  adreste en yavaş olan o. Küçük kümelerde (orta/seyrek adres) 1 ms'nin
+  altında kalıyor: sorun ölçek, dizin değil.
+- **TimescaleDB sıkıştırma sırasına göre hızlı ya da yavaş.** `kime`'ye göre
+  sıralı sıkıştırılmış parçada "kime = X" 220 ms, ama `kimden` sorgusu bütün
+  parçaları açıyor: 0,7–1,0 sn. 2.30'un seyrek `bloom(kimden)` dizini bunu
+  yarıya indiriyor (diske etkisi yok), yine de sütunlu iki motordan 20–40 kat
+  yavaş.
+- **Sütun payı** (ClickHouse `taze`, projeksiyonlu): tx hash 582 MiB — rastgele
+  32 bayt, hiç sıkışmaz, toplamın %26'sı; kimden 231 MiB, kime 100 MiB
+  (sıralama anahtarı), kalan her şey 60 MiB.
 
-D: NVMe'de 198 GB boş.
+**DuckDB 1.5.5'in Parquet BLOB bloom filtresi BOZUK — ve sessiz.** 19 Mn
+satırlık dosyada `kime = unhex('…')` süzgeci 165 satır grubunun 165'ini eliyor
+ve **hatasız 0 satır** dönüyor; aynı değer `kime >= x AND kime <= x` ile ya da
+süzgeç itmesi kapatılınca 560.160 satır veriyor (`parquet_bloom_probe` ile
+doğrulandı). 397 bin satırlık küçük dosyada hata GÖRÜNMÜYOR (4 satır grubu, 0
+eleme) — yani küçük veriyle yapılan bir doğrulama bunu yakalayamaz. Ölçüm
+betiği artık aralık süzgeci kullanıyor ve hatayı her koşuda ayrıca sınıyor.
+Parquet bu kapsamda seçilirse **adres eşitliği ham hâliyle kullanılamaz**;
+kural ya aralık süzgeci ya da adresin tam sayıya çevrilmesidir.
+
+**Projeksiyon** (2026 günlük hacmi 6,7 Mn satır; eşikli alt kümede bayt/satır
+aynı varsayıldı — toz adresler elendiği için gerçekte iyimser sınıra daha yakın
+olmalı, ölçülmedi):
+
+| Kapsam | Satır/gün | CH 1 yıl | Parquet 1 yıl | PG 1 yıl | CH tam geçmiş | Parquet tam geçmiş |
+|---|---|---|---|---|---|---|
+| Eşiksiz | 6,7 Mn | 84–127 GB | 96–136 GB | ~790 GB | **335–505 GB** | **380–540 GB** |
+| USDT ≥100 + TRX ≥100 | 1,76 Mn | 22–33 GB | 25–36 GB | ~210 GB | 94–142 GB | 107–152 GB |
+| Yalnız USDT ≥1.000 | 0,74 Mn | 9–14 GB | 11–15 GB | ~88 GB | 38–57 GB | 43–61 GB |
+
+D: NVMe'de bugün 198 GB boş; kullanıcı ileride ~267 GB daha açacak (toplam
+~465 GB). **Eşiksiz tam geçmiş yalnızca sütunlu bir motorla ve ancak o disk
+açıldığında sığar; kötümser sınırda taşar.**
+
+**İşletim farkı (ölçülmedi ama seçimi bağlar):** DuckDB bir dosyaya tek yazıcı
+süreç kabul eder — canlı uç yazarken web'in aynı dosyayı sorgulaması sorun
+olur. Parquet'te bu sorun yok: yazıcı yeni dosya ekler, okuyucular var olanları
+okur. ClickHouse ve Postgres zaten çok süreçli sunuculardır.
 
 **Toplu geçmiş kaynağı:**
 - **BigQuery:** Google yönetimli TRON veri seti var, **önizleme** durumunda:
@@ -173,12 +212,21 @@ D: NVMe'de 198 GB boş.
   Kaynak: TRON Developer Hub "Database snapshots" sayfası (2026-09-15).
 
 **B0'dan çıkan sonuçlar:**
-1. **Depolama: ClickHouse.** Postgres aynı veride 2,7–4,3 kat disk ve yoğun
-   adreste ~35 kat yavaş; eşiksiz bir yıl D:'ye sığmıyor (790 GB).
-2. **Eşiksiz bir yıl ClickHouse'ta da sınırda** (185–290 GB ⟷ 198 GB boş).
-3. **Tam geçmiş yalnızca "yalnız USDT ≥1.000" kapsamında sığar**, o da
-   BigQuery'nin maliyeti ölçülmeden planlanamaz.
+1. **Satır tabanlı Postgres bu iş için pahalı:** sütunlu motorların 4,7–9,4 katı
+   disk, yoğun adreste 15–35 kat yavaş. Eşiksiz bir yıl tek başına ~790 GB.
+2. **Sıra: ClickHouse (projeksiyonsuz) ≈ Parquet > TimescaleDB ≈ DuckDB dosyası
+   > Postgres.** İlk ikisi hem en küçük hem en hızlı; aradaki fark (34,5 ⟷ 39,2
+   B/satır) seçimi tek başına belirleyecek kadar büyük değil, işletim farkı daha
+   belirleyici.
+3. **Eşiksiz tam geçmiş (9,7 Mr satır) 335–540 GB ister**: bugünkü 198 GB'a
+   sığmaz, kullanıcının açacağı ~465 GB'a iyimser sınırda sığar, kötümser
+   sınırda taşar. Karar verilirken "önce canlı uç, geçmiş geriye doğru dolar"
+   sırası bu yüzden gerekli.
 4. **Hız kapısı şart:** kapısız paralel okuma istek başına ~%60 yeniden deneme.
+5. **Sessiz yanlış cevap riski ölçüldü:** DuckDB'nin Parquet BLOB bloom filtresi
+   eşitlik süzgecinde 0 satır döndürüyor ve hata vermiyor. Bir motor seçilince
+   ilk yazılacak test, bilinen bir adresin sayısının iki farklı yoldan (süzgeçli
+   ve süzgeçsiz) aynı çıktığını sınayan testtir.
 
 ## 2. Önerilen mimari — iki katman
 
