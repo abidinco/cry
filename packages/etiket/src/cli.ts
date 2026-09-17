@@ -5,6 +5,7 @@
  *   npx tsx packages/etiket/src/cli.ts --kaynak=ofac --uygula
  *   npx tsx packages/etiket/src/cli.ts --kaynak=aday --uygula
  *   npx tsx packages/etiket/src/cli.ts --kaynak=kesif [--esik=50]
+ *   npx tsx packages/etiket/src/cli.ts --kaynak=kesif-blok [--esik=50] [--minGuven=0.7]   (ClickHouse ister)
  *   npx tsx packages/etiket/src/cli.ts --kaynak=tronscan [--kapsam=aday|hepsi] [--sinir=N] [--tazele]
  *
  * TronScan `TRONSCAN_API_KEY` ister; yanıtlar `.onbellek/tronscan/` altına
@@ -20,6 +21,7 @@ import { readFile } from "node:fs/promises";
 import { prisma } from "@cry/db";
 import { ADAY_ETIKETLER } from "./aday";
 import { arsivdenAdaylar } from "./kesif-oku";
+import { bloktanAdaylar } from "./kesif-blok-oku";
 import { ofacAyristir, ofacIndir } from "./ofac";
 import { tronscanEtiketleri } from "./tronscan-oku";
 import type { TohumSonucu } from "./tipler";
@@ -38,6 +40,10 @@ async function kaynagiOku(kaynak: string): Promise<TohumSonucu> {
     const esik = Number(bayrak("esik") ?? 50);
     return arsivdenAdaylar({ karsiTarafEsigi: esik, gecisEsigi: esik * 2 });
   }
+  if (kaynak === "kesif-blok") {
+    const esik = Number(bayrak("esik") ?? 50);
+    return bloktanAdaylar({ karsiTarafEsigi: esik, gecisEsigi: esik * 2 }, Number(bayrak("minGuven") ?? 0.7));
+  }
   if (kaynak === "ofac") {
     const dosya = bayrak("dosya");
     const xml = dosya ? await readFile(dosya, "utf8") : await ofacIndir();
@@ -54,7 +60,7 @@ async function kaynagiOku(kaynak: string): Promise<TohumSonucu> {
       anahtar: process.env.TRONSCAN_API_KEY ?? "",
     });
   }
-  throw new Error(`bilinmeyen kaynak: ${kaynak} (ofac|aday|kesif|tronscan)`);
+  throw new Error(`bilinmeyen kaynak: ${kaynak} (ofac|aday|kesif|kesif-blok|tronscan)`);
 }
 
 async function main() {

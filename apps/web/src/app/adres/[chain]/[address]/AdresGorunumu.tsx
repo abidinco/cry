@@ -5,6 +5,7 @@ import { yuklemeIzle } from "@/lib/yukleme";
 import { islemGezgini } from "@/lib/gezgin";
 import { Adres, Bos, Kayit, Rozet, Satir, Tarih, Tutar, type Koken } from "@/components/ui";
 import { hareketsizGun, kisaAdres, sayi, tarih } from "@/lib/bicim";
+import BlokIndeksi from "./BlokIndeksi";
 
 type Etiket = {
   id: number;
@@ -246,6 +247,8 @@ export default function AdresGorunumu({ chain, address }: { chain: string; addre
           )}
         </div>
       </Kayit>
+
+      <BlokIndeksi chain={chain} address={ozet.address} />
 
       <Kayit
         koken="kaynak"

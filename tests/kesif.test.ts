@@ -64,6 +64,25 @@ describe("yapısal keşif", () => {
     expect(s.eşiginAltinda).toBe(1);
   });
 
+  it("toz sayımdan ELENMEZ ama gerekçede AYRI görünür (blok indeksi keşfi)", () => {
+    // Gerçek pencereden (2026-09-17): 3.069 göndericinin 3.053'ü yalnızca toz gönderdi.
+    const [c] = servisAdaylari([
+      ist({
+        address: "A", indeksDurumu: "kismi", altSinirNotu: "blok indeksi penceresi",
+        gonderenSayisi: 3069, tozGonderenSayisi: 3053, aliciSayisi: 128231, tozAliciSayisi: 0,
+      }),
+    ]).adaylar;
+    expect(c!.gerekce[0]).toBe(
+      "3069 farklı adresten alıyor (3053'i yalnızca toz), 128231 farklı adrese gönderiyor (blok indeksi penceresi — bunlar ALT SINIR)",
+    );
+    // Toz sayısı adaylığı ve güveni DEĞİŞTİRMEZ: karar eşiksiz sayıyla verilir.
+    const [tozsuz] = servisAdaylari([
+      ist({ address: "A", indeksDurumu: "kismi", gonderenSayisi: 3069, aliciSayisi: 128231 }),
+    ]).adaylar;
+    expect(c!.guven).toBe(tozsuz!.guven);
+    expect(tozsuz!.gerekce[0]).toContain("(kısmi tarama — bunlar ALT SINIR)");
+  });
+
   it("eşik bir SEÇİMDİR: değiştirilince sonuç değişir", () => {
     const g = [ist({ address: "A", gonderenSayisi: 60, aliciSayisi: 1 })];
     expect(servisAdaylari(g, VARSAYILAN_KESIF).adaylar).toHaveLength(1);

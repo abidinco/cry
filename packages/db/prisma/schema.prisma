@@ -189,7 +189,7 @@ model Label {
   /// Kategori exchange_* ise dolu: "Binance", "BtcTurk"…
   exchange    String?
 
-  /// Etiket NEREDEN geldi: tronscan|ofac|acik_kaynak|kesif|kullanici
+  /// Etiket NEREDEN geldi: tronscan|ofac|acik_kaynak|kesif|kesif_blok|kullanici
   source     String
   sourceUrl  String?   @map("source_url")
   /// 0..1. Keşif motorunun ürettiği etikette hesaplanmış değer durur.

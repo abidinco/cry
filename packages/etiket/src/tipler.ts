@@ -26,7 +26,7 @@ export type EtiketKategorisi =
   | "kullanici"
   | "diger";
 
-export type EtiketKaynagi = "ofac" | "tronscan" | "acik_kaynak" | "kesif" | "kullanici";
+export type EtiketKaynagi = "ofac" | "tronscan" | "acik_kaynak" | "kesif" | "kesif_blok" | "kullanici";
 
 export type TohumEtiket = {
   chain: ChainId;

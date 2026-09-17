@@ -186,6 +186,28 @@ Canlı uç (B4) — ölçülerek konanlar (2026-09-17):
   `.env` de konteynere UYMAZ (Postgres bağlantısı farklı, TronGrid anahtarı yok); deneme konteyneri
   `--env-file C:\srv\cry\.env`, `--network cry_default` ve `-e CLICKHOUSE_URL=http://clickhouse:8123` ile koşar.
 
+Motor ve arayüz (B5) — kullanıcı kararları 2026-09-17:
+
+- **Giden yön `kimden` sıralı İNCE AYNADAN okunur** (`blok_indeks_giden`, MV ile dolar). Ana tablo `kime`
+  sıralı olduğu için giden sorgu tam tablo taraması yapıyordu: 63 Mn satırda `FINAL` ile ~600 ms, tam geçmişe
+  izdüşümü ~100 sn. Aynada 28 ms. İnce: tx yerine `cityHash64(tx)`, blok yok → 28,2 B/satır (+%52; tam kopya
+  +%97). Disk bedelini kullanıcı kabul etti ("daha geniş disk alanı sağlayacağım"). Yazan kod aynayı BİLMEZ.
+  **MV'den önce yazılmış satır aynaya kendiliğinden gelmez** (`scripts/blok-indeks-ayna-doldur.mts`).
+- **Keşifte tutar eşiği YOK; toz AYRI SAYILIR ve GÖSTERİLİR.** Kullanıcı: "0 eşiksiz yap. toz tutarları ayrı
+  bir şekilde göstersin. ama göstersin." Toz = <1 TRX/USDT (`TOZ_SINIRI`). Ölçüldü: bir adrese gönderen 3.069
+  adresin 3.053'ü yalnızca toz — adres zehirleme sayıyı şişiriyor, ama sayı ELENMEZ, yanında yazar.
+- **Blok indeksinin her cevabı bir PENCEREYE bağlıdır** (boşluksuz son aralık, `pencereOku`). Pencere ölçümü
+  bir ALT SINIRDIR: 9,7 günlük pencerede arşiv keşfinin 17 etiketinden 16'sı eşiğin altında kaldı. Blok
+  keşfi aday EKLER, var olanı düşürmez. Kaynağı `kesif_blok`tur, `kesif` değil. Zaten doğrulanmış ya da arşiv
+  keşfinin yazdığı adrese aday yazmaz. Arşivle sınırlanır: pencerede ≥50 göndericisi olan zincir adresi
+  111.235.
+- **Ulaşılamayan blok indeksi "hareket yok" DEĞİLDİR.** Adres sayfası `bakilamadi` der; pencerede hareketi
+  olmayan adres için de "pencere dışı için bir şey söylenemez" yazar.
+- **Web, `@cry/blok-indeks`i `extensionAlias` ile derler.** Paket NodeNext düzeninde (`./istemci.js` → `.ts`);
+  tsx ve tsc bunu çözüyor, Next'in webpack'i çözmüyor: `next build` "Module not found: ./sema.js" ile düştü.
+  Yerel typecheck ve testler GEÇİYORDU; hata ancak imaj temiz kopyada derlenince görüldü. Web'e yeni paket
+  bağlanınca push'tan önce imaj derlenir (CLAUDE.md → B4 temiz kopya yolu).
+
 Sabit kalan iki kural:
 
 - **İki katman: blok indeksi ADAY üretir, adres taraması HÜKÜM.** Blok

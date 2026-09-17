@@ -29,6 +29,16 @@ export type AdresIstatistigi = {
   /** Bu adresin gönderdiği KAÇ FARKLI adres. */
   aliciSayisi: number;
   hareketSayisi: number;
+  /**
+   * Göndericilerden kaçı bu adrese YALNIZCA toz tutar gönderdi (blok indeksi keşfi, kullanıcı kararı
+   * 2026-09-17: sayım eşiksiz, toz AYRI gösterilir). Adres zehirleme gibi toz gönderimleri karşı taraf
+   * sayısını şişirebilir; sayı gerekçede görünür ki insan ayırt edebilsin. Verilmezse bilinmiyor.
+   */
+  tozGonderenSayisi?: number;
+  /** Alıcılardan kaçına YALNIZCA toz tutar gönderdi. */
+  tozAliciSayisi?: number;
+  /** Alt sınırın SEBEBİ, gerekçeye yazılır. Verilmezse "kısmi tarama". */
+  altSinirNotu?: string;
 };
 
 /** Bir servis cüzdanının şekli — hangi yönü kalabalık. */
@@ -109,9 +119,10 @@ export function servisAdaylari(
     const ikisiDe = gonderen >= esikler.gecisEsigi && alici >= esikler.gecisEsigi;
     const sekil: Sekil = ikisiDe ? "gecis" : gonderen > alici ? "toplayici" : "dagitici";
 
+    const toz = (n?: number) => (n ? ` (${n}'i yalnızca toz)` : "");
     const gerekce: string[] = [
-      `${gonderen} farklı adresten alıyor, ${alici} farklı adrese gönderiyor` +
-        (altSinirMi ? " (kısmi tarama — bunlar ALT SINIR)" : ""),
+      `${gonderen} farklı adresten alıyor${toz(s.tozGonderenSayisi)}, ${alici} farklı adrese gönderiyor${toz(s.tozAliciSayisi)}` +
+        (altSinirMi ? ` (${s.altSinirNotu ?? "kısmi tarama"} — bunlar ALT SINIR)` : ""),
       `${s.hareketSayisi} hareket`,
     ];
     if (sekil === "toplayici") {

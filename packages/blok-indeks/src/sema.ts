@@ -66,8 +66,48 @@ CREATE TABLE IF NOT EXISTS ${KAPSAM_TABLO} (
 ORDER BY blok
 `.trim();
 
-/** Kurulum sırası önemli değil; ikisi de IF NOT EXISTS. */
-export const SEMALAR = [SEMA_SQL, KAPSAM_SEMA_SQL] as const;
+/**
+ * GİDEN yön aynası: aynı transferler `kimden` sıralı (kullanıcı kararı 2026-09-17, B5 kapısı).
+ *
+ * Ana tablo `kime` sıralı olduğu için "bu adres kime gönderdi" sorusu TAM TABLO taraması yapıyordu:
+ * 63 Mn satırda `FINAL` ile ~600 ms, tam geçmişte (~10,8 Mr) ~100 sn. Ayna aynı sorguyu 28 ms'de verir.
+ * İnce tutuldu — tx hash'i yerine `cityHash64(tx)`, blok yok: 28,2 bayt/satır, tam kopya 54,4
+ * (ölçüldü). Hash çakışması tekilliği bozamaz: anahtar `kimden` ve `zaman`ı da taşıyor (63 Mn (tx, idx)
+ * çiftinde çakışma 0). Hash'in kendisi gösterilmez; işlemin kimliği ana tablodan okunur.
+ *
+ * Yazan kod aynayı BİLMEZ: materialized view ana tabloya her INSERT'te aynayı doldurur. Aynı blok iki
+ * kez yazılırsa ayna da iki kez alır, ReplacingMergeTree + `FINAL` ana tablodaki gibi tekiller.
+ */
+export const GIDEN_TABLO = "blok_indeks_giden";
+export const GIDEN_MV = "blok_indeks_giden_mv";
+
+export const GIDEN_SEMA_SQL = `
+CREATE TABLE IF NOT EXISTS ${GIDEN_TABLO} (
+  kimden FixedString(20)              CODEC(ZSTD(3)),
+  zaman  DateTime                     CODEC(Delta, ZSTD(3)),
+  txh    UInt64                       CODEC(ZSTD(3)),
+  idx    UInt16                       CODEC(ZSTD(3)),
+  varlik Enum8('TRX' = 1, 'USDT' = 2),
+  kime   FixedString(20)              CODEC(ZSTD(3)),
+  tutar  UInt256                      CODEC(ZSTD(3))
+) ENGINE = ReplacingMergeTree
+PARTITION BY toYYYYMM(zaman)
+ORDER BY (kimden, zaman, txh, idx)
+`.trim();
+
+/** Aynanın ana tablodan türetilişi — MV ve geriye dönük doldurma AYNI seçimi kullanır. */
+export const GIDEN_SECIM_SQL = `SELECT kimden, zaman, cityHash64(tx) AS txh, idx, varlik, kime, tutar FROM ${TABLO}`;
+
+export const GIDEN_MV_SQL = `
+CREATE MATERIALIZED VIEW IF NOT EXISTS ${GIDEN_MV} TO ${GIDEN_TABLO} AS
+${GIDEN_SECIM_SQL}
+`.trim();
+
+/**
+ * Kurulum SIRASI önemli: ayna tablosu MV'den önce kurulmalı. Hepsi IF NOT EXISTS. MV kurulmadan önce
+ * yazılmış satırlar aynaya kendiliğinden GELMEZ — `scripts/blok-indeks-ayna-doldur.mts`.
+ */
+export const SEMALAR = [SEMA_SQL, KAPSAM_SEMA_SQL, GIDEN_SEMA_SQL, GIDEN_MV_SQL] as const;
 
 export const KAPSAM_EKLE_SQL = `
 INSERT INTO ${KAPSAM_TABLO} (blok, zaman, satir, islem, basarisiz_islem, transfer_olmayan_olay, kapsam_disi_token)

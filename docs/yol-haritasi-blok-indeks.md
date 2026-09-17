@@ -520,6 +520,91 @@ bitecek büyüklükte bölünür (görev disiplini, `docs/gorevler/README.md`).
 - **Bitiş:** koşu 9 yeniden koşturulduğunda sonuç aynı; keşif adayları
   artar ve her birinin kaynağı yazılı.
 
+**Kapı ölçümü (2026-09-17)** — `scripts/olcum/b5-kapi.mts`, tablo 63,2 Mn satır:
+
+- **Pencere:** boşluksuz son aralık 86.037.434–86.316.657 = 279.224 blok, **9,70 gün**
+  (2026-09-07 12:28 → 09-17 05:15 UTC), 63.057.285 satır. B3 geriye doğru ilerledikçe pencere günde
+  ~22 gün genişliyor. Pencere dışındaki eski deneme öbeği (30.000.000–30.001.299) keşfe girmez.
+- **Keşif, arşivin 31.896 TRON adresi üzerinde** (31.780'i `bilinmiyor`), karşı taraf eşiği 50:
+
+  | Tutar ≥ | Pencerede görünen arşiv adresi | Aday | ↳ `bilinmiyor` (YENİ) | ↳ mevcut keşif etiketi | Gelen / giden sorgusu |
+  |---|---|---|---|---|---|
+  | 0 | 1.221 | 71 (+1 yakma) | 69 | 1 | 655 / 472 ms |
+  | 1 | 237 | 63 (+1 yakma) | 62 | 1 | 295 / 432 ms |
+  | 100 | 174 | 52 | 51 | 1 | 245 / 319 ms |
+
+  - **Mevcut 17 keşif etiketinin 16'sı pencerede eşiğin ALTINDA.** Onlar yılların taramasından ölçüldü,
+    pencere 9,7 gün. Pencere ölçümü bir ALT SINIRDIR (`kismi` gibi): aday EKLER, var olan etiketi
+    düşürmez ya da silmez.
+  - **Arşivle sınırlanmayan keşif anlamsız:** pencerede ≥50 farklı göndericisi olan zincir adresi
+    **111.235** (667 ms). Keşif yalnızca arşivin sorduğu adreslere bakar.
+  - Tutar ≥0'da pencerede görünen arşiv adresi 1.221, ≥1'de 237: arşiv adreslerinin çoğuna pencerede
+    yalnızca 1 TRX/USDT altı tutar geliyor. Toz, karşı taraf sayısını şişirebilir (adres zehirleme).
+- **Katman 2 ile tutarlılık:** taraması pencereye uzanan 3 `tam` adreste gelen karşı taraf kümesi ve
+  hareket sayısı 3/3 aynı. Örnek küçük, çünkü taramalar 09-10/11'de bitiyor. Geniş karşılaştırma B2/B4'ün
+  `dogrula.ts` koşularında (25/25, 23/23, 20/20).
+- **Hız — adres sayfası:**
+
+  | Sorgu (tek adres, tüm tablo) | Ortanca | Okunan satır | Tam geçmişe (10,8 Mr) izdüşüm |
+  |---|---|---|---|
+  | `kime =` (gelen), `FINAL`, 1,1–1,5 Mn satırlık adres | 107–118 ms | 1,3–1,5 Mn | sıralı anahtar: adresin hacmiyle büyür |
+  | `kimden =` (giden), `FINAL` | 579–610 ms | **63–65 Mn (tam tablo)** | **~100 sn** |
+  | `kimden =`, `FINAL`sız | 50–104 ms | 63 Mn | 9–18 sn |
+  | `kimden =`, son 3 gün | 515 ms | — | bölüm AYLIK: ayın tamamı okunur |
+
+  **Giden yön tam tarama.** Sıralama `(kime, …)` ve bölüm aylık, `zaman` süzgeci ayın içini daraltmıyor.
+  Adres sayfasının "kime gönderdi" sorusu tam geçmişte kullanılamaz hâle gelir. Ölçülen iki ayna
+  (202609 bölümü, `OPTIMIZE FINAL` sonrası):
+
+  | `kimden` sıralı kopya | Bayt/satır | Ana tabloya ek | Aynı sorgu |
+  |---|---|---|---|
+  | Tam kopya (aynı sütunlar) | 54,4 | +%97 | 30 ms |
+  | **İnce ayna:** tx yerine `cityHash64(tx)`, blok yok | **28,2** | **+%52** | 28 ms |
+
+  İnce aynada 63 Mn (tx, idx) çiftinde karma çakışması 0. Anahtar `kimden` ve `zaman`ı da taşıdığı için
+  çakışma tekilliği bozamaz. Ana tablonun sütun payı: tx 32 · kimden 14,7 · kime 2,8 · tutar 2,4
+  bayt/satır. `kimden`in payı `kime` sıralı tabloda 14,7, `kimden` sıralı aynada 2,2.
+  **Karar (kullanıcı, 2026-09-17): ince ayna ŞİMDİ kurulur** — disk alanı genişletilecek (Docker ileride
+  yeniden C:'ye taşınabilir). **Keşifte tutar eşiği YOK, toz ayrı gösterilir.**
+
+  ```bash
+  node --env-file=.env --env-file=apps/web/.env.local --import tsx scripts/olcum/b5-kapi.mts
+  ```
+
+- **Yapıldı (2026-09-17):**
+  - **Ayna** `blok_indeks_giden` + materialized view `blok_indeks_giden_mv`. Yazan kod aynayı bilmiyor:
+    doldurucu ve canlı uç ana tabloya yazdıkça MV aynayı doldurur. MV'den önceki satırlar
+    `scripts/blok-indeks-ayna-doldur.mts` ile kopyalandı: iki bölüm, 202609'da 66 sn, ana tablo ile aynanın
+    `FINAL` sayısı eşit (65.932.272). Ayna diskte 1,90 GiB (birleşme öncesi). İki yazar da hatasız sürdü.
+  - **Okuma sorguları** `packages/blok-indeks/src/sorgular.ts`, keşif ve web aynı yerden okur:
+    - `pencereOku`: boşluksuz son aralık, 98 ms.
+    - `adresOzeti`: yön × varlık başına karşı taraf, hareket, toplam ve en büyük 10 karşı taraf. En yoğun
+      adreste (1,1 Mn gelen) 512 ms.
+    - `kesifSayilari`: toplu, geçici Memory tablosuyla.
+    - Toz (`TOZ_SINIRI`, <1 TRX/USDT) her yerde AYRI sayılır.
+  - **Keşif** `--kaynak=kesif-blok`, uygulaması `packages/etiket/src/kesif-blok-oku.ts`:
+    - Kaynak `kesif_blok`; kanıtta pencere, sayılar ve toz sınırı var.
+    - Pencere ölçümü ALT SINIR sayılır (`kismi`). Gerekçe cümlesi toz sayısını ayrıca söyler (testli).
+    - Kuru koşu sonucu: 71 aday → **50 yazılacak** · 20 güven ≤ 0,7 · 1 zaten doğrulanmış · 1 yakma. Örnek:
+      `TAzsQ9Gx…` "3069 farklı adresten alıyor (3053'i yalnızca toz), 128231 farklı adrese gönderiyor".
+    - **Yazılmadı:** yazılırsa bu adresler sonraki koşularda `terminal_aday` durması üretir. Kullanıcı onayı
+      bekliyor.
+  - **Adres sayfası:** `GET /api/adres/tron/<adres>/blok-indeksi` ve `BlokIndeksi.tsx`:
+    - Köken oluğu "türetildi". Pencere tarihleri, "aday bilgi — takip ve rapor kullanmaz", toz notu ve açılır
+      en büyük karşı taraflar görünür.
+    - ClickHouse'a ulaşılamazsa "bakılamadı" der, "hareket yok" demez.
+    - Web konteyneri `CLICKHOUSE_URL=http://clickhouse:8123` alır.
+    - Oturumsuz doğrulandı: görünüm katmanı gerçek veriyle statik çizildi. Üç adres ve bakılamadı durumu
+      çizildi; tablo taşması 0.
+- **Kalan:** takip motorunda önbellek ısıtma (sıradaki adresi önceden taramaya koymak). Atıf ve durma
+  kararlarını değiştirmez; koşu 9'un "sonuç aynı" ölçütü bugün de geçerli, çünkü motor koduna
+  dokunulmadı. Canlıda adres sayfası gözle bakılacak (push sonrası).
+
+  ```bash
+  node --env-file=.env --env-file=apps/web/.env.local --import tsx scripts/blok-indeks-ayna-doldur.mts --uygula
+  node --env-file=.env --env-file=apps/web/.env.local --import tsx packages/etiket/src/cli.ts --kaynak=kesif-blok [--uygula]
+  ```
+
 ### B6 — İşletim
 
 - Disk izleme ve uyarı (bölüm başına boyut, kalan alan; D: NVMe 198 GB boş).

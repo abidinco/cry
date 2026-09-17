@@ -58,6 +58,8 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
+      # Adres sayfasının blok indeksi bölümü (B5). .env makineyi (127.0.0.1:18123) gösteriyor; konteynerden servis adı.
+      CLICKHOUSE_URL: http://clickhouse:8123
     # 127.0.0.1: ÖNEKİ KOYMA — WireGuard tünelinden (10.99.0.2) erişilmeli.
     ports:
       - "1337:3000"
