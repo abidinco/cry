@@ -10,6 +10,23 @@ import { ekle, satirDizisi, kapsamDizisi, EKLE_SQL, KAPSAM_EKLE_SQL, type Ayar, 
 /** Geçici yazma hatası bu kadar süre yeniden denenir; sonra kalıcı sayılır. */
 const GECICI_HATA_SURESI_MS = 10 * 60_000;
 
+/**
+ * Günlük zaman damgası: YEREL saat + AÇIK fark (`2026-09-18T00:47:22+03:00`).
+ *
+ * Önce `toISOString()` kullanılıyordu, yani UTC — ve damga bunu SÖYLEMİYORDU. Makinenin saati TSİ
+ * (+03): 2026-09-18'de bir denetim, günlüğün son satırını ("21:47") Windows saatiyle ("00:47")
+ * karşılaştırıp "3 saattir ilerlemiyor" dedi. Doldurucu gayet çalışıyordu; yine de takıldı sanılıp
+ * öldürüldü ve yeniden başlatıldı. Damga kendi saat dilimini söylemezse, onu okuyan her araç
+ * kendi diliminde yorumlar.
+ */
+export const ts = (): string => {
+  const d = new Date();
+  const fark = -d.getTimezoneOffset();
+  const iki = (n: number) => String(Math.floor(Math.abs(n))).padStart(2, "0");
+  const yerel = new Date(d.getTime() + fark * 60_000).toISOString().slice(0, 19);
+  return `${yerel}${fark < 0 ? "-" : "+"}${iki(fark / 60)}:${iki(fark % 60)}`;
+};
+
 /** Bağlantı kopması ve sunucu tarafı 5xx geçicidir; 4xx (sorgu/şema hatası) kalıcıdır. */
 export function geciciMi(e: unknown): boolean {
   const m = (e as Error)?.message ?? "";

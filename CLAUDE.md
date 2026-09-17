@@ -201,6 +201,10 @@ Motor ve arayüz (B5) — kullanıcı kararları 2026-09-17:
   keşfi aday EKLER, var olanı düşürmez. Kaynağı `kesif_blok`tur, `kesif` değil. Zaten doğrulanmış ya da arşiv
   keşfinin yazdığı adrese aday yazmaz. Arşivle sınırlanır: pencerede ≥50 göndericisi olan zincir adresi
   111.235.
+- **Günlük damgası saat dilimini SÖYLER** (`ts()`, `apps/blok-okuyucu/src/yazici.ts`): yerel saat + fark.
+  Damga UTC'ydi ve bunu söylemiyordu; makine TSİ. İki ayrı denetim aynı tuzağa düştü (2026-09-18): biri
+  "3 saattir ilerlemiyor" deyip sapasağlam çalışan doldurucuyu öldürüp yeniden başlattı. **Bir sürecin
+  takılıp takılmadığı damgayla değil İLERLEMEYLE ölçülür:** günlüğün boyutu/satırı 90 sn'de artıyor mu.
 - **Ulaşılamayan blok indeksi "hareket yok" DEĞİLDİR.** Adres sayfası `bakilamadi` der; pencerede hareketi
   olmayan adres için de "pencere dışı için bir şey söylenemez" yazar.
 - **Web, `@cry/blok-indeks`i `extensionAlias` ile derler.** Paket NodeNext düzeninde (`./istemci.js` → `.ts`);

@@ -30,7 +30,7 @@ import {
 import { prisma } from "@cry/db";
 import { KUYRUK, KUYRUK_ONEKI } from "@cry/kuyruk";
 import { KAYNAKLAR, TronBlokKaynagi } from "./kaynak.js";
-import { Yazici, geciciyseTekrarla } from "./yazici.js";
+import { Yazici, geciciyseTekrarla, ts } from "./yazici.js";
 
 const deger = (ad: string) => process.argv.find((x) => x.startsWith(`--${ad}=`))?.split("=").slice(1).join("=");
 const sayi = (ad: string, vars: number) => {
@@ -50,7 +50,6 @@ const SECILEN = (deger("kaynaklar") ?? "publicnode,tronstack,trongrid").split(",
 /** Parçada okunamayan blok oranı bunu aşarsa kaynaklar okuyamıyor demektir: geçmişi boşlukla doldurmak yerine DUR. */
 const HATA_ORANI_SINIRI = 0.01;
 const uyu = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const ts = () => new Date().toISOString().slice(0, 19).replace("T", " ");
 
 const a = ayarOku();
 const tg = new TronBlokKaynagi({ apiKey: process.env.TRONGRID_API_KEY });

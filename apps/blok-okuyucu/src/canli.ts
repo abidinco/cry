@@ -26,7 +26,7 @@ import { writeFileSync } from "node:fs";
 import { ayarOku, sorgu, bloktanSatirlar, bitisikKursor, SEMALAR, KAPSAM_TABLO, type AyristirmaSonucu } from "@cry/blok-indeks";
 import { prisma } from "@cry/db";
 import { KAYNAKLAR, TronBlokKaynagi } from "./kaynak.js";
-import { Yazici, geciciyseTekrarla } from "./yazici.js";
+import { Yazici, geciciyseTekrarla, ts } from "./yazici.js";
 
 const deger = (ad: string) => process.argv.find((x) => x.startsWith(`--${ad}=`))?.split("=").slice(1).join("=");
 const sayi = (ad: string, vars: number) => {
@@ -47,7 +47,6 @@ const KURSOR_MS = 30_000;
 /** Yeni kesinleşen blokta bilgi eksik gelebiliyor (ölçüldü: 3–13 sn): yedeğe geçmeden önce birincil kaç kez beklenir. */
 const BIRINCIL_DENEME = 5;
 const uyu = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const ts = () => new Date().toISOString().slice(0, 19).replace("T", " ");
 
 const a = ayarOku();
 const birincil = new TronBlokKaynagi(KAYNAKLAR.publicnode(sayi("publicnodeMs", 60)));
