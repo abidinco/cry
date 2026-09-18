@@ -111,6 +111,34 @@ export class TronBlokKaynagi {
     if (blok.block_header.raw_data.number !== no) throw new Error(`${this.ad}: ${no} istendi, ${blok.block_header.raw_data.number} geldi`);
     return { blok, bilgi };
   }
+
+  /**
+   * [bas, son] aralığındaki blokları TEK istekte getirir (`getblockbylimitnext`, bitiş HARİÇ gönderilir).
+   *
+   * Doldurucunun blok başına iki isteğinden birini kaldırır. Kaynaklar istek hızıyla sınırlı olduğu için eski
+   * geçmişte hız ~2 kat olur. Ölçüm (2026-09-18, blok 80.000.000): tronstack ve TronGrid'de 10/50/100 blok
+   * döndü; döndürülen blok `getblockbynum`'la BAYT BAYT aynı. 50 blok 1,6–2,2 sn, ~15 MB. publicnode 100'de
+   * 429 verdi. Dönen her blok numarasıyla eşlenir; aralıkta olup dönmeyen blok haritada YOKTUR ve çağıran onu
+   * tekli istekle okur — eksik cevap "0 transferli blok" olamaz.
+   */
+  async bloklar(bas: number, son: number): Promise<Map<number, unknown>> {
+    const j = await this.post<{ block: { block_header: { raw_data: { number: number } } }[] }>(
+      "/wallet/getblockbylimitnext",
+      { startNum: bas, endNum: son + 1 },
+      (x) => Array.isArray((x as { block?: unknown })?.block) && (x as { block: unknown[] }).block.every(blokSekli),
+    );
+    const m = new Map<number, unknown>();
+    for (const b of j.block) {
+      const n = b.block_header.raw_data.number;
+      if (n >= bas && n <= son) m.set(n, b);
+    }
+    return m;
+  }
+
+  /** Tek bloğun işlem bilgisi. Toplu blok isteğinin yanında blok başına kalan tek istek budur. */
+  async bilgi(no: number): Promise<unknown[]> {
+    return this.post<unknown[]>("/wallet/gettransactioninfobyblocknum", { num: no }, Array.isArray);
+  }
 }
 
 function blokSekli(j: unknown): boolean {

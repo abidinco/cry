@@ -453,6 +453,27 @@ bitecek büyüklükte bölünür (görev disiplini, `docs/gorevler/README.md`).
   node --env-file=.env --env-file=apps/web/.env.local --import tsx apps/blok-okuyucu/src/doldur.ts --uygula --ilerlemeSn=60
   ```
 
+- **Hızlandırma (2026-09-18): toplu blok isteği.** Dünkü 14 saatlik günlükte kaynak başına hız: publicnode 5,4,
+  tronstack 2,9, TronGrid 0,45 blok/sn. publicnode blok ~83,68 Mn'un altına inmiyor, yani ~3 gün sonra hız
+  ~3,4 blok/sn'ye düşecekti ve disk sınırına ~75 gün kalıyordu. `getblockbylimitnext` tek istekte 50–100 blok
+  döndürüyor ve dönen blok `getblockbynum` ile bayt bayt aynı. İşçi artık kaynağından ardışık 20 blok alıyor:
+  blokları tek istekte, işlem bilgisini blok blok çekiyor. Ölçüm (tronstack, kuru, aynı 800/600 blok):
+
+  | Ayar | Hız | İstek | Not |
+  |---|---|---|---|
+  | toplu 1 × 2 eşzaman (eski) | 2,44 blok/sn | 1.601 | |
+  | toplu 20 × 2 | 2,92 | 841 | satırlar AYNI (224.772) — darboğaz sıralı bekleme |
+  | **toplu 20 × 4** | **4,61** | 631 | hatasız |
+  | toplu 20 × 6 | 4,71 | 631 | 1 hata: 200 ms kapı sınırı |
+
+  **Canlıda üç kaynakla 7,3 → 15,25 blok/sn**, hatasız. Eski geçmişte (tronstack + TronGrid) beklenen ~6–7 blok/sn:
+  disk sınırı ~75 gün yerine ~38 gün. TronGrid 2 eşzamanda kaldı (kota worker'la paylaşılıyor), ama istek
+  sayısı yarıya indiği için kotadan eskisinin yarısını yiyor.
+- **Yanlış "bitti" / "takıldı" alarmları (2026-09-18):** günlük damgası UTC'ydi ve bunu söylemiyordu, makine TSİ.
+  Bir denetim sapasağlam doldurucuyu "3 saattir ilerlemiyor" diye öldürüp yeniden başlattı; `doldur-devam.ps1`
+  günlükteki 16 Eylül'e ait eski bir "bitti:" satırını okuyup "B3 bitti" bildirimi yolladı. Damga artık saat
+  dilimini taşıyor (`2026-09-18T04:43:29+03:00`).
+
 ### B4 — Canlı uç ✅ kod + doğrulama (2026-09-17) · 24 saat ölçütü sürüyor
 
 - Okuyucu sürekli çalışır: her ~3 sn kesinleşmiş yeni blokları yazar.

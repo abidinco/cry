@@ -3,7 +3,7 @@
  *
  *   node --env-file=.env --env-file=apps/web/.env.local --import tsx apps/blok-okuyucu/src/doldur.ts \
  *     [--uygula] [--ust=<blok>] [--taban=1] [--parca=10000] [--kaynaklar=publicnode,tronstack,trongrid] \
- *     [--minBosGB=50] [--disk=D:\][--capraz=500] [--ilerlemeSn=10] [--<kaynak>Ms=…] [--<kaynak>Es=…]
+ *     [--minBosGB=50] [--disk=D:\][--capraz=500] [--ilerlemeSn=10] [--<kaynak>Ms=…] [--<kaynak>Es=…] [--<kaynak>Toplu=20]
  *
  * Karar (kullanıcı, 2026-09-17; bekleyen-kararlar §8'in cevabı): ücretsiz kaynaklar, geriye doğru, dolan
  * disk durdurur. Ölçümler yol haritası → B3.
@@ -19,6 +19,13 @@
  *   karşılaştırılır. Uyuşmazsa hangisinin doğru olduğu bilinemez: blok YAZILMAZ, boşluk kalır.
  * - Disk: her parçadan önce `disk` sürücüsünün boş alanı ölçülür; `minBosGB` altında DURUR (çıkış 3).
  * - Parça bitince boşluklar kapsamdan hesaplanıp `block_cursors.missing_ranges`e yazılır.
+ * - **Toplu blok:** her işçi kendi kaynağından ARDIŞIK en çok `<kaynak>Toplu` blok alır, blokları tek istekte
+ *   (`getblockbylimitnext`), işlem bilgisini blok blok çeker: istek blok başına ~2'den ~1'e iner (2026-09-18).
+ *   Toplu istek düşerse dizinin blokları tek tek başka kaynağa gider; dönmeyen blok tekli istekle okunur.
+ *   `--<kaynak>Toplu=1` eski davranıştır.
+ *   Ölçüm (blok 69.998.601–70.000.000, tronstack, kuru): toplu 1 × 2 eşzaman 2,44 blok/sn, 1.601 istek · toplu 20 × 2
+ *   2,92 blok/sn, 841 istek (satırlar AYNI, 224.772) · toplu 20 × 4 **4,61**, hatasız · × 6 4,71 ve 1 hata (200 ms kapı sınırı).
+ *   Varsayılan: tronstack ve publicnode 4, TronGrid 2 eşzaman (kota worker'la paylaşılıyor).
  */
 import { statfsSync } from "node:fs";
 import { Queue } from "bullmq";
@@ -63,6 +70,8 @@ type Aktif = {
   kaynak: TronBlokKaynagi;
   sinir: KaynakSiniri;
   eszaman: number;
+  /** Bir işçinin tek seferde aldığı ardışık blok sayısı (toplu blok isteği). */
+  toplu: number;
   oncelikli: boolean;
   basarili: number;
   hata: number;
@@ -85,7 +94,7 @@ for (const ad of SECILEN) {
       if (enEski !== null) enEski += 28_800;
     } catch (e) { console.error(`${ad} yoklanamadı, kullanılmıyor: ${(e as Error).message}`); continue; }
   }
-  aktifler.push({ kaynak, sinir: { ad, enEski }, eszaman: sayi(`${ad}Es`, ad === "publicnode" ? 4 : 2), oncelikli: ad === "trongrid", basarili: 0, hata: 0, ardisikHata: 0, bekleyeKadar: 0 });
+  aktifler.push({ kaynak, sinir: { ad, enEski }, eszaman: sayi(`${ad}Es`, ad === "trongrid" ? 2 : 4), toplu: Math.max(1, Math.min(100, sayi(`${ad}Toplu`, 20))), oncelikli: ad === "trongrid", basarili: 0, hata: 0, ardisikHata: 0, bekleyeKadar: 0 });
 }
 if (aktifler.length === 0) { console.error("kullanılabilir kaynak yok"); process.exit(2); }
 
@@ -122,7 +131,7 @@ console.log(
   `${UYGULA ? "YAZILIYOR" : "KURU (yazılmaz; --uygula)"} · disk ${DISK} en az ${MIN_BOS / 2 ** 30} GiB boş · çapraz her ${CAPRAZ || "—"}`,
 );
 for (const k of aktifler) {
-  console.log(`  kaynak ${k.sinir.ad}: ${k.sinir.enEski === null ? "tam geçmiş" : `en eski ${k.sinir.enEski}`} · ${k.eszaman} eşzaman${k.oncelikli ? " · worker kuyruğu boşken" : ""}`);
+  console.log(`  kaynak ${k.sinir.ad}: ${k.sinir.enEski === null ? "tam geçmiş" : `en eski ${k.sinir.enEski}`} · ${k.eszaman} eşzaman · toplu ${k.toplu}${k.oncelikli ? " · worker kuyruğu boşken" : ""}`);
 }
 
 // ---- durdurma ----
@@ -199,12 +208,37 @@ async function parcaOku(bekleyen: number[]): Promise<number> {
   let hatali = 0;
   let caprazSayac = 0;
 
-  const al = (k: Aktif): Is | undefined => {
+
+  /** Geri dönen iş varsa tek başına o; yoksa ana kuyruktan ARDIŞIK (azalan) en çok `k.toplu` blok. */
+  const alDizi = (k: Aktif): Is[] => {
     const gi = geri.findIndex((i) => !i.denenen.has(k.sinir.ad) && kaynakUygunMu(k.sinir, i.no));
-    if (gi >= 0) return geri.splice(gi, 1)[0];
-    const i = ana[anaSira];
-    if (i && kaynakUygunMu(k.sinir, i.no)) { anaSira++; return i; }
-    return undefined;
+    if (gi >= 0) return [geri.splice(gi, 1)[0]!];
+    const dizi: Is[] = [];
+    while (dizi.length < k.toplu) {
+      const i = ana[anaSira];
+      if (!i || !kaynakUygunMu(k.sinir, i.no)) break;
+      if (dizi.length && i.no !== dizi[dizi.length - 1]!.no - 1) break; // önceden okunmuş blokta dizi kesilir
+      dizi.push(i);
+      anaSira++;
+    }
+    return dizi;
+  };
+  /** Bir bloğun hatası. Toplu istek düşünce dizinin yalnızca İLKİ ardışık hata sayılır: bir istek, bir hata. */
+  const hataIsle = (k: Aktif, is: Is, e: unknown, say = true) => {
+    const mesaj = (e as Error).message.slice(0, 200);
+    if (say) {
+      k.hata++;
+      k.sonHata = mesaj;
+      if (++k.ardisikHata >= 20) {
+        k.bekleyeKadar = Date.now() + 60_000;
+        k.ardisikHata = 0;
+        console.log(`${ts()} ${k.sinir.ad} 20 ardışık hata — 60 sn bekletiliyor. Son: ${mesaj}`);
+      }
+    }
+    is.denenen.add(k.sinir.ad);
+    const baskaKaynak = !(e as { kesin?: boolean }).kesin && aktifler.some((x) => !is.denenen.has(x.sinir.ad) && kaynakUygunMu(x.sinir, is.no));
+    if (baskaKaynak) geri.push(is);
+    else { hatali++; if (hatalar.length < 50) hatalar.push(`${is.no}: ${mesaj}`); }
   };
   // Parça bitti: yeni iş yok, uçuşta iş yok, geri dönenlerin hiçbiri ŞU AN kullanılabilir bir kaynağa gidemiyor.
   // (Ana kuyrukta iş kaldıysa, onu alabilecek kaynak bekletiliyor olsa da parça BİTMEZ — beklenir.)
@@ -214,33 +248,36 @@ async function parcaOku(bekleyen: number[]): Promise<number> {
   const isci = async (k: Aktif) => {
     for (;;) {
       if (durdur) return;
-      const is = musait(k) ? al(k) : undefined;
-      if (!is) { if (bitti()) return; await uyu(200); continue; }
-      ucusta++;
-      try {
-        const { blok, bilgi } = await k.kaynak.blok(is.no);
-        const r = bloktanSatirlar(blok as never, bilgi as never);
-        if (CAPRAZ > 0 && ++caprazSayac % CAPRAZ === 0) await caprazDenetle(k, is.no, r);
-        k.basarili++;
-        k.ardisikHata = 0;
-        s.okunan++;
-        s.satir += r.satirlar.length;
-        yazici.ekle(r);
-      } catch (e) {
-        const mesaj = (e as Error).message.slice(0, 200);
-        k.hata++;
-        k.sonHata = mesaj;
-        if (++k.ardisikHata >= 20) {
-          k.bekleyeKadar = Date.now() + 60_000;
-          k.ardisikHata = 0;
-          console.log(`${ts()} ${k.sinir.ad} 20 ardışık hata — 60 sn bekletiliyor. Son: ${mesaj}`);
+      const dizi = musait(k) ? alDizi(k) : [];
+      if (dizi.length === 0) { if (bitti()) return; await uyu(200); continue; }
+      ucusta += dizi.length;
+      // Dizi azalan: blokları tek istekte [en küçük, en büyük].
+      let hazir = new Map<number, unknown>();
+      if (dizi.length > 1) {
+        try {
+          hazir = await k.kaynak.bloklar(dizi[dizi.length - 1]!.no, dizi[0]!.no);
+        } catch (e) {
+          dizi.forEach((is, i) => hataIsle(k, is, e, i === 0));
+          ucusta -= dizi.length;
+          continue;
         }
-        is.denenen.add(k.sinir.ad);
-        const baskaKaynak = !(e as { kesin?: boolean }).kesin && aktifler.some((x) => !is.denenen.has(x.sinir.ad) && kaynakUygunMu(x.sinir, is.no));
-        if (baskaKaynak) geri.push(is);
-        else { hatali++; if (hatalar.length < 50) hatalar.push(`${is.no}: ${mesaj}`); }
-      } finally {
-        ucusta--;
+      }
+      for (const is of dizi) {
+        try {
+          const onceden = hazir.get(is.no);
+          const { blok, bilgi } = onceden !== undefined ? { blok: onceden, bilgi: await k.kaynak.bilgi(is.no) } : await k.kaynak.blok(is.no);
+          const r = bloktanSatirlar(blok as never, bilgi as never);
+          if (CAPRAZ > 0 && ++caprazSayac % CAPRAZ === 0) await caprazDenetle(k, is.no, r);
+          k.basarili++;
+          k.ardisikHata = 0;
+          s.okunan++;
+          s.satir += r.satirlar.length;
+          yazici.ekle(r);
+        } catch (e) {
+          hataIsle(k, is, e);
+        } finally {
+          ucusta--;
+        }
       }
     }
   };
