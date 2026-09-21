@@ -216,20 +216,22 @@ olarak yazılması gerekir.
 
 ---
 
-## 11. Veritabanı yedeği yok
+## 11. Blok indeksinin yedeği YOK — bu bir KARAR (2026-09-22)
 
-**Ne bozuk:** 23.895 hareket ve 19 tam taranmış adres tek bir Docker
-volume'ünde duruyor. Rapor "kanıt dondurma" iddiasında; altındaki veri
-yedeksiz.
+**Ne var, ne yok:** Postgres yedekleniyor (`deploy/pc/yedek.ps1`, günlük 03:15, E: diskine,
+14 kopya). Blok indeksi (688 Mn satır / 53 GiB) yedeklenMİYOR.
 
-**Nasıl görülür:** görünmez — ta ki görünene kadar.
+**Neden karar:** yeri doldurulamayan veri Postgres'te ve **57 MB** — vaka, takip koşusu, etiket,
+rapor, denetim kaydı. Blok indeksi zincirden yeniden türetilebilir; bedeli para değil ZAMAN
+(bu hızla tam geçmiş ~98 gün). 53 GiB'lik ve büyüyen bir tabloyu 103 GiB boşu olan bir USB diske
+yedeklemek, tam geçmiş geldiğinde (832 GiB) zaten imkânsız.
 
-**Komut:**
-```powershell
-docker exec cry-db pg_dump -U cry -d cry --format=custom > "cry-yedek-$(Get-Date -Format yyyyMMdd).dump"
-```
+**Ne zaman yeniden düşünülür:** 2 TB disk gelip tam geçmiş yüklendiğinde. O noktada yeniden
+türetme maliyeti aylara çıkar ve indeksin de bir kopyası gerekir — muhtemelen ClickHouse'un kendi
+`BACKUP TABLE` komutuyla, ayrı bir fiziksel diske.
 
----
+**Kapsam dışı:** bu yedek PC'nin Postgres'ini kapsar. Hetzner'daki yığının veritabanı ayrıdır ve
+onun yedeği YOKTUR.
 
 ## 12. Hız sınırına takılma kullanıcıya söylenmiyor
 

@@ -320,6 +320,27 @@ dosyada hata GÖRÜNMÜYOR. Bu yüzden bir motor seçilince ilk yazılacak test,
 bilinen bir adresin sayısını **iki farklı yoldan** (süzgeçli ve süzgeçsiz)
 alıp karşılaştıran testtir.
 
+## Yedek — ne yedeklenir, ne yedeklenmez (2026-09-22)
+
+- **Yedeklenen: yalnızca Postgres.** Vaka, takip koşusu, etiket, rapor ve denetim kaydı zincirden
+  yeniden TÜRETİLEMEZ ve hepsi **57 MB**. `deploy/pc/yedek.ps1` her gün 03:15'te E:'ye alır (14
+  kopya). Aynı fiziksel diske yedek, yedek değildir.
+- **Blok indeksi BİLEREK yedeklenmiyor** (688 Mn satır / 53 GiB): türetilebilir, bedeli zaman.
+  Yedek günlüğü yine de indeksin hangi bloğa kadar dolu olduğunu yazar — kayıpta ne kadar yeniden
+  okunacağı bilinsin diye. Tam geçmiş yüklenince bu karar yeniden düşünülür (cozulmesi-gerekenler §11).
+- **Geri yüklenmemiş bir yedek, yedek DEĞİLDİR.** `deploy/pc/yedek-geri-yukleme-denemesi.ps1` her
+  pazar 03:45'te en yeni dump'ı geçici bir veritabanına yükleyip satır sayılarını karşılaştırır.
+  Ölçüt canlı değil, dump'ın yanına yazılan `.sayim` dosyasıdır: canlıyla kıyas yapan bir kontrol,
+  EKSİK bir dump'ı "canlı büyümüştür" diye normal görürdü. Denemenin kırmızıya dönebildiği
+  ÖLÇÜLDÜ — bozuk dump exit 1, sayımı şişirilmiş dump "geri 86.674 < yedek anındaki 99.999 EKSİK".
+- **PowerShell'de ölçülmüş üç tuzak** (üçü de bu betikleri yazarken yaşandı):
+  `docker exec ... > dosya` ikili çıktıyı metne çevirip **arşivi bozar** (dump konteyner içinde
+  alınıp `docker cp` ile taşınır) · PS 5.1 yerli exe'ye geçerken **gömülü çift tırnakları bozuyor**
+  (ClickHouse sorgusu "SELECT"e kırpıldı; argümanlar ayrı ayrı verilir, `sh -lc "..."` kullanılmaz) ·
+  yerli exe'de `2>&1` stderr'i ErrorRecord'a çevirir ve `$ErrorActionPreference="Stop"` ile sağlam
+  bir komutu bile hataya düşürür.
+- **Hetzner'daki yığının veritabanı bu yedeğin KAPSAMI DIŞINDA.**
+
 ## Windows self-hosted runner — üç tuzak
 
 1. **`shell: bash` WSL'in bash'ine çözülüyor** (`C:\WINDOWS\system32\bash.EXE`)

@@ -7,6 +7,9 @@
   Yaptiklari:
     - "cry-baslangic" zamanlanmis gorevi: oturum acilisinda baslangic.ps1
       (kullanici haklariyla; Docker Desktop bir oturum uygulamasidir, servis degil)
+    - "cry-yedek" gorevi: her gun 03:15'te Postgres yedegi (yedek.ps1)
+    - "cry-yedek-denemesi" gorevi: her pazar 03:45'te yedegi GERI YUKLEYEREK dogrular.
+      Alinmis ama geri yuklenmemis bir yedek, yedek degildir.
     - Docker Desktop'in KENDI "oturum acilisinda basla" ayarini acar
       (settings-store.json -> AutoStart). Olculdu 2026-09-15: False idi.
 
@@ -19,10 +22,14 @@ param([switch]$Kaldir, [switch]$GelistirmeYok)
 
 $gorevAdi = "cry-baslangic"
 $betik = Join-Path $PSScriptRoot "baslangic.ps1"
+$yedekBetik = Join-Path $PSScriptRoot "yedek.ps1"
+$denemeBetik = Join-Path $PSScriptRoot "yedek-geri-yukleme-denemesi.ps1"
 
 if ($Kaldir) {
-  Unregister-ScheduledTask -TaskName $gorevAdi -Confirm:$false -ErrorAction SilentlyContinue
-  Write-Output "gorev kaldirildi: $gorevAdi"
+  foreach ($g in @($gorevAdi, "cry-yedek", "cry-yedek-denemesi")) {
+    Unregister-ScheduledTask -TaskName $g -Confirm:$false -ErrorAction SilentlyContinue
+    Write-Output "gorev kaldirildi: $g"
+  }
   exit 0
 }
 
@@ -41,6 +48,26 @@ $kim = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -Logon
 Register-ScheduledTask -TaskName $gorevAdi -Action $eylem -Trigger $tetik -Settings $ayar -Principal $kim `
   -Description "cry: Docker Desktop, konteynerler, saglik denetimi ve yerel gelistirme sunucusu (deploy\pc\baslangic.ps1)" -Force | Out-Null
 Write-Output "gorev kaydedildi: $gorevAdi (oturum acilisi + 30 sn)"
+
+# --- Yedek gorevleri ---
+# Zamanlar gece: yedek 03:15, dogrulama pazar 03:45. `-StartWhenAvailable` bilgisayar o saatte
+# kapaliysa acilista telafi eder - yoksa gunu kapali geciren bir makine hic yedek almaz.
+function Gorev([string]$Ad, [string]$Yol, $Tetik, [string]$Aciklama) {
+  if (-not (Test-Path $Yol)) { Write-Output "ATLANDI ($Ad): betik yok - $Yol"; return }
+  $e = New-ScheduledTaskAction -Execute "powershell.exe" `
+    -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$Yol`""
+  $a = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+    -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 30)
+  $k = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
+  Register-ScheduledTask -TaskName $Ad -Action $e -Trigger $Tetik -Settings $a -Principal $k `
+    -Description $Aciklama -Force | Out-Null
+  Write-Output "gorev kaydedildi: $Ad"
+}
+
+Gorev "cry-yedek" $yedekBetik (New-ScheduledTaskTrigger -Daily -At 3:15am) `
+  "cry: Postgres yedegi E: diskine (deploy\pc\yedek.ps1). Blok indeksi yedeklenmez - yeniden turetilebilir."
+Gorev "cry-yedek-denemesi" $denemeBetik (New-ScheduledTaskTrigger -Weekly -DaysOfWeek Sunday -At 3:45am) `
+  "cry: en yeni yedegi gecici bir veritabanina geri yukleyip satir sayilarini karsilastirir (deploy\pc\yedek-geri-yukleme-denemesi.ps1)."
 
 # Docker Desktop'in kendi otomatik baslatma ayari.
 $dosya = Join-Path $env:APPDATA "Docker\settings-store.json"
