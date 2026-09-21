@@ -688,6 +688,45 @@ olurdu. B5'in ayna kararı burada karşılığını verdi.
 ölçüm "indeks kaynağı kadar iyi" der, "zincirin tamamı" demez. O boşluğu BigQuery'nin
 `tron_internal_transactions` tablosu kapatacak (bkz. BigQuery maliyet ölçümü).
 
+### M1-E — `transfers.index` KAYNAĞA BAĞLI ÇIKTI (2026-09-21)
+
+Kapının C sorusu (hareket kümesi) geçti, ama hareketi VERİTABANINDA tekilleştiren anahtar geçmedi.
+Postgres'te `@@unique([chain, txHash, index])` var ve yazma `skipDuplicates`. İki yol aynı harekete
+farklı `index` verirse aynı para İKİ SATIR olur.
+
+```bash
+node --env-file=.env --env-file=apps/web/.env.local --import tsx scripts/olcum/m1-kapi.mts --adres=6 --cokKayitli
+```
+
+Ölçüm (6 adres, 2.270 hareket — aday seçimi bilerek ZOR haldan: aynı işlemde adrese ait 3+ kaydı olanlar):
+
+| Kural | Uyuşmayan |
+|---|---|
+| **KURAL-1** — bugünkü şema: TronGrid'in verdiği sıra (adresin o işlemdeki kaçıncı kaydı) | **60 / 2.270** |
+| **KURAL-2** — aday: işlem içinde aynı (kimden, kime, varlık, tutar) dörtlüsünün kaçıncı TEKRARI | **0 / 2.270** |
+
+**KURAL-1 neden üretilemiyor:** TronGrid adaptörünün sırası, adresin o işlemdeki kayıtlarını BÜTÜN
+TOKEN'LAR boyunca sayıyor. Blok indeksi yalnızca USDT ve TRX tutuyor, yani aradaki kayıtları
+göremiyor. Somut: tx `9e4d9165…` indekste `idx` = 0,1,2,3,4,5,**7** — 6 yok, çünkü o konumdaki olay
+USDT değil. TronGrid aynı adrese o işlemde 8 kayıt verip 0–7 numaralıyor. Sayı, BAKANIN kapsamına
+bağlı; kaynaktan bağımsız bir kimlik olamaz.
+
+**KURAL-2 neden işe yarıyor:** İçerik tek başına anahtar değil (aynı tx'te 20 özdeş Transfer olayı
+ölçülmüştü), ama içerik + tekrar sırası anahtar. Özdeş iki kaydın hangisine #0 hangisine #1 dendiği
+ÖNEMSİZ — özdeşler zaten birbirinin yerine geçer, çokluk aynı kalır. Bir adresi sorgulayan taraf,
+o adresi ilgilendiren bir dörtlünün BÜTÜN kopyalarını görür (kopyaların hepsinde aynı kimden/kime
+var), o yüzden sayım iki kaynakta da aynı çıkar.
+
+**Bugünkü veri buna hazır:** 86.674 TRON satırında aynı dörtlüden birden çok satırı olan yalnızca
+**4 öbek** var. Yani `occurrence` sütunu gerçekten gerekiyor (dörtlü tek başına yetmez) ama göç
+küçük.
+
+Önerilen değişiklik (UYGULANMADI, kullanıcı kararı bekliyor):
+- `transfers`'a `occurrence Int` eklenir; pencere fonksiyonuyla mevcut satırlar için hesaplanır.
+- Tekillik `(chain, txHash, index)` → `(chain, txHash, fromAddressId, toAddressId, assetId, amountRaw, occurrence)`.
+- `index` KALIR — sıralama ve gösterim için; artık kimlik değil, kaynağın kendi sırası.
+  (takip.ts `orderBy: [ts, index]` kullanıyor; kimlik değişse de sıra bozulmaz.)
+
 ### BigQuery maliyet ölçümü — KURU KOŞU (2026-09-21)
 
 B3 geçmişi ücretsiz kaynaklardan uçtan geriye doluyor ve ~19,5 blok/sn'de tam geçmiş ~51 gün sürüyor.

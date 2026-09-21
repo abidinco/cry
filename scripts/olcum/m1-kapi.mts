@@ -65,10 +65,19 @@ const kBas = zamanBas + 300, kSon = zamanSon - 300;
 const W = `zaman BETWEEN ${kBas} AND ${kSon}`;
 
 // Yoğunluk bandı geniş tutulur: tek bir yoğun adres kapıyı temsil etmez.
-const adayHex = (await tsv(`
-  SELECT lower(hex(kime)), count() AS n FROM ${TABLO} FINAL WHERE ${W}
-  GROUP BY kime HAVING n BETWEEN 3 AND 400 ORDER BY cityHash64(kime) LIMIT ${ADRES_SAYISI}`))
-  .map((r) => [r[0]!, Number(r[1])] as const);
+// `--cokKayitli` E ölçümünün ZOR halini seçer: aynı işlemde bu adrese ait 3+ kaydı olan adresler.
+// Aday SEÇİMİ pencerenin son gününden yapılır (95 günün tamamında `GROUP BY kime, tx` ClickHouse'u
+// zaman aşımına düşürüyor); KARŞILAŞTIRMA yine pencerenin tamamında.
+// `index` alanının yeniden numaralanması ancak orada sınanır; tek kayıtlı işlemde her kural 0 verir.
+const COK_KAYITLI = process.argv.includes("--cokKayitli");
+const adaySql = COK_KAYITLI
+  ? `SELECT lower(hex(a)), sum(n) AS t FROM (
+       SELECT kime AS a, tx, count() AS n FROM ${TABLO} FINAL
+       WHERE zaman BETWEEN ${kSon - 86400} AND ${kSon} GROUP BY kime, tx HAVING n >= 3)
+     GROUP BY a HAVING t BETWEEN 3 AND 400 ORDER BY cityHash64(a) LIMIT ${ADRES_SAYISI}`
+  : `SELECT lower(hex(kime)), count() AS n FROM ${TABLO} FINAL WHERE ${W}
+     GROUP BY kime HAVING n BETWEEN 3 AND 400 ORDER BY cityHash64(kime) LIMIT ${ADRES_SAYISI}`;
+const adayHex = (await tsv(adaySql)).map((r) => [r[0]!, Number(r[1])] as const);
 console.log(`C) ${adayHex.length} adres seçildi (pencere içi gelen hareket: ${adayHex.map(([, n]) => n).join(", ")})`);
 
 const adapter = new TronAdapter({ apiKey: process.env.TRONGRID_API_KEY });
@@ -85,10 +94,16 @@ const fark = (x: Map<string, number>, y: Map<string, number>) => {
 const say = (m: Map<string, number>) => [...m.values()].reduce((x, y) => x + y, 0);
 
 let toplamIndeks = 0, toplamGrid = 0, toplamEksik = 0, toplamFazla = 0, uyusmayanAdres = 0, olculemeyen = 0;
+// E) `index` ALANI: Postgres'te (chain, txHash, index) TEKİL ve yazma `skipDuplicates`. İki yol aynı
+// harekete farklı `index` verirse aynı para iki satır olur (CLAUDE.md: "201 mükerrer öbek" olayı).
+// Sınanan kural: TRX'te indeksin `idx`'i doğrudan kullanılır (ikisi de sözleşmenin işlem içindeki sırası);
+// USDT'de TronGrid adaptörü ADRESE ÖZGÜ sıra veriyor, o yüzden aynı tx'in bu adresi ilgilendiren
+// satırları `idx`'e göre sıralanıp 0'dan yeniden numaralanır.
+let toplamIndeksAlani = 0, uyusmayanKural1 = 0, uyusmayanKural2 = 0;
 const gecikmeIndeks: number[] = [], gecikmeGrid: number[] = [];
 
 const uyu = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const SEC = `SELECT lower(hex(tx)), lower(hex(kimden)), lower(hex(kime)), toString(varlik), toString(tutar) FROM ${TABLO} FINAL WHERE ${W}`;
+const SEC = `SELECT lower(hex(tx)), lower(hex(kimden)), lower(hex(kime)), toString(varlik), toString(tutar), idx FROM ${TABLO} FINAL WHERE ${W}`;
 const msGelenler: number[] = [], msGidenler: number[] = [], msAynalar: number[] = [];
 
 for (const [hex] of adayHex) {
@@ -166,6 +181,55 @@ for (const [hex] of adayHex) {
       )),
   );
 
+  // E) `index` alanı: iki aday kural yan yana sınanır.
+  //   KURAL-1 (bugünkü şema) TronGrid'in verdiği sıra: adresin o işlemdeki kaçıncı kaydı. Blok
+  //     indeksinden yeniden üretilmeye çalışılır (TRX'te `idx`, USDT'de 0'dan yeniden numaralama).
+  //   KURAL-2 (aday şema) İŞLEM İÇİNDE AYNI (kimden, kime, varlık, tutar) dörtlüsünün kaçıncı
+  //     TEKRARI. İçerik tek başına anahtar olamaz (aynı tx'te 20 özdeş Transfer ölçüldü), ama
+  //     içerik + tekrar sırası olur — ve iki kaynak da onu görebildiği için KAYNAKTAN BAĞIMSIZ.
+  type Sat = { tx: string; idx: number; varlik: string; kimden: string; kime: string; tutar: string };
+  const satirlar: Sat[] = ham.map((r) => ({ tx: r[0]!, kimden: r[1]!, kime: r[2]!, varlik: r[3]!, tutar: r[4]!, idx: Number(r[5] ?? 0) }));
+  const usdtSira = new Map<string, number>();
+  const kural1 = coklukKur(
+    [...satirlar].sort((x, y) => x.tx.localeCompare(y.tx) || x.idx - y.idx).map((r) => {
+      if (r.varlik === "TRX") return `${r.tx}|${r.idx}`;
+      const n = usdtSira.get(r.tx) ?? 0;
+      usdtSira.set(r.tx, n + 1);
+      return `${r.tx}|${n}`;
+    }),
+  );
+  const tekrarNo = (l: { tx: string; kimden: string; kime: string; varlik: string; tutar: string }[]) => {
+    const sayac = new Map<string, number>();
+    return l.map((r) => {
+      const t = `${r.tx}|${r.kimden}|${r.kime}|${r.varlik}|${r.tutar}`;
+      const n = sayac.get(t) ?? 0;
+      sayac.set(t, n + 1);
+      return `${t}#${n}`;
+    });
+  };
+  const kural2 = coklukKur(tekrarNo([...satirlar].sort((x, y) => x.tx.localeCompare(y.tx) || x.idx - y.idx)));
+
+  const gridSuzulmus = gridHam
+    .filter((t) => t.success)
+    .filter((t) => (t.kind === "native" && t.asset.contract === null) ||
+                   (t.kind === "token" && !!t.asset.contract && govde(t.asset.contract) === USDT_TRC20_HEX))
+    .filter((t) => { const sn = Date.parse(t.ts) / 1000; return sn >= kBas && sn <= kSon; });
+  const gridKural1 = coklukKur(gridSuzulmus.map((t) => `${t.txHash.toLowerCase()}|${t.index}`));
+  const gridKural2 = coklukKur(tekrarNo(gridSuzulmus.map((t) => ({
+    tx: t.txHash.toLowerCase(),
+    kimden: t.from ? govde(t.from) : "",
+    kime: t.to ? govde(t.to) : "",
+    varlik: t.asset.contract === null ? "TRX" : "USDT",
+    tutar: t.amountRaw,
+  }))));
+
+  const s1 = fark(gridKural1, kural1).length + fark(kural1, gridKural1).length;
+  const s2 = fark(gridKural2, kural2).length + fark(kural2, gridKural2).length;
+  toplamIndeksAlani += say(gridKural1);
+  uyusmayanKural1 += s1;
+  uyusmayanKural2 += s2;
+  if (s1 || s2) console.log(`      index alanı: kural-1 uyuşmayan ${s1} - kural-2 uyuşmayan ${s2}`);
+
   const eksik = fark(grid, indeks);   // TronGrid'de var, indekste YOK -> indeks kör
   const fazla = fark(indeks, grid);   // indekste var, TronGrid'de yok -> kaynak eksik ya da indeks uyduruyor
   toplamIndeks += ham.length;
@@ -181,6 +245,7 @@ for (const [hex] of adayHex) {
 
 const ort = (l: number[]) => Math.round(l.reduce((x, y) => x + y, 0) / Math.max(1, l.length));
 console.log(`\nC) SONUÇ: ${adayHex.length} adres - indeks ${toplamIndeks} hareket - TronGrid ${toplamGrid} - eksik ${toplamEksik} - fazla ${toplamFazla} - uyuşmayan adres ${uyusmayanAdres} - ölçülemeyen ${olculemeyen}`);
+console.log(`E) index alanı: ${toplamIndeksAlani} hareket - KURAL-1 (TronGrid sırası) uyuşmayan ${uyusmayanKural1} - KURAL-2 (içerik+tekrar) uyuşmayan ${uyusmayanKural2}`);
 console.log(`D) hız (ortalama): gelen ${ort(msGelenler)} ms - ayna+tx ${ort(msAynalar)} ms - TronGrid ${ort(gecikmeGrid)} ms - (ana tabloda kimden taraması ${ort(msGidenler)} ms, KULLANILMAZ)`);
 console.log(`   indeks toplam ${ort(gecikmeIndeks)} ms - TronGrid ${ort(gecikmeGrid)} ms - oran ${(ort(gecikmeGrid) / Math.max(1, ort(gecikmeIndeks))).toFixed(1)}x`);
 await prisma.$disconnect();

@@ -229,9 +229,13 @@ Motor indeksi okuyor (M1) — ölçülerek konanlar (2026-09-21):
   **Tuzak 1: `kime OR kimden` TEK sorguda yazılmaz** — birincil anahtarı tamamen düşürüyor, 596 Mn
   satır taranıyor (26–47 sn). **Tuzak 2: tx çözümü JOIN ile yazılmaz** — `INNER JOIN … FINAL` sağ
   tablonun TAMAMINI belleğe alıyor (26,4 sn ⟷ 15–98 ms, 300 kat).
-- **Karşılaştırmada `idx`/`index` ANAHTARA GİRMEZ.** İndekste TRC20 `idx`'i işlemin OLAY dizisindeki
-  konum; TronGrid adaptöründe aynı adresin o işlemdeki kaçıncı kaydı. İki şema aynı tx için
-  karıştırılırsa bir hareket iki hareket sanılır.
+- **Hareketin KİMLİĞİ kaynağa bağlı olamaz — `(chain, txHash, index)` öyleydi.** Ölçüldü (M1-E,
+  2.270 hareket): TronGrid adaptörünün `index`'i, adresin o işlemdeki kayıtlarını BÜTÜN TOKEN'LAR
+  boyunca sayıyor; blok indeksi yalnızca USDT+TRX tuttuğu için onu üretemiyor ve 60 harekette
+  uyuşmuyor (tx `9e4d9165…`: indekste idx 0–5 ve 7, 6 USDT değil). Kaynaktan BAĞIMSIZ kural
+  0 uyuşmazlık verdi: işlem içinde aynı (kimden, kime, varlık, tutar) dörtlüsünün kaçıncı TEKRARI.
+  Özdeş kayıtlarda hangisine #0 dendiği önemsiz — özdeşler birbirinin yerine geçer. **İki kaynağın
+  yazdığı bir tabloda tekillik, ikisinin de görebildiği şeyden kurulur.**
 
 Sabit kalan kural:
 
