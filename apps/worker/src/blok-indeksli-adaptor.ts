@@ -5,18 +5,29 @@
  * kalmasın." Bu sarmalayıcı `ChainAdapter`'ın ÖNÜNE geçiyor; `adresIndeksle` hiçbir şey bilmiyor.
  *
  * KURAL (CLAUDE.md → M1): indeks yalnızca PENCERENİN İÇİNDE hüküm verebilir — kapsam tablosunun
- * boşluksuz kapsadığı aralık. Sorulan aralığın bir ucu bile dışarıdaysa soru TronGrid'e gider.
- * Yarısını indeksten yarısını kaynaktan birleştirmek YOK: pencere sınırı bir blok hassasiyetinde,
- * TronGrid'in TRC20 ucu ise blok numarası vermiyor (zaman üzerinden dikiş, sınırda hareket kaybeder
- * ya da çiftler). Kapsanmayan aralık "bakılamadı"dır ve kaynağa sorulur.
+ * boşluksuz kapsadığı aralık. Ölçüldü (M1, 2026-09-21): orada TronGrid ile birebir aynı hareketleri
+ * veriyor (13 adres, 560 hareket, eksik 0 / fazla 0) ve 17–67 kat hızlı.
  *
- * Ölçüldü (M1, 2026-09-21): pencere içinde indeks TronGrid ile birebir aynı hareketleri veriyor
- * (13 adres, 560 hareket, eksik 0 / fazla 0) ve 17–26 kat hızlı (498 ms ⟷ 8.764 ms).
+ * ÜÇ YOL:
+ *   - `indeks`  — sorulan aralık tamamen pencerede. Kaynağa hiç gidilmez.
+ *   - `melez`   — aralık pencereden ÖNCE başlıyor: pencere öncesi KAYNAKTAN, pencere içi İNDEKSTEN.
+ *   - `kaynak`  — pencere yok/okunamıyor ya da aralık tamamen pencere öncesi.
+ *
+ * Melez neden GÜVENLİ (ve neden dün değildi): iki parça arasındaki dikiş, sınırda hareket kaybetme
+ * ya da çiftleme riski taşıyordu. Şimdi parçalar bilerek ÖRTÜŞTÜRÜLÜYOR (`ORTAK_PAY`) — boşluk
+ * kalmıyor — ve örtüşmede çıkan mükerrer satırlar zararsız, çünkü hareketin kimliği artık
+ * `occurrence` ile KAYNAKTAN BAĞIMSIZ (göç 20260921160000). Sayaçlar ayrı: kaynak parçasını sarılan
+ * adaptör kendi sayacıyla, indeks parçasını bu sınıf kendi sayacıyla numaralar; ortak bir sayaç
+ * örtüşen kayda #3 deyip mükerrerliği kimlik düzeyinde bozar.
+ *
+ * NEDEN `firstSeen`'e GÜVENİLMİYOR: "adresin ömrü pencereye sığıyorsa ilk tarama da indeksten olur"
+ * fikri ölçülüp ELENDİ (M2, 2026-09-22): TronGrid'in `create_time`'ı 8 adresin 6'sında ilk
+ * hareketten SONRA (birinde 73 gün). TRC20 bakiyesi sözleşmenin deposunda; aktive edilmemiş adrese
+ * USDT gidebiliyor. Bu yüzden pencere öncesi HER ZAMAN kaynağa sorulur.
  */
 import {
   adresHareketleri,
   ayarOku,
-  pencereKarsilarMi,
   pencereOku,
   USDT_TRC20_HEX,
   type Ayar,
@@ -41,7 +52,18 @@ const USDT: Asset = { chain: "tron", contract: hexToBase58("41" + USDT_TRC20_HEX
 /** Pencere sorgusu her çağrıda atılmaz; canlı uç ilerledikçe tazelenir. */
 const PENCERE_TAZE_MS = 60_000;
 
-type Imlec = { indeks: HareketImleci } | { kaynak: string | null };
+/**
+ * Melez taramada iki parçanın ÖRTÜŞME payı (saniye). Pencere sınırı blok hassasiyetinde, TronGrid'in
+ * TRC20 ucu blok numarası vermiyor; pay olmadan sınırdaki hareket iki parçanın arasına düşebilir.
+ * Örtüşmenin bedeli mükerrer satır ve o zararsız — kimlik `occurrence` ile kaynaktan bağımsız.
+ */
+const ORTAK_PAY_SN = 300;
+
+type Imlec =
+  | { indeks: HareketImleci }
+  | { kaynak: string | null }
+  /** Melezin BİRİNCİ parçası: pencere öncesi, kaynaktan. Bitince indeks parçasına geçilir. */
+  | { oncesi: string | null };
 
 const imlecYaz = (i: Imlec): string => Buffer.from(JSON.stringify(i), "utf8").toString("base64url");
 const imlecOku = (m: string | null | undefined): Imlec | null => {
@@ -53,7 +75,7 @@ const imlecOku = (m: string | null | undefined): Imlec | null => {
   }
 };
 
-export type IndeksKullanimi = { kaynak: "blok-indeksi" | "trongrid"; sebep: string };
+export type IndeksKullanimi = { kaynak: "blok-indeksi" | "melez" | "trongrid"; sebep: string };
 
 /**
  * `listTransfers` dışındaki her şeyi sarılan adaptöre devreder — bakiye, aktivasyon, tek işlem ve
@@ -113,35 +135,51 @@ export class BlokIndeksliAdaptor implements ChainAdapter {
   async listTransfers(address: string, opts: ListOptions = {}): Promise<Page<Transfer>> {
     const adres = this.normalizeAddress(address);
     const onceki = imlecOku(opts.cursor);
+    const p = await this.pencereyiAl();
 
-    // Tur başı: yol bir kez seçilir. Tur ortasında yol değiştirmek `occurrence` sayacını bölerdi.
-    if (!onceki) this.tekrar.sifirla();
-
-    if (onceki && "kaynak" in onceki) return this.kaynaktan(adres, opts, onceki.kaynak);
+    // Tur başı: yol BİR KEZ seçilir. Tur ortasında yol değiştirmek sayaçları bölerdi.
     if (!onceki) {
-      const karar = await this.yolSec(opts);
-      this.sonKullanim = karar;
-      if (karar.kaynak === "trongrid") return this.kaynaktan(adres, opts, null);
+      this.tekrar.sifirla();
+      this.sonKullanim = this.yolSec(p, opts);
     }
 
-    const p = await this.pencereyiAl();
-    if (!p) return this.kaynaktan(adres, opts, null);
+    // Melezin BİRİNCİ parçası: pencere öncesi, kaynaktan, üst sınır pencerenin başı + ortak pay.
+    if ((onceki && "oncesi" in onceki) || (!onceki && this.sonKullanim.kaynak === "melez")) {
+      const imlec = onceki && "oncesi" in onceki ? onceki.oncesi : null;
+      const sayfa = await this.ic.listTransfers(adres, {
+        ...opts,
+        cursor: imlec,
+        toTs: new Date((p!.zamanBas + ORTAK_PAY_SN) * 1000).toISOString(),
+      });
+      // Parça bitince tur BİTMEZ: imleç ikinci parçaya (indeks) geçer.
+      return {
+        items: sayfa.items,
+        nextCursor:
+          sayfa.nextCursor !== null
+            ? imlecYaz({ oncesi: sayfa.nextCursor })
+            : imlecYaz({ indeks: { gelen: null, giden: null } }),
+      };
+    }
+
+    if ((onceki && "kaynak" in onceki) || (!onceki && this.sonKullanim.kaynak === "trongrid")) {
+      return this.kaynaktan(adres, opts, onceki && "kaynak" in onceki ? onceki.kaynak : null);
+    }
+
+    if (!p) return this.kaynaktan(adres, opts, null); // pencere kaybolduysa kaynağa düş
     return this.indekstenSayfa(adres, p, opts, onceki && "indeks" in onceki ? onceki.indeks : { gelen: null, giden: null });
   }
 
-  /** Sorulan aralık pencerenin içinde mi? Cevap "hayır" ise sebebiyle birlikte döner. */
-  private async yolSec(opts: ListOptions): Promise<IndeksKullanimi> {
+  /** Aralığın pencereyle ilişkisine göre yolu seçer; sebebi günlüğe ve `IndeksSonucu`'na düşer. */
+  private yolSec(p: Pencere | null, opts: ListOptions): IndeksKullanimi {
     if (this.chain !== "tron") return { kaynak: "trongrid", sebep: "blok indeksi yalnızca TRON" };
-    const p = await this.pencereyiAl();
     if (!p) return { kaynak: "trongrid", sebep: "pencere okunamadı" };
-    // `fromTs` yoksa soru "bütün geçmiş"tir ve pencere onu karşılamaz.
-    if (!opts.fromTs) return { kaynak: "trongrid", sebep: "ilk tam tarama — pencere geçmişin tamamını kapsamıyor" };
-    const bas = Math.floor(Date.parse(opts.fromTs) / 1000);
+    const gun = ((p.zamanSon - p.zamanBas) / 86400).toFixed(1);
+    // `fromTs` yoksa soru "bütün geçmiş"tir: başlangıç bilinmiyor, pencereden ÖNCE varsayılır.
+    const bas = opts.fromTs ? Math.floor(Date.parse(opts.fromTs) / 1000) : Number.NEGATIVE_INFINITY;
     const son = opts.toTs ? Math.floor(Date.parse(opts.toTs) / 1000) : p.zamanSon;
-    if (!pencereKarsilarMi(p, bas, son)) {
-      return { kaynak: "trongrid", sebep: `aralık pencere dışında (pencere ${new Date(p.zamanBas * 1000).toISOString()} -> ${new Date(p.zamanSon * 1000).toISOString()})` };
-    }
-    return { kaynak: "blok-indeksi", sebep: `pencere içi (${((p.zamanSon - p.zamanBas) / 86400).toFixed(1)} gün)` };
+    if (son <= p.zamanBas) return { kaynak: "trongrid", sebep: "aralık tamamen pencere öncesi" };
+    if (bas >= p.zamanBas && son <= p.zamanSon) return { kaynak: "blok-indeksi", sebep: `pencere içi (${gun} gün)` };
+    return { kaynak: "melez", sebep: `pencere öncesi kaynaktan, pencere içi (${gun} gün) indeksten` };
   }
 
   private async kaynaktan(adres: string, opts: ListOptions, imlec: string | null): Promise<Page<Transfer>> {
@@ -151,8 +189,10 @@ export class BlokIndeksliAdaptor implements ChainAdapter {
 
   private async indekstenSayfa(adres: string, p: Pencere, opts: ListOptions, imlec: HareketImleci): Promise<Page<Transfer>> {
     const hex = base58ToHex(adres).replace(/^41/, "").toLowerCase();
-    const bas = opts.fromTs ? Math.floor(Date.parse(opts.fromTs) / 1000) : p.zamanBas;
-    const son = opts.toTs ? Math.floor(Date.parse(opts.toTs) / 1000) : p.zamanSon;
+    // Alt sınır pencerenin başından ÖNCE olamaz: indeks orada veri tutmuyor. Üst sınır da pencereyi
+    // aşamaz — aşan kısım "bakılamadı"dır ve bu yolun işi değildir.
+    const bas = Math.max(p.zamanBas, opts.fromTs ? Math.floor(Date.parse(opts.fromTs) / 1000) : p.zamanBas);
+    const son = Math.min(p.zamanSon, opts.toTs ? Math.floor(Date.parse(opts.toTs) / 1000) : p.zamanSon);
     const sayfa = await adresHareketleri(this.a, hex, bas, son, imlec);
     const bitti = sayfa.imlec.gelen === "bitti" && sayfa.imlec.giden === "bitti";
     return {

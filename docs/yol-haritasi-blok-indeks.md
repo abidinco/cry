@@ -767,6 +767,81 @@ tam geçmiş yüklendiğinde gelir; iskelet o güne hazır.
 **Görünürlük:** `IndeksSonucu.hareketKaynagi` worker günlüğüne "kaynak: blok-indeksi (pencere içi
 96,1 gün)" diye düşüyor. Hangi yoldan beslendiğini söylemeyen bir hızlanma, ölçülemez.
 
+### M2 — `create_time` ile ilk taramayı indeksten yapma fikri ÖLDÜ (2026-09-22)
+
+M1 uygulandıktan sonra ortaya çıkan sorun: takip koşusu YENİ adres keşfediyor, onların
+`indexedThroughTs`'i boş, soru "bütün geçmiş" oluyor ve yönlendirme TronGrid'e gidiyor. Yani
+M1'in 67 katlık hızlanması takip koşusuna HİÇ yansımıyordu.
+
+Denenen fikir: adresin ömrü pencerenin içindeyse "bütün geçmiş" sorusunu da indeks karşılar; ömrün
+başlangıcı TronGrid'in `create_time`'ı (adaptörde `firstSeen`).
+
+```bash
+node --env-file=.env --env-file=apps/web/.env.local --import tsx scripts/olcum/m2-kapi.mts --adres=12
+```
+
+**Sonuç: uyan 2, İHLAL 6, `create_time` hiç yok 1.** `create_time` ilk hareketin ALT SINIRI DEĞİL.
+
+| Adres | create_time | En eski hareket | Fark |
+|---|---|---|---|
+| `TNCe7C4kMbKFHT2bLRBsrnGKvvnPMqFLcD` | 2026-09-17 | 2026-07-06 | **73 gün** |
+| `TSFbLC7TXG4vZrdA2McFkRhaPdJYku7vYo` | 2026-07-31 14:48 | 2026-07-31 12:24 | 2,4 saat |
+| `TJu4HxVRgb2pGnpDscywbx78EitpeaF2vy` | 2026-08-01 17:29 | 2026-08-01 17:26 | 2 dk |
+| `TXZ9jpcp1yvgXTmRdJcWRwWjFJUvbb8Kqo` | **yok** | 2026-01-16 | — |
+
+Sebep zincirin kendisinde: TRC20 bakiyesi SÖZLEŞMENİN deposunda tutuluyor, yani aktive EDİLMEMİŞ
+bir adrese USDT gönderilebilir. `create_time` hesabın aktivasyonunu söyler, paranın ilk gelişini
+değil. Buna dayanan bir kural adresin daha eski hareketlerini "yok" sayardı — bakılmamış bir yeri
+temiz göstermek.
+
+**Ölçülmeden yazılsaydı** takip koşusu sessizce eksik graf üretirdi ve hata ancak bir davada
+görülürdü. `firstSeen` bir KAYNAK İDDİASIDIR; zincirin olgusu sanılmamalı.
+
+### M3 — Melez tarama: dikiş yerine ÖRTÜŞME (2026-09-22)
+
+M1 bittiğinde kural şuydu: aralığın bir ucu bile pencere dışındaysa soru komple kaynağa gider.
+Gerekçe, iki parçayı birleştiren dikişin sınırda hareket kaybetmesi ya da çiftlemesiydi. M2, o
+kuralın takip koşusuna hiçbir fayda bırakmadığını gösterdi — koşu YENİ adres keşfediyor, onların
+sorusu "bütün geçmiş", yani hep kaynağa gidiyor.
+
+**Gerekçenin düştüğü yer:** `occurrence` göçünden (20260921160000) sonra aynı hareketi iki kez
+yazmak ZARARSIZ, çünkü kimlik kaynaktan bağımsız ve `skipDuplicates` onu eliyor. O hâlde dikişi
+sıfır genişlikte tutmaya çalışmak yerine parçaları BİLEREK ÖRTÜŞTÜRMEK doğru cevap: boşluk riski
+ortadan kalkar, bedeli olan mükerrerlik zaten bedava eleniyor.
+
+Uygulama `apps/worker/src/blok-indeksli-adaptor.ts`: `ORTAK_PAY_SN = 300`. Birinci parça kaynaktan
+`[fromTs, pencereBaşı + 5 dk]`, ikinci parça indeksten `[pencereBaşı, son]`.
+
+**Sayaçlar AYRI olmalı.** Kaynak parçasını sarılan adaptör kendi `TekrarSayaci`'yla, indeks parçasını
+sarmalayıcı kendisininkiyle numaralar. Ortak bir sayaç, örtüşen bölgede kaynağın #0 dediği kayda
+indeks tarafında #1 derdi ve mükerrerlik kimlik düzeyinde BOZULURDU — örtüşme o an gerçek mükerrer
+satıra dönüşür.
+
+```bash
+node --env-file=.env --env-file=apps/web/.env.local --import tsx scripts/olcum/m1-adaptor-dogrula.mts --adres=4
+```
+
+| Ölçüm | Adres | Hareket | Eksik | Fazla |
+|---|---|---|---|---|
+| pencere içi (saf indeks) | 2 | 226 | 0 | 0 |
+| **melez** (fromTs pencereden 2 gün önce) | 3 | 234 | **0** | **0** |
+
+`fazla 0` burada asıl bulgudur: bilerek örtüştürülen 5 dakika FAZLADAN satır üretmiyor.
+
+Yönlendirme dört durumda da çalıştırılarak doğrulandı:
+
+| Sorulan | Seçilen yol |
+|---|---|
+| `fromTs` yok | melez |
+| `fromTs` pencereden önce | melez |
+| `fromTs` pencere içinde | blok-indeksi |
+| aralık tamamen pencere öncesi | trongrid |
+
+**Hız dürüstçe:** melezin bedeli pencere ÖNCESİ geçmişin büyüklüğü. Ömrü yeni bir adreste o parça
+birkaç boş isteğe iner; 2018'den beri işleyen bir adreste inmez. Ölçülen süreler 625–8.348 ms
+arasında oynadı ve TronGrid kotası canlı worker'la paylaşıldığı için gürültülü — buradan tek bir
+hızlanma katsayısı çıkarmak doğru olmaz. Kesin olan şey doğruluk.
+
 ### BigQuery maliyet ölçümü — KURU KOŞU (2026-09-21)
 
 B3 geçmişi ücretsiz kaynaklardan uçtan geriye doluyor ve ~19,5 blok/sn'de tam geçmiş ~51 gün sürüyor.

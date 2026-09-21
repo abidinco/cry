@@ -15,7 +15,7 @@
 import { sorgu, type Ayar } from "./istemci.js";
 import { TABLO, GIDEN_TABLO } from "./sema.js";
 import type { Varlik } from "./ayristir.js";
-import { hexDenetle, type Pencere } from "./sorgular.js";
+import { hexDenetle } from "./sorgular.js";
 
 /** Bir indeks satırı, gösterim sınırına çevrilmeden önce. Tutar HAM metin. */
 export type IndeksHareketi = {
@@ -124,9 +124,4 @@ export async function adresHareketleri(
       giden: imlec.giden === "bitti" ? "bitti" : (aynaSatirlari.length < limit ? "bitti" : `${Number(aynaSatirlari[aynaSatirlari.length - 1]![0])}|${aynaSatirlari[aynaSatirlari.length - 1]![1]}|${Number(aynaSatirlari[aynaSatirlari.length - 1]![2])}`),
     },
   };
-}
-
-/** Sorulan aralık pencerenin TAMAMEN içinde mi — dışarıdaysa indeks cevap veremez. */
-export function pencereKarsilarMi(p: Pencere | null, bas: number, son: number): boolean {
-  return !!p && bas >= p.zamanBas && son <= p.zamanSon;
 }

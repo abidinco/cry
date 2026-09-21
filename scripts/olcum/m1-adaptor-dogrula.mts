@@ -52,11 +52,15 @@ const ham = new TronAdapter({ apiKey: process.env.TRONGRID_API_KEY });
 const sarmal = new BlokIndeksliAdaptor(ham, a);
 
 /** Bütün sayfaları toplar — imleç mantığı da böylece sınanmış olur. */
-async function hepsi(ad: { listTransfers: TronAdapter["listTransfers"] }, adres: string): Promise<Transfer[]> {
+async function hepsi(
+  ad: { listTransfers: TronAdapter["listTransfers"] },
+  adres: string,
+  bas = kBas,
+): Promise<Transfer[]> {
   const l: Transfer[] = [];
   let imlec: string | null = null;
   for (let s = 0; s < 60; s++) {
-    const sayfa = await ad.listTransfers(adres, { cursor: imlec, limit: 200, fromTs: iso(kBas), toTs: iso(kSon) });
+    const sayfa = await ad.listTransfers(adres, { cursor: imlec, limit: 200, fromTs: iso(bas), toTs: iso(kSon) });
     l.push(...sayfa.items);
     imlec = sayfa.nextCursor;
     if (!imlec) break;
@@ -114,13 +118,58 @@ for (const hex of adayHex) {
   await uyu(1_500); // TronGrid kotası canlı worker'la paylaşılıyor (vaka > indeks).
 }
 
-// Yönlendirme kararı: `fromTs` yoksa soru "bütün geçmiş"tir ve pencere onu karşılamaz.
-const denekAdres = hexToBase58("41" + adayHex[0]!);
-await sarmal.listTransfers(denekAdres, { limit: 1 });
-console.log(`\nyönlendirme (fromTs YOK): ${sarmal.sonKullanim.kaynak} - ${sarmal.sonKullanim.sebep}`);
-await sarmal.listTransfers(denekAdres, { limit: 1, fromTs: new Date((p.zamanBas - 86400) * 1000).toISOString() });
-console.log(`yönlendirme (pencere ÖNCESİ): ${sarmal.sonKullanim.kaynak} - ${sarmal.sonKullanim.sebep}`);
+// ---------- MELEZ ----------
+// `fromTs` pencereden ÖNCE: sarmalayıcı birinci parçayı kaynaktan, ikincisini indeksten okumalı.
+// Referans AYNI aralıkta saf TronGrid. Sorulan şey DİKİŞTE hareket kaybolup kaybolmadığı: iki parça
+// bilerek örtüşüyor (ORTAK_PAY) ve örtüşmenin mükerrerleri kimlik düzeyinde eleniyor — bu yüzden
+// karşılaştırma ÇOKLUK üzerinden yapılır, mükerrer bir satır "fazla" olarak görünür.
+console.log("\nMELEZ (fromTs pencereden 2 gün önce):");
+const melezBas = p.zamanBas - 2 * 86400;
+let melezEksik = 0, melezFazla = 0, melezHareket = 0, melezAdres = 0;
+for (const hex of adayHex.slice(0, 3)) {
+  const adres = hexToBase58("41" + hex);
+  try {
+    const [karisik, mi] = await zamanla(() => hepsi(sarmal, adres, melezBas));
+    const yol = sarmal.sonKullanim.kaynak;
+    const [grid, mg] = await zamanla(() => hepsi(ham, adres, melezBas));
+    const i = coklukKur(karisik.filter(kapsamda).map(kimlik));
+    const g = coklukKur(grid.filter(kapsamda).map(kimlik));
+    const eksik = fark(g, i), fazla = fark(i, g);
+    melezEksik += eksik.length;
+    melezFazla += fazla.length;
+    melezHareket += [...g.values()].reduce((x, y) => x + y, 0);
+    melezAdres++;
+    console.log(`   ${adres} - yol ${yol} - melez ${karisik.filter(kapsamda).length} (${mi} ms) - grid ${grid.filter(kapsamda).length} (${mg} ms) - eksik ${eksik.length} - fazla ${fazla.length}`);
+    for (const x of eksik.slice(0, 3)) console.log(`      EKSİK ${x}`);
+    for (const x of fazla.slice(0, 3)) console.log(`      FAZLA ${x}`);
+  } catch (e) {
+    console.log(`   ${adres} - ÖLÇÜLEMEDİ: ${(e as Error).message.slice(0, 70)}`);
+    await uyu(15_000);
+  }
+  await uyu(1_500);
+}
+console.log(`MELEZ SONUÇ: ${melezAdres} adres - ${melezHareket} hareket - eksik ${melezEksik} - fazla ${melezFazla}`);
+
+/** Yönlendirme kararı ÇAĞRIDAN ÖNCE veriliyor; 429 onu değiştirmez, o yüzden hata yutuluyor. */
+async function yolunuSor(ad: string, secenek: Parameters<typeof sarmal.listTransfers>[1]) {
+  try {
+    await sarmal.listTransfers(hexToBase58("41" + adayHex[0]!), secenek);
+  } catch {
+    /* ölçülen şey `sonKullanim`, cevabın kendisi değil */
+  }
+  console.log(`yönlendirme (${ad}): ${sarmal.sonKullanim.kaynak} - ${sarmal.sonKullanim.sebep}`);
+}
 
 const ort = (l: number[]) => Math.round(l.reduce((x, y) => x + y, 0) / Math.max(1, l.length));
 console.log(`\nSONUÇ: ${msIndeks.length} adres - ${toplamHareket} hareket - eksik ${toplamEksik} - fazla ${toplamFazla} - ölçülemeyen ${olculemeyen}`);
 console.log(`hız: sarmalayıcı ${ort(msIndeks)} ms - TronGrid ${ort(msGrid)} ms - oran ${(ort(msGrid) / Math.max(1, ort(msIndeks))).toFixed(1)}x`);
+
+console.log("");
+await yolunuSor("fromTs YOK", { limit: 1 });
+await yolunuSor("pencere ÖNCESİ", { limit: 1, fromTs: new Date((p.zamanBas - 86400) * 1000).toISOString() });
+await yolunuSor("pencere İÇİ", { limit: 1, fromTs: new Date((p.zamanBas + 86400) * 1000).toISOString() });
+await yolunuSor("tamamen pencere öncesi", {
+  limit: 1,
+  fromTs: new Date((p.zamanBas - 10 * 86400) * 1000).toISOString(),
+  toTs: new Date((p.zamanBas - 86400) * 1000).toISOString(),
+});

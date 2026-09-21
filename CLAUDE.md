@@ -243,13 +243,25 @@ Motor indeksi okuyor (M1) — ölçülerek konanlar (2026-09-21):
   indeksi yalnızca HAREKET tutuyor. Gerçek veriyle doğrulandı (`scripts/olcum/m1-adaptor-dogrula.mts`,
   sayfalama dahil, Postgres'in tekillik anahtarı üzerinden): olağan 246 hareket 15,5x, çok kayıtlı
   zor halde 2.086 hareket **67,8x**, ikisinde de eksik 0 / fazla 0.
-- **Aralığın bir ucu bile pencere dışındaysa soru KAYNAĞA gider; yarısı indeksten yarısı kaynaktan
-  DİKİLMEZ.** Pencere sınırı blok hassasiyetinde, TronGrid'in TRC20 ucu blok numarası vermiyor;
-  zaman üzerinden dikiş sınırda hareket kaybeder ya da çiftler. Aynı sebeple ClickHouse'a
-  ulaşılamazsa pencere "bilinmiyor" sayılır ve soru kaynağa gider — sessiz boş cevap, bakılmamış
-  bir yeri temiz gösterirdi.
-- **Bugünkü kazanç DAR:** pencere 96 gün, arşivin %0,34'ü. İlk kez taranan adres hâlâ TronGrid'e
-  gidiyor ("bütün geçmiş" sorusunu pencere karşılamıyor). Hızlanma tam geçmiş yüklenince gelir.
+- **Üç yol var ve melez olan DİKMEZ, ÖRTÜŞTÜRÜR** (M3, 2026-09-22). Aralık tamamen pencerede ise
+  indeks; pencereden önce başlıyorsa pencere öncesi KAYNAKTAN + pencere içi İNDEKSTEN; tamamen
+  pencere öncesiyse kaynak. 2026-09-21'de buraya "yarısı indeksten yarısı kaynaktan DİKİLMEZ" diye
+  yazmıştım; gerekçe dikişin sınırda hareket kaybetmesiydi ve o gerekçe `occurrence` göçüyle
+  DÜŞTÜ. Parçalar 5 dk ÖRTÜŞTÜRÜLÜYOR (boşluk kalmıyor) ve örtüşmenin mükerrerleri zararsız, çünkü
+  kimlik artık kaynaktan bağımsız. Ölçüldü: 3 adres, 234 hareket, eksik 0 ve **fazla 0** — örtüşme
+  fazladan satır üretmiyor. Sayaçlar AYRI olmalı: kaynak parçasını sarılan adaptör, indeks parçasını
+  sarmalayıcı kendi sayacıyla numaralar; ortak sayaç örtüşen kayda #3 deyip mükerrerliği bozardı.
+- **`firstSeen`/`create_time` bir ALT SINIR DEĞİLDİR** (M2, 2026-09-22). "Adresin ömrü pencereye
+  sığıyorsa ilk tarama da indeksten olur" fikri ölçülüp elendi: 8 adresin 6'sında `create_time` ilk
+  hareketten SONRA, birinde **73 gün**; bir adreste hiç yok ama Ocak'tan beri hareketi var. TRC20
+  bakiyesi sözleşmenin deposunda tutulduğu için aktive EDİLMEMİŞ adrese USDT gidebiliyor —
+  `create_time` hesabın aktivasyonunu söyler, paranın ilk gelişini değil. Bu yüzden pencere öncesi
+  HER ZAMAN kaynağa sorulur.
+- **ClickHouse'a ulaşılamazsa pencere "bilinmiyor" sayılır ve soru kaynağa gider.** Sessiz boş
+  cevap, bakılmamış bir yeri temiz gösterirdi.
+- **Bugünkü kazanç pencere içiyle SINIRLI:** pencere 96 gün, arşivin %0,34'ü. Melez, pencere öncesi
+  geçmişi hâlâ TronGrid'den okuyor; ömrü yeni olan adreste o parça birkaç isteğe iner, eski adreste
+  inmez. Asıl hızlanma tam geçmiş yüklenince gelir.
 
 Sabit kalan kural:
 
