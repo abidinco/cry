@@ -75,6 +75,12 @@ export class TronAdapter implements ChainAdapter {
    */
   private txSayaci = new Map<string, number>();
   /**
+   * `occurrence` sayacı: (tx, from, to, varlık, tutar) -> kaç kez görüldü.
+   * TUR boyunca yaşar — bir işlemin kayıtları sayfa sınırında bölünebiliyor ve parti başına
+   * sıfırlanan bir sayaç ikinci yarıyı birinciyle çakıştırıp satırı sessizce düşürür.
+   */
+  private tekrarSayaci = new Map<string, number>();
+  /**
    * Atlanan onay sayısı. Sessizce atılan kayıt "yoktu" sanılır; tur bunu
    * raporlayabilsin diye sayılıyor.
    */
@@ -172,6 +178,7 @@ export class TronAdapter implements ChainAdapter {
     // İmleç yoksa bu turun İLK sayfasıdır; sayaç oradan başlar.
     if (!opts.cursor) {
       this.txSayaci.clear();
+      this.tekrarSayaci.clear();
       this.atlananOnay = 0;
     }
 
@@ -258,23 +265,36 @@ export class TronAdapter implements ChainAdapter {
     return { items, next };
   }
 
+  /** Aynı dörtlüden kaçıncısı olduğunu söyler ve sayacı ilerletir. */
+  private tekrarNo(tx: string, from: string | null, to: string | null, sozlesme: string | null, tutar: string): number {
+    const anahtar = `${tx}|${from ?? ""}|${to ?? ""}|${sozlesme ?? ""}|${tutar}`;
+    const n = this.tekrarSayaci.get(anahtar) ?? 0;
+    this.tekrarSayaci.set(anahtar, n + 1);
+    return n;
+  }
+
   private trc20Cevir(k: any, i: number): Transfer {
     const ondalik = Number(k.token_info?.decimals ?? 0);
+    const from = adresNormalize(k.from);
+    const to = adresNormalize(k.to);
+    const sozlesme = adresNormalize(k.token_info?.address) ?? null;
+    const tutar = String(k.value ?? "0");
     return {
       chain: "tron",
       txHash: k.transaction_id,
       index: i,
+      occurrence: this.tekrarNo(String(k.transaction_id), from, to, sozlesme, tutar),
       blockNumber: null, // Bu uç blok numarası vermiyor; uydurulmaz.
       ts: isoZaman(k.block_timestamp),
-      from: adresNormalize(k.from),
-      to: adresNormalize(k.to),
+      from,
+      to,
       asset: {
         chain: "tron",
-        contract: adresNormalize(k.token_info?.address) ?? null,
+        contract: sozlesme,
         symbol: k.token_info?.symbol ?? "?",
         decimals: Number.isFinite(ondalik) ? ondalik : 0,
       },
-      amountRaw: String(k.value ?? "0"),
+      amountRaw: tutar,
       kind: "token",
       success: true, // bu uç yalnızca gerçekleşmiş transferleri döndürür
       raw: k,
@@ -294,25 +314,26 @@ export class TronAdapter implements ChainAdapter {
       const trc10 = s.type === "TransferAssetContract";
       if (s.type !== "TransferContract" && !trc10) return [];
 
+      const from = adresNormalize(deger.owner_address);
+      const to = adresNormalize(deger.to_address);
+      const varlik = trc10
+        ? { chain: "tron" as const, contract: `trc10:${trc10AdCoz(deger.asset_name)}`, symbol: "TRC10", decimals: 0 }
+        : TRX;
+      const tutar = String(deger.amount ?? 0);
+
       return [
         {
           chain: "tron",
           txHash: k.txID,
           // Sözleşmenin işlem içindeki sırası — sayfadan bağımsız, kararlı.
           index: i,
+          occurrence: this.tekrarNo(String(k.txID), from, to, varlik.contract, tutar),
           blockNumber: k.blockNumber ?? null,
           ts: isoZaman(k.block_timestamp ?? k.raw_data?.timestamp),
-          from: adresNormalize(deger.owner_address),
-          to: adresNormalize(deger.to_address),
-          asset: trc10
-            ? {
-                chain: "tron" as const,
-                contract: `trc10:${trc10AdCoz(deger.asset_name)}`,
-                symbol: "TRC10",
-                decimals: 0,
-              }
-            : TRX,
-          amountRaw: String(deger.amount ?? 0),
+          from,
+          to,
+          asset: varlik,
+          amountRaw: tutar,
           kind: "native",
           success: basarili,
           feeRaw: ucret === null ? null : String(ucret),

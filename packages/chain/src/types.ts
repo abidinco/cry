@@ -35,8 +35,26 @@ export type Asset = {
 export type Transfer = {
   chain: ChainId;
   txHash: string;
-  /** Aynı tx içinde birden çok hareket olabilir; sıralamayı bu korur. */
+  /**
+   * Kaynağın verdiği sıra — SIRALAMA için. **Kimlik değildir.**
+   *
+   * Ölçüldü (M1-E, 2026-09-21): TronGrid bu sayıyı adresin o işlemdeki kayıtlarını BÜTÜN
+   * token'lar boyunca sayarak veriyor. Yalnızca USDT+TRX tutan blok indeksi aynı sayıyı
+   * üretemiyor ve 2.270 harekette 60'ı kayıyor. Kaynağa bağlı bir sayı, iki kaynağın yazdığı
+   * tabloda kimlik olamaz — onu `occurrence` taşır.
+   */
   index: number;
+  /**
+   * Aynı işlem içinde BİREBİR aynı (from, to, asset, amountRaw) dörtlüsünün kaçıncı tekrarı (0'dan).
+   *
+   * Kimliğin kaynaktan bağımsız parçası. Özdeş iki kaydın hangisine 0 dendiği önemsizdir: özdeşler
+   * birbirinin yerine geçer, çokluk değişmez. Gerçek bir durumdur — bir işlemde 20 özdeş Transfer
+   * olayı ölçüldü.
+   *
+   * **Sayaç TUR boyunca yaşar, sayfa boyunca değil:** bir işlemin kayıtları sayfa sınırında
+   * bölünebiliyor ve parti başına sıfırlanan bir sayaç ikinci yarıyı birinciyle çakıştırır.
+   */
+  occurrence: number;
   blockNumber: number | null;
   /** UTC, ISO 8601. */
   ts: string;

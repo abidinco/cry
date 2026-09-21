@@ -144,7 +144,13 @@ export async function adresIndeksle(
   };
 }
 
-/** Hareketleri yazar; aynı (chain, txHash, index) ikinci kez yazılmaz. */
+/**
+ * Hareketleri yazar; aynı hareket ikinci kez yazılmaz.
+ *
+ * Tekillik (chain, txHash, from, to, asset, amountRaw, occurrence) — KAYNAKTAN BAĞIMSIZ.
+ * Eskiden (chain, txHash, index) idi ve `index`'i TronGrid'in kendi sırasından alıyordu; blok
+ * indeksi aynı sayıyı üretemediği için aynı para iki satır olurdu (ölçüm M1-E: 2.270'te 60).
+ */
 async function hareketleriYaz(hareketler: Transfer[]): Promise<number> {
   let yazilan = 0;
 
@@ -158,6 +164,7 @@ async function hareketleriYaz(hareketler: Transfer[]): Promise<number> {
         chain: h.chain,
         txHash: h.txHash,
         index: h.index,
+        occurrence: h.occurrence,
         blockNumber: h.blockNumber,
         ts: new Date(h.ts),
         fromAddressId: h.from ? (adresIdleri.get(anahtar(h.chain, h.from)) ?? null) : null,

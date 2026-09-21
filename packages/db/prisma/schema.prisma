@@ -134,7 +134,9 @@ model Transfer {
   id          BigInt   @id @default(autoincrement())
   chain       String
   txHash      String   @map("tx_hash")
-  /// Aynı tx içindeki sıra — bir tx birden çok hareket taşıyabilir.
+  /// Kaynağın verdiği sıra — SIRALAMA ve gösterim için. KİMLİK DEĞİL: ölçüldü (M1-E,
+  /// 2026-09-21) ki TronGrid bu sayıyı adresin o işlemdeki kayıtlarını BÜTÜN token'lar
+  /// boyunca sayarak veriyor, blok indeksi ise yalnızca USDT+TRX gördüğü için üretemiyor.
   index       Int
   blockNumber Int?     @map("block_number")
   ts          DateTime
@@ -153,8 +155,23 @@ model Transfer {
   feeRaw    String? @map("fee_raw")
   raw       Json?
 
+  /// Aynı işlem içinde BİREBİR aynı (kimden, kime, varlık, tutar) dörtlüsünün kaçıncı tekrarı.
+  /// Kimliğin kaynaktan bağımsız parçası: özdeş kayıtlarda hangisine 0 dendiği önemsizdir,
+  /// çünkü özdeşler birbirinin yerine geçer ve çokluk aynı kalır.
+  occurrence Int @default(0)
+
   createdAt DateTime @default(now()) @map("created_at")
 
+  /// KİMLİK. Eski hâli (chain, txHash, index) idi ve KAYNAĞA BAĞLIYDI: aynı hareketi TronGrid ile
+  /// blok indeksinden yazmak 2.270 harekette 60 mükerrer satır üretiyordu (ölçüm: M1-E). Bu dörtlü
+  /// + tekrar sırası iki kaynağın da GÖREBİLDİĞİ şeyden kurulu.
+  /// UYARI: from/to NULL olursa Postgres NULL'ları farklı sayar ve o satır tekilleşmez. Bugün
+  /// böyle satır YOK (ölçüldü: 86.674 satırda 0); null adres üreten bir adaptör eklenirse burası
+  /// yeniden düşünülür.
+  @@unique([chain, txHash, fromAddressId, toAddressId, assetId, amountRaw, occurrence])
+  /// GEÇİCİ. Eski kimlik; yeni yazıcı dağıtılana kadar duruyor, çünkü `occurrence` yazmayan eski
+  /// worker yalnızca yeni anahtarla çalışırsa özdeş transferleri tek satıra indirir. Blok
+  /// indeksinden yazan yol gelmeden ÖNCE ikinci bir göçle düşer (o yol farklı `index` üretiyor).
   @@unique([chain, txHash, index])
   @@index([fromAddressId, ts])
   @@index([toAddressId, ts])

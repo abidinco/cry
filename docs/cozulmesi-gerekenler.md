@@ -283,3 +283,28 @@ indekslenmesi (en çok 10 sayfa) sürerken iptal o tarama bitene kadar bekler.
 
 **Nerede:** `apps/worker/src/indeksle.ts` sayfa döngüsüne iptal kontrolü
 (koşu kimliği parametre olarak) — ya da kabul: en kötü durum birkaç dakika.
+
+---
+
+## 16. Eski tekillik `(chain, tx_hash, index)` hâlâ duruyor — ikinci göç bekliyor
+
+**Ne bozuk:** hareketin kimliği 2026-09-21'de
+`(chain, tx_hash, from, to, asset, amount_raw, occurrence)` oldu (göç
+`20260921160000_hareket_kimligi`, ölçüm: yol haritası → M1-E). Eski tekillik
+BİLEREK silinmedi: göç uygulandığında çalışan worker hâlâ eski kodu taşıyordu ve
+`occurrence` yazmıyordu; eski anahtar o anda kalksaydı aynı işlemdeki ÖZDEŞ
+transferler (ölçüldü: bir işlemde 20 tane) tek satıra iner ve para sessizce
+kaybolurdu.
+
+**Neden kalıcı olamaz:** blok indeksinden yazan yol farklı bir `index` üretiyor
+(log dizisindeki konum ⟷ TronGrid'in adres içi sırası). Eski anahtar dururken
+o yol yazmaya başlarsa, gerçekten FARKLI iki hareket aynı `(tx, index)` çiftine
+düşüp biri sessizce atılabilir.
+
+**Sıra:** (1) `occurrence` yazan yazıcı DAĞITILIR — bu commit'te var, canlıya
+push ile gider. (2) Sonra ikinci göç eski indeksi düşürür:
+`DROP INDEX "transfers_chain_tx_hash_index_key";` ve şemadaki geçici
+`@@unique([chain, txHash, index])` satırı silinir. (3) Ancak ondan sonra blok
+indeksinden besleyen adaptör devreye alınır.
+
+**Nerede:** `packages/db/prisma/schema.prisma` → `Transfer` (geçici `@@unique`).
