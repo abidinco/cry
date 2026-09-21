@@ -639,6 +639,82 @@ bitecek büyüklükte bölünür (görev disiplini, `docs/gorevler/README.md`).
 Aynı iskelet, farklı okuyucu: ERC-20 `Transfer` olayları (USDT/USDC) +
 yerel transfer. Önce B0'ın EVM karşılığı ölçülür (BSC hacmi TRON'a yakın).
 
+## M1 — Takip koşuları blok indeksini okusun (ölçüm kapısı, 2026-09-21)
+
+Kullanıcı hedefi: "Kendi motorumuzdan istediğimiz takip koşularını yapalım. TronGrid'e ihtiyacımız
+kalmasın." Bu, CLAUDE.md'nin **iki katman** kuralını (indeks ADAY üretir, hüküm adres taramasınındır)
+değiştirmek demek; şartı indeksin TronGrid'le BİREBİR aynı hareketleri verdiğini ölçmekti.
+Betik `scripts/olcum/m1-kapi.mts`.
+
+```bash
+node --env-file=.env --env-file=apps/web/.env.local --import tsx scripts/olcum/m1-kapi.mts --adres=5
+```
+
+- **A) Pencere 95,52 gün:** 83.693.140–86.443.134 (2.749.995 blok), 2026-06-18 → 2026-09-21.
+  B5'te 9,7 gündü; doldurucu toplu istekle hızlandıktan sonra 95 güne çıktı.
+- **B) Arşiv kapsaması %0,34:** Postgres'teki 86.674 TRON hareketinin yalnızca 299'u pencerede.
+  Arşiv 2018-06-25 → 2026-09-11 aralığına yayılı. **Motor bu yüzden BUGÜN melez olmak zorunda:**
+  pencere içi indeksten, pencere dışı TronGrid'den.
+- **C) Doğruluk: 13 adres, 560 hareket, EKSİK 0 / FAZLA 0.** (İki koşu: 8 adres/314 hareket ve
+  5 adres/246 hareket.) Karşılaştırma anahtarı `(tx, kimden, kime, varlık, tutar)`;
+  **`idx`/`index` anahtara GİRMEZ** — indekste TRC20 `idx`'i işlemin OLAY dizisindeki konum,
+  TronGrid adaptöründe aynı adresin o işlemdeki kaçıncı kaydı. İkisi karıştırılırsa aynı hareket
+  iki ayrı hareket sanılır.
+- **D) Hız: indeks 498 ms, TronGrid 8.764 ms → 17,6 kat.** Ama ancak DOĞRU sorgu yoluyla (aşağıda).
+
+### Motorun atacağı üç sorgu — ve iki tuzak
+
+Doğru yol (ölçülen 326–871 ms, ortalama 498 ms):
+
+1. **gelen** ← ana tablo, `kime = X` (birincil anahtar ön eki) — **80 ms**
+2. **giden** ← ayna `blok_indeks_giden`, `kimden = X` (aynanın birincil anahtar ön eki) — **~300 ms**
+3. **tx çözümü** ← aynada tx yerine `cityHash64` var; gerçek hash defterin blok gezgini bağlantısı
+   için ŞART. Aynanın verdiği `(kime, zaman)` çiftleriyle ana tablo NOKTA okunur — **~100 ms**.
+   Ölçüldü: çözülen satır sayısı aynanınkiyle birebir (23/23, 71/71, 25/25, 3/3).
+
+Tuzak 1 — **`kime OR kimden` tek sorguda yazılmaz.** Birincil anahtarı TAMAMEN devre dışı bırakıyor,
+596 Mn satır taranıyor: 25.842–47.000 ms. İki ayrı sorgu şart.
+
+Tuzak 2 — **tx çözümü JOIN ile yazılmaz.** `INNER JOIN blok_indeks AS m FINAL` sağ tablonun
+TAMAMINI belleğe alıyor: aynı iş 26.369 ms. Ön ek okuması 15–98 ms. Aradaki fark 300 kat.
+
+Ayrıca ana tabloda `kimden` taraması **29.496 ms** — ayna olmasaydı indeks TronGrid'den 3 kat YAVAŞ
+olurdu. B5'in ayna kararı burada karşılığını verdi.
+
+### "Eksik 0" ne demek DEĞİL
+
+İndeks TronGrid'le aynı cevabı veriyor; **eksiksiz olduğunu göstermiyor.** İkisi de sözleşme içi
+(internal) TRX transferlerini göstermiyor — TronGrid'in hesap uçları da onları döndürmüyor. Yani bu
+ölçüm "indeks kaynağı kadar iyi" der, "zincirin tamamı" demez. O boşluğu BigQuery'nin
+`tron_internal_transactions` tablosu kapatacak (bkz. BigQuery maliyet ölçümü).
+
+### BigQuery maliyet ölçümü — KURU KOŞU (2026-09-21)
+
+B3 geçmişi ücretsiz kaynaklardan uçtan geriye doluyor ve ~19,5 blok/sn'de tam geçmiş ~51 gün sürüyor.
+Alternatif olarak Google'ın yönettiği `bigquery-public-data.goog_blockchain_tron_mainnet_us` veri seti
+ölçüldü. **Hiçbir sorgu çalıştırılmadı**; sayılar konsolun kuru koşu ("This query will process N when
+run") tahminidir ve o an ekranda okunmuştur. Sorgular ihtiyacımız olan sütunlarla yazıldı (`SELECT *`
+değil) — BigQuery sütunlu okur ve fiyat taranan bayta bağlıdır.
+
+| Görünüm | Ne için | 2018–2022 | Tam geçmiş |
+|---|---|---|---|
+| `logs` (USDT sözleşmesi + Transfer konusu) | USDT transferleri | 1,04 TB | 2,25 TB |
+| `transactions` (`input` HARİÇ) | yerel TRX transferleri | 1,12 TB | ~3,47 TB (öngörü) |
+| `receipts` | başarısız işlemi elemek | 356,22 GB | ~1,10 TB (öngörü) |
+| `tron_internal_transactions` | sözleşme içi TRX | 803,21 GB | 909 GB |
+| **Toplam** | | **~3,3 TB** | **~7,7 TB** |
+
+- `transactions` `input` sütunuyla 1,50 TB, onsuz 1,12 TB — tek sütun %25 fark ediyor.
+- İç transferlerin %88'i 2023 ÖNCESİNDE (803,21 + 106,18 = 909,39 GB; iki dilim tam geçmişe oturuyor).
+  2023 sonrası TRON hacmi ağırlıkla TRC20 USDT ve o log tarafında sayılıyor.
+- **Ölçülmemiş varsayım:** TRON'un sözleşme tipi için ayrı bir sütun YOK; `TransferContract`'ı
+  `input = '0x'` üzerinden çıkarmak gerekiyor. Bu varsayım kendi verimizle karşılaştırılmadan
+  `transactions` çıkarımı yazılmaz.
+- Ücret: isteğe bağlı fiyatlandırmada 6,25 $/TiB, **ayda ilk 1 TiB ücretsiz** (kota her takvim ayı
+  yenilenir). GCS'e dışa aktarım aynı bölgede ücretsiz; asıl kalem internete indirme (~0,12 $/GB).
+  BigQuery Sandbox (kartsız) sorguyu ÇALIŞTIRIR ama dışa AKTARAMAZ — veri almak için faturalama şart.
+- Kullanıcının ücretsiz deneme süresi 2026-09-21'de dolmuştu; 300 $ kredi YOK, tutarlar doğrudan karta yazar.
+
 ## 4. Riskler ve açık sorular
 
 - **Kota paylaşımı:** canlı uç kotanın ~%58'ini tüketir; aynı gün yoğun bir

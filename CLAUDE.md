@@ -212,12 +212,29 @@ Motor ve arayüz (B5) — kullanıcı kararları 2026-09-17:
   Yerel typecheck ve testler GEÇİYORDU; hata ancak imaj temiz kopyada derlenince görüldü. Web'e yeni paket
   bağlanınca push'tan önce imaj derlenir (CLAUDE.md → B4 temiz kopya yolu).
 
-Sabit kalan iki kural:
+Motor indeksi okuyor (M1) — ölçülerek konanlar (2026-09-21):
 
-- **İki katman: blok indeksi ADAY üretir, adres taraması HÜKÜM.** Blok
-  indeksi eşikli olabilir; ama eşikli bir indeks "bu adrese başka para
-  girmedi" dedirtirse yanlıştır. İz, takip ve rapor YALNIZCA eşiksiz adres
-  taramasından beslenir.
+- **İki katman kuralı PENCERE İÇİNDE kalktı.** Eski hâli "blok indeksi ADAY üretir, adres taraması
+  HÜKÜM"dü. Ölçüldü (`scripts/olcum/m1-kapi.mts`): 13 adres, 560 hareket, TronGrid'le **eksik 0 /
+  fazla 0**. Eşiksiz ve kapsam tablosuyla boşluksuz olduğu ispatlı bir pencerede indeks HÜKÜM
+  verebilir. **Pencere DIŞI değişmedi:** orası TronGrid'den okunur, indeks orada "bakılamadı" der.
+  Eski kuralın hâlâ geçerli çekirdeği: EŞİKLİ bir indeks asla "başka para girmedi" dedirtmez.
+- **"Eksik 0" EKSİKSİZ demek değildir.** İndeks kaynağı KADAR iyi olduğunu söyler. İkisi de sözleşme
+  içi (internal) TRX transferlerini göstermiyor — TronGrid'in hesap uçları da döndürmüyor. Bir
+  karşılaştırma, iki tarafın ortak körlüğünü göremez.
+- **Motor üç sorgu atar, iki tuzağa düşmeden.** (1) gelen ← ana tablo `kime` ön eki (80 ms),
+  (2) giden ← ayna `kimden` ön eki (~300 ms), (3) gerçek tx ← aynanın `(kime, zaman)` çiftleriyle ana
+  tabloda NOKTA okuma (~100 ms; aynada tx yerine cityHash64 var, gezgin bağlantısı gerçek hash ister).
+  Toplam 498 ms ⟷ TronGrid 8.764 ms (17,6 kat).
+  **Tuzak 1: `kime OR kimden` TEK sorguda yazılmaz** — birincil anahtarı tamamen düşürüyor, 596 Mn
+  satır taranıyor (26–47 sn). **Tuzak 2: tx çözümü JOIN ile yazılmaz** — `INNER JOIN … FINAL` sağ
+  tablonun TAMAMINI belleğe alıyor (26,4 sn ⟷ 15–98 ms, 300 kat).
+- **Karşılaştırmada `idx`/`index` ANAHTARA GİRMEZ.** İndekste TRC20 `idx`'i işlemin OLAY dizisindeki
+  konum; TronGrid adaptöründe aynı adresin o işlemdeki kaçıncı kaydı. İki şema aynı tx için
+  karıştırılırsa bir hareket iki hareket sanılır.
+
+Sabit kalan kural:
+
 - **Önce ölçüm kapısı.** Her aşama (B0–B7) bir ölçümle açılır; kapının
   cevabı gelmeden sonraki aşamanın kodu yazılmaz. "Arşiv düğümü imkânsız"
   kararı hâlâ geçerli (2,9–3,6 TB ⟷ 465 GB); blok indeksi düğüm değil,
