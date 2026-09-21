@@ -34,6 +34,7 @@ const indeksWorker = new Worker<IndeksIsi>(
           `${sonuc.okunanSayfa} sayfa` +
           (sonuc.sonTarih ? `, ${sonuc.sonTarih.slice(0, 10)} tarihine kadar` : "") +
           (sonuc.atlananOnay ? `, ${sonuc.atlananOnay} onay atlandı` : "") +
+          (sonuc.hareketKaynagi ? `, kaynak: ${sonuc.hareketKaynagi}` : "") +
           (sonuc.tamamlandi ? "" : " (devam edecek)"),
       );
     }

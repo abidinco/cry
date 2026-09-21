@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@cry/blok-indeks": "*",
     "@cry/chain": "*",
     "@cry/db": "*",
     "bullmq": "^5.34.5",

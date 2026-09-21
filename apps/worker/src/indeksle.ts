@@ -6,9 +6,27 @@
  * kendi indeksi oluşur.
  */
 import { prisma } from "@cry/db";
-import { registryFromEnv, type ChainId, type Transfer } from "@cry/chain";
+import { registryFromEnv, type ChainAdapter, type ChainId, type Transfer } from "@cry/chain";
+import { BlokIndeksliAdaptor } from "./blok-indeksli-adaptor.js";
 
 const registry = registryFromEnv();
+
+/**
+ * TRON adaptörünün önüne blok indeksini koyar: pencere İÇİNDEKİ soruları kendi diskimizden
+ * cevaplar, dışındakileri kaynağa bırakır (CLAUDE.md → M1). Sarmalayıcı adres başına DEĞİL süreç
+ * başına tutuluyor; pencereyi 60 sn önbelleğe alıyor ve `occurrence` sayacını tur başında sıfırlıyor.
+ */
+const sarmalayicilar = new Map<ChainId, ChainAdapter>();
+function adaptorAl(chain: ChainId): ChainAdapter {
+  const ham = registry.get(chain);
+  if (chain !== "tron") return ham;
+  let s = sarmalayicilar.get(chain);
+  if (!s) {
+    s = new BlokIndeksliAdaptor(ham);
+    sarmalayicilar.set(chain, s);
+  }
+  return s;
+}
 
 /** Tek seferde veritabanına yazılan hareket sayısı. */
 const YIGIN = 500;
@@ -25,6 +43,8 @@ export type IndeksSonucu = {
   /** Transfer sayılmayan onay kayıtları: sessizce atılan kayıt "yoktu" sanılır. */
   atlananOnay?: number;
   atlanmaSebebi?: string;
+  /** Hareketler nereden geldi: kendi blok indeksimiz mi, kaynak mı — ve neden. */
+  hareketKaynagi?: string;
 };
 
 export async function adresIndeksle(
@@ -43,7 +63,7 @@ export async function adresIndeksle(
     };
   }
 
-  const adaptor = registry.get(chain);
+  const adaptor = adaptorAl(chain);
   const adres = adaptor.normalizeAddress(hamAdres);
   const ozet = await adaptor.getAddressSummary(adres, opts.signal);
 
@@ -140,6 +160,11 @@ export async function adresIndeksle(
     atlananOnay:
       "atlananOnaySayisi" in adaptor
         ? (adaptor as { atlananOnaySayisi: number }).atlananOnaySayisi
+        : undefined,
+    // Yazılıp hiçbir yerin sormadığı bilgi, olmayan bilgidir (CLAUDE.md → Görev disiplini).
+    hareketKaynagi:
+      adaptor instanceof BlokIndeksliAdaptor
+        ? `${adaptor.sonKullanim.kaynak} (${adaptor.sonKullanim.sebep})`
         : undefined,
   };
 }

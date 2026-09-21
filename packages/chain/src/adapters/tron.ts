@@ -4,6 +4,7 @@
  */
 
 import { getJson, RateGate } from "../http";
+import { TekrarSayaci } from "../tekrar";
 import { base58ToHex, tronGecerliMi, tronNormalize, hexToBase58 } from "../tron-address";
 import {
   ChainSourceError,
@@ -74,12 +75,8 @@ export class TronAdapter implements ChainAdapter {
    * hareket ikinci kez yazılıyordu (ölçüldü). Tur başında sıfırlanır.
    */
   private txSayaci = new Map<string, number>();
-  /**
-   * `occurrence` sayacı: (tx, from, to, varlık, tutar) -> kaç kez görüldü.
-   * TUR boyunca yaşar — bir işlemin kayıtları sayfa sınırında bölünebiliyor ve parti başına
-   * sıfırlanan bir sayaç ikinci yarıyı birinciyle çakıştırıp satırı sessizce düşürür.
-   */
-  private tekrarSayaci = new Map<string, number>();
+  /** `occurrence` kuralı TEK yerde (`../tekrar`); blok indeksi okuyucusu da onu kullanıyor. */
+  private tekrarSayaci = new TekrarSayaci();
   /**
    * Atlanan onay sayısı. Sessizce atılan kayıt "yoktu" sanılır; tur bunu
    * raporlayabilsin diye sayılıyor.
@@ -178,7 +175,7 @@ export class TronAdapter implements ChainAdapter {
     // İmleç yoksa bu turun İLK sayfasıdır; sayaç oradan başlar.
     if (!opts.cursor) {
       this.txSayaci.clear();
-      this.tekrarSayaci.clear();
+      this.tekrarSayaci.sifirla();
       this.atlananOnay = 0;
     }
 
@@ -265,14 +262,6 @@ export class TronAdapter implements ChainAdapter {
     return { items, next };
   }
 
-  /** Aynı dörtlüden kaçıncısı olduğunu söyler ve sayacı ilerletir. */
-  private tekrarNo(tx: string, from: string | null, to: string | null, sozlesme: string | null, tutar: string): number {
-    const anahtar = `${tx}|${from ?? ""}|${to ?? ""}|${sozlesme ?? ""}|${tutar}`;
-    const n = this.tekrarSayaci.get(anahtar) ?? 0;
-    this.tekrarSayaci.set(anahtar, n + 1);
-    return n;
-  }
-
   private trc20Cevir(k: any, i: number): Transfer {
     const ondalik = Number(k.token_info?.decimals ?? 0);
     const from = adresNormalize(k.from);
@@ -283,7 +272,7 @@ export class TronAdapter implements ChainAdapter {
       chain: "tron",
       txHash: k.transaction_id,
       index: i,
-      occurrence: this.tekrarNo(String(k.transaction_id), from, to, sozlesme, tutar),
+      occurrence: this.tekrarSayaci.sonraki(String(k.transaction_id), from, to, sozlesme, tutar),
       blockNumber: null, // Bu uç blok numarası vermiyor; uydurulmaz.
       ts: isoZaman(k.block_timestamp),
       from,
@@ -327,7 +316,7 @@ export class TronAdapter implements ChainAdapter {
           txHash: k.txID,
           // Sözleşmenin işlem içindeki sırası — sayfadan bağımsız, kararlı.
           index: i,
-          occurrence: this.tekrarNo(String(k.txID), from, to, varlik.contract, tutar),
+          occurrence: this.tekrarSayaci.sonraki(String(k.txID), from, to, varlik.contract, tutar),
           blockNumber: k.blockNumber ?? null,
           ts: isoZaman(k.block_timestamp ?? k.raw_data?.timestamp),
           from,

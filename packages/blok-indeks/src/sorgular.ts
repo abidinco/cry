@@ -30,7 +30,7 @@ const tsv = async (a: Ayar, sql: string) =>
   (await sorgu(a, `${sql} FORMAT TSV`)).trim().split("\n").filter(Boolean).map((l) => l.split("\t"));
 
 /** Hex (40 hane, 41 öneksiz) doğrulaması — SQL'e giden tek kullanıcı girdisi bu. */
-function hexDenetle(hex: string): string {
+export function hexDenetle(hex: string): string {
   if (!/^[0-9a-f]{40}$/.test(hex)) throw new Error(`adres gövdesi 40 hane küçük hex olmalı: "${hex}"`);
   return hex;
 }

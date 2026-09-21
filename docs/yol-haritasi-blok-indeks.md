@@ -727,6 +727,46 @@ küçük.
 - `index` KALIR — sıralama ve gösterim için; artık kimlik değil, kaynağın kendi sırası.
   (takip.ts `orderBy: [ts, index]` kullanıyor; kimlik değişse de sıra bozulmaz.)
 
+### M1 uygulaması — motor artık kendi diskimizden okuyor (2026-09-21)
+
+`apps/worker/src/blok-indeksli-adaptor.ts` `ChainAdapter`'ın ÖNÜNE geçiyor; `adresIndeksle` hiçbir
+şey bilmiyor, `registry.get` yerine `adaptorAl` çağırıyor. `listTransfers` DIŞINDAKİ her şey
+(bakiye, aktivasyon, tek işlem) hâlâ kaynağın işi — blok indeksi yalnızca HAREKET tutuyor.
+
+**Yönlendirme kuralı:** sorulan aralığın bir ucu bile pencerenin dışındaysa soru TronGrid'e gider.
+Yarısını indeksten yarısını kaynaktan DİKMEK yok: pencere sınırı blok hassasiyetinde, TronGrid'in
+TRC20 ucu ise blok numarası vermiyor; zaman üzerinden dikiş sınırda hareket kaybeder ya da çiftler.
+ClickHouse'a ulaşılamazsa pencere "bilinmiyor" sayılır ve soru kaynağa gider — sessiz boş cevap,
+bakılmamış bir yeri temiz gösterirdi.
+
+**Gerçek veriyle doğrulama** (`scripts/olcum/m1-adaptor-dogrula.mts`) — sayfalama dahil, motorun
+gerçekten kullandığı yol, karşılaştırma Postgres'teki TEKİLLİK ANAHTARININ aynısı üzerinden
+`(txHash, from, to, sözleşme, tutar, occurrence)`:
+
+```bash
+node --env-file=.env --env-file=apps/web/.env.local --import tsx scripts/olcum/m1-adaptor-dogrula.mts --adres=6 [--cokKayitli]
+```
+
+| Koşu | Adres | Hareket | Eksik | Fazla | Sarmalayıcı | TronGrid | Oran |
+|---|---|---|---|---|---|---|---|
+| olağan | 5 | 246 | **0** | **0** | 238 ms | 3.688 ms | 15,5x |
+| **çok kayıtlı** (zor hal) | 5 | 2.086 | **0** | **0** | 106 ms | 7.192 ms | **67,8x** |
+
+Zor halde `TYRVFVe4YGHQpBSiW4XQu1WVDyVrf8cJ8S` var — M1-E'de `index` alanında 60 kayma veren adres.
+Kimlik `occurrence`a taşındıktan sonra 205/205 birebir.
+
+Yönlendirme de çalıştırılarak doğrulandı: `fromTs` yokken "ilk tam tarama — pencere geçmişin
+tamamını kapsamıyor" diyip kaynağa gidiyor; pencere öncesi bir `fromTs` ile "aralık pencere dışında"
+diyor. İkisi de TronGrid'e düşüyor, doğru.
+
+**Bugünkü kazanım DAR ve bunu söylemek gerek:** pencere 96 gün, arşivin %0,34'ü. Yani indeks bugün
+yalnızca (a) penceresi içinde kalan artımlı taramaları ve (b) son üç ayın vakalarını karşılıyor.
+İlk kez taranan bir adres hâlâ TronGrid'e gidiyor, çünkü onun sorusu "bütün geçmiş". Asıl kazanç
+tam geçmiş yüklendiğinde gelir; iskelet o güne hazır.
+
+**Görünürlük:** `IndeksSonucu.hareketKaynagi` worker günlüğüne "kaynak: blok-indeksi (pencere içi
+96,1 gün)" diye düşüyor. Hangi yoldan beslendiğini söylemeyen bir hızlanma, ölçülemez.
+
 ### BigQuery maliyet ölçümü — KURU KOŞU (2026-09-21)
 
 B3 geçmişi ücretsiz kaynaklardan uçtan geriye doluyor ve ~19,5 blok/sn'de tam geçmiş ~51 gün sürüyor.

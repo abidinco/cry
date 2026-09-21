@@ -237,6 +237,20 @@ Motor indeksi okuyor (M1) — ölçülerek konanlar (2026-09-21):
   Özdeş kayıtlarda hangisine #0 dendiği önemsiz — özdeşler birbirinin yerine geçer. **İki kaynağın
   yazdığı bir tabloda tekillik, ikisinin de görebildiği şeyden kurulur.**
 
+- **Motor pencere içini KENDİ DİSKİMİZDEN okuyor** (`apps/worker/src/blok-indeksli-adaptor.ts`).
+  Sarmalayıcı `ChainAdapter`'ın önüne geçiyor; `adresIndeksle` bunu bilmiyor. Yalnızca
+  `listTransfers` devralınır — bakiye, aktivasyon ve tek işlem hâlâ kaynağın işi, çünkü blok
+  indeksi yalnızca HAREKET tutuyor. Gerçek veriyle doğrulandı (`scripts/olcum/m1-adaptor-dogrula.mts`,
+  sayfalama dahil, Postgres'in tekillik anahtarı üzerinden): olağan 246 hareket 15,5x, çok kayıtlı
+  zor halde 2.086 hareket **67,8x**, ikisinde de eksik 0 / fazla 0.
+- **Aralığın bir ucu bile pencere dışındaysa soru KAYNAĞA gider; yarısı indeksten yarısı kaynaktan
+  DİKİLMEZ.** Pencere sınırı blok hassasiyetinde, TronGrid'in TRC20 ucu blok numarası vermiyor;
+  zaman üzerinden dikiş sınırda hareket kaybeder ya da çiftler. Aynı sebeple ClickHouse'a
+  ulaşılamazsa pencere "bilinmiyor" sayılır ve soru kaynağa gider — sessiz boş cevap, bakılmamış
+  bir yeri temiz gösterirdi.
+- **Bugünkü kazanç DAR:** pencere 96 gün, arşivin %0,34'ü. İlk kez taranan adres hâlâ TronGrid'e
+  gidiyor ("bütün geçmiş" sorusunu pencere karşılamıyor). Hızlanma tam geçmiş yüklenince gelir.
+
 Sabit kalan kural:
 
 - **Önce ölçüm kapısı.** Her aşama (B0–B7) bir ölçümle açılır; kapının

@@ -169,10 +169,6 @@ model Transfer {
   /// böyle satır YOK (ölçüldü: 86.674 satırda 0); null adres üreten bir adaptör eklenirse burası
   /// yeniden düşünülür.
   @@unique([chain, txHash, fromAddressId, toAddressId, assetId, amountRaw, occurrence])
-  /// GEÇİCİ. Eski kimlik; yeni yazıcı dağıtılana kadar duruyor, çünkü `occurrence` yazmayan eski
-  /// worker yalnızca yeni anahtarla çalışırsa özdeş transferleri tek satıra indirir. Blok
-  /// indeksinden yazan yol gelmeden ÖNCE ikinci bir göçle düşer (o yol farklı `index` üretiyor).
-  @@unique([chain, txHash, index])
   @@index([fromAddressId, ts])
   @@index([toAddressId, ts])
   @@index([chain, ts])
