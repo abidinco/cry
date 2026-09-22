@@ -92,6 +92,17 @@ export class BlokIndeksliAdaptor implements ChainAdapter {
   private readonly tekrar = new TekrarSayaci();
   /** Son turun hangi yoldan beslendiği — çağıran raporlayabilsin diye. */
   sonKullanim: IndeksKullanimi = { kaynak: "trongrid", sebep: "henüz sorulmadı" };
+  /**
+   * Hangi yolun kaç kez seçildiği. Bir takip koşusu onlarca adres indeksliyor ve süresinin
+   * nereye gittiği ancak bu dağılımla söylenebilir: "hızlandı" demek yetmez, NEYİN hızlandığı
+   * söylenir. Süreç boyunca birikir; `sayaciSifirla` ile bir ölçümün başında sıfırlanır.
+   */
+  readonly sayac: Record<IndeksKullanimi["kaynak"], number> = { "blok-indeksi": 0, melez: 0, trongrid: 0 };
+  sayaciSifirla(): void {
+    this.sayac["blok-indeksi"] = 0;
+    this.sayac.melez = 0;
+    this.sayac.trongrid = 0;
+  }
 
   constructor(
     private readonly ic: ChainAdapter,
@@ -141,6 +152,7 @@ export class BlokIndeksliAdaptor implements ChainAdapter {
     if (!onceki) {
       this.tekrar.sifirla();
       this.sonKullanim = this.yolSec(p, opts);
+      this.sayac[this.sonKullanim.kaynak]++;
     }
 
     // Melezin BİRİNCİ parçası: pencere öncesi, kaynaktan, üst sınır pencerenin başı + ortak pay.

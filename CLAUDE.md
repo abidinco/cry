@@ -341,6 +341,21 @@ alıp karşılaştıran testtir.
   bir komutu bile hataya düşürür.
 - **Hetzner'daki yığının veritabanı bu yedeğin KAPSAMI DIŞINDA.**
 
+## Takip koşusunun süresi NEREYE gidiyor (M4, 2026-09-22)
+
+- **Bugünkü gerçek: 10–12 düğümlük bir koşu ~200 saniye.** İkisi ölçüldü (201,5 ve 204,9 sn).
+  Kök indekslemesi 4–6 sn; geri kalanın tamamı koşunun keşfettiği adresleri indekslemek.
+- **Süreyi indeks değil TronGrid belirliyor.** Koşuda indekslenen 8 adresin 8'i de MELEZ yoldan
+  geçti: pencere öncesi geçmiş kaynaktan okunuyor, adres başına ~25 sn. Pencere içi kısım 106–498 ms,
+  yani 198 saniyenin içinde indeksin payı saniyenin altında. **Tam geçmiş yüklenince aynı koşu
+  birkaç saniyeye iner** — BigQuery kararının somut karşılığı budur.
+- **İndekslenmemiş bir kökle koşu 1 DÜĞÜMDE biter.** Motor tohumu Postgres'ten okuyor
+  (`tohumGirisleri`); taze adreste ölçüldü: 10,9 sn, 0 kenar. Arayüzdeki sıra zaten adres → indeksle
+  → takip; ama "adresi yapıştır, koşuyu al" diye tek adımlık bir akış yazılırsa kök indekslemesini
+  kendisi yapmalı.
+- **Yol dağılımı adaptörün kendi sayacından okunur** (`BlokIndeksliAdaptor.sayac`). "Hızlandı"
+  demek yetmez; hangi taramanın hangi yoldan geçtiği sayılmadan süre açıklanamaz.
+
 ## Boşluk, "biraz eksik veri" değildir (2026-09-22)
 
 - **Pencere boşluksuz son aralıktır; bir boşluk ALTINDAKİ HER ŞEYİ motora kapatır.** Tam geçmiş

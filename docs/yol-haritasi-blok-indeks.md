@@ -842,6 +842,38 @@ birkaç boş isteğe iner; 2018'den beri işleyen bir adreste inmez. Ölçülen 
 arasında oynadı ve TronGrid kotası canlı worker'la paylaşıldığı için gürültülü — buradan tek bir
 hızlanma katsayısı çıkarmak doğru olmaz. Kesin olan şey doğruluk.
 
+### M4 — "Rastgele bir adres verdiğimde ne kadar sürüyor?" (2026-09-22)
+
+Kullanıcının hedefi: *"Ben sana rastgele bir cüzdan adresi veya TX hash verdiğimde çok uzun
+olmayan bir sürede bunun sankey diyagramını, takip koşusunu çıkarmanı isteyeceğim."*
+M1–M3 motoru indekse bağladı; bu ölçüm uçtan uca karşılığını söyler.
+Betik `scripts/olcum/m4-takip-suresi.mts` (koşu kuyruğa atılmaz, `takipKos` doğrudan çağrılır;
+deneme koşusu sonunda SİLİNİR).
+
+```bash
+node --env-file=.env --env-file=apps/web/.env.local --import tsx scripts/olcum/m4-takip-suresi.mts --adres=T... --hop=2 --dugum=12
+```
+
+| Kök | Toplam | Kök indeksleme | Koşu | Graf | Yol dağılımı |
+|---|---|---|---|---|---|
+| `TLkwyaJU…` | **201,5 sn** | 4,0 sn (blok-indeksi) | 197,5 sn | 12 düğüm / 63 kenar | — |
+| `TN3U9Ryq…` | **204,9 sn** | 6,3 sn (melez) | 198,5 sn | 10 düğüm / 28 kenar | **melez 8 / 8** |
+
+**Süre nereye gidiyor:** koşunun keşfettiği 8 adresin 8'i de MELEZ yoldan indeksleniyor, yani
+pencere öncesi geçmişleri TronGrid'den okunuyor. Adres başına ~25 sn ve koşu süresinin tamamı bu.
+Pencere içi kısım ölçülmüş haliyle 106–498 ms; yani bugünkü 198 saniyenin içinde indeksin payı
+saniyenin altında.
+
+**Bir şey daha ortaya çıktı:** motor tohumu Postgres'ten okuyor (`tohumGirisleri`), dolayısıyla
+İNDEKSLENMEMİŞ bir kökle koşu 1 düğümde biter. İlk denemede tam bu oldu: 10,9 sn, 0 kenar.
+Arayüzdeki gerçek sıra da budur (adres aranır → indekslenir → takip başlatılır), ama "adresi
+yapıştır, koşuyu al" diye tek adımlık bir akış yazılacaksa kök indekslemesini kendisi yapmalı.
+
+**Tam geçmiş yüklendiğinde ne değişir:** 8 adresin 8'i de MELEZ değil saf İNDEKS yoluna düşer.
+Ölçülen tek adres maliyeti 106–498 ms olduğuna göre aynı koşu ~198 sn yerine **birkaç saniyeye**
+iner. Yani hedefteki "çok uzun olmayan süre" bugün 3,5 dakika, tam geçmişle saniyeler.
+Bu, BigQuery kararının somut karşılığıdır.
+
 ### BigQuery maliyet ölçümü — KURU KOŞU (2026-09-21)
 
 B3 geçmişi ücretsiz kaynaklardan uçtan geriye doluyor ve ~19,5 blok/sn'de tam geçmiş ~51 gün sürüyor.

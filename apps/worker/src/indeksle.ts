@@ -17,7 +17,7 @@ const registry = registryFromEnv();
  * başına tutuluyor; pencereyi 60 sn önbelleğe alıyor ve `occurrence` sayacını tur başında sıfırlıyor.
  */
 const sarmalayicilar = new Map<ChainId, ChainAdapter>();
-function adaptorAl(chain: ChainId): ChainAdapter {
+export function adaptorAl(chain: ChainId): ChainAdapter {
   const ham = registry.get(chain);
   if (chain !== "tron") return ham;
   let s = sarmalayicilar.get(chain);
