@@ -341,6 +341,24 @@ alıp karşılaştıran testtir.
   bir komutu bile hataya düşürür.
 - **Hetzner'daki yığının veritabanı bu yedeğin KAPSAMI DIŞINDA.**
 
+## Boşluk, "biraz eksik veri" değildir (2026-09-22)
+
+- **Pencere boşluksuz son aralıktır; bir boşluk ALTINDAKİ HER ŞEYİ motora kapatır.** Tam geçmiş
+  yüklendikten sonra 84.000.000'daki tek bir boşluk 84 milyon bloğu kullanılamaz yapar — veri
+  diskte dursa bile. Doldurucu iki kaynak çelişince ya da blok okunamayınca bilerek boşluk bırakıyor
+  (B3 kuralı, doğru kural); kapatmak AYRI bir iştir.
+- **Kapatıcı: `scripts/blok-indeks-bosluk-doldur.mts`**, günlük görev `cry-bosluk-doldur` (04:15).
+  Kaynakları sırayla dener; hiçbiri veremezse boşluk KALIR ve sebebi sayılır — sessizce "0
+  transferli blok" yazmak bakılmamış bloğu bakılmış göstermek olurdu.
+- **Doldurucunun CEPHESİNE yaklaşılmaz** (`--emniyet`, 50.000 blok). Ölçüldü: cephenin hemen
+  üstünde 205 bloğun 27'si "boşluk" göründü, oysa oran bütün koşuda yüz binde 3 — çünkü onlar
+  boşluk değil, doldurucunun UÇUŞTA olan blokları. İkisi aynı bloğu okursa kota iki kez harcanır.
+- **Büyük aralık boşluk DEĞİLDİR** (`--enBuyukBosluk`, 1000). Kapsam tablosunda hiç okunmamış koca
+  bölgeler var (B0'ın 30.000.000 civarındaki örnek blokları ile asıl bölge arası); onlar
+  doldurucunun işi. Süzgeç olmadan kapatıcı milyonlarca bloğu "boşluk" sanardı.
+- **Betik `process.exit()` ÇAĞIRMAZ:** ClickHouse istemcisinin açık tutamaçları varken zorla kapanan
+  süreç libuv "Assertion failed" basıyor ve sağlıklı bir turu hatalı gösteriyor.
+
 ## Doldurucunun bekçisi (2026-09-22)
 
 - **Doldurucu artık kendi kendine ayakta kalıyor.** `deploy/pc/doldurucu-bekci.ps1`, zamanlanmış

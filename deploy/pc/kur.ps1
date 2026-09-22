@@ -10,6 +10,8 @@
     - "cry-yedek" gorevi: her gun 03:15'te Postgres yedegi (yedek.ps1)
     - "cry-yedek-denemesi" gorevi: her pazar 03:45'te yedegi GERI YUKLEYEREK dogrular.
       Alinmis ama geri yuklenmemis bir yedek, yedek degildir.
+    - "cry-bosluk-doldur" gorevi: her gun 04:15'te blok indeksindeki bosluklari kapatir.
+      Pencere bosluksuz araliktir; tek bir bosluk altindaki her seyi motora kapatir.
     - "cry-doldurucu-bekci" gorevi: 15 dakikada bir B3 doldurucusunun ayakta olup
       olmadigina bakar, dusmusse yeniden baslatir. doldur-devam.ps1 yalnizca oturum
       acilisinda calisiyor; gun ici bir dusus bir sonraki acilisa kadar fark edilmiyordu.
@@ -28,9 +30,10 @@ $betik = Join-Path $PSScriptRoot "baslangic.ps1"
 $yedekBetik = Join-Path $PSScriptRoot "yedek.ps1"
 $denemeBetik = Join-Path $PSScriptRoot "yedek-geri-yukleme-denemesi.ps1"
 $bekciBetik = Join-Path $PSScriptRoot "doldurucu-bekci.ps1"
+$boslukBetik = Join-Path $PSScriptRoot "bosluk-doldur.ps1"
 
 if ($Kaldir) {
-  foreach ($g in @($gorevAdi, "cry-yedek", "cry-yedek-denemesi", "cry-doldurucu-bekci")) {
+  foreach ($g in @($gorevAdi, "cry-yedek", "cry-yedek-denemesi", "cry-doldurucu-bekci", "cry-bosluk-doldur")) {
     Unregister-ScheduledTask -TaskName $g -Confirm:$false -ErrorAction SilentlyContinue
     Write-Output "gorev kaldirildi: $g"
   }
@@ -84,6 +87,9 @@ Gorev "cry-yedek" $yedekBetik (New-ScheduledTaskTrigger -Daily -At 3:15am) `
   "cry: Postgres yedegi E: diskine (deploy\pc\yedek.ps1). Blok indeksi yedeklenmez - yeniden turetilebilir."
 Gorev "cry-yedek-denemesi" $denemeBetik (New-ScheduledTaskTrigger -Weekly -DaysOfWeek Sunday -At 3:45am) `
   "cry: en yeni yedegi gecici bir veritabanina geri yukleyip satir sayilarini karsilastirir (deploy\pc\yedek-geri-yukleme-denemesi.ps1)."
+
+Gorev "cry-bosluk-doldur" $boslukBetik (New-ScheduledTaskTrigger -Daily -At 4:15am) `
+  "cry: blok indeksindeki bosluklari kapatir (bosluk-doldur.ps1). Bosluk, altindaki her seyi pencere disinda birakir."
 
 # Bekci 15 dakikada bir. Sure 10 yil: `[TimeSpan]::MaxValue` Task Scheduler tarafindan
 # REDDEDILIYOR (HRESULT 0x80041318, olculdu). Oturum acilisinda da 2 dk gecikmeyle bir kez daha calisir:
