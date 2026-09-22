@@ -874,6 +874,68 @@ yapıştır, koşuyu al" diye tek adımlık bir akış yazılacaksa kök indeksl
 iner. Yani hedefteki "çok uzun olmayan süre" bugün 3,5 dakika, tam geçmişle saniyeler.
 Bu, BigQuery kararının somut karşılığıdır.
 
+## 2 TB diske göç — hazırlık ve sıra (2026-09-23)
+
+Disk: **Lexar NM620 2 TB, PCIe 3.0 M.2** (sipariş verildi). Yerine takılacak: D: = *MLD M300 NVMe
+465,8 GiB*. Her iki M.2 yuvası dolu, o yüzden bu bir TAKAS; çıkan 465 GiB disk boşta kalır.
+
+### Bugün ölçülen durum
+
+| | |
+|---|---|
+| `CustomWslDistroDir` | `D:\Docker\wsl` (doğru anahtar; `DataFolder` WSL2'de hiçbir şey yapmaz) |
+| `docker_data.vhdx` | **117,9 GiB** (`D:\Docker\wsl\disk\`) |
+| İçindeki gerçek kullanım | imaj 7,5 GB · konteyner 1,3 GB · **volume 73,4 GB** · derleme önbelleği 14,35 GB |
+| Geri alınabilir | ~17,7 GB ölçüldü; **13,7 GB'ı 2026-09-23'te alındı** (`docker builder prune -f`: 14,78 → 1,08 GB) |
+| D: boş | ~347 GiB |
+
+Önbellek temizliği dosyayı KÜÇÜLTMEZ ama içeride yeniden kullanılabilir alan açar: doldurucu
+büyütmeden önce oraya yazar, yani D:'nin boşu daha uzun süre yerinde kalır.
+
+**VHDX kendiliğinden küçülmez** (CLAUDE.md'de bir kez yaşandı: içinde 6 GB veri varken dosya
+125 GB'tı). Bu yüzden göçten önce küçültmek hem kopyalamayı kısaltır hem D:'yi hemen rahatlatır.
+
+### Göç sırası (disk geldiğinde)
+
+Adımların hepsi geri alınabilir; veri tek bir dosyada (`docker_data.vhdx`).
+
+1. **Önce ölç:** `powershell -File deploy\pc\goc-onkontrol.ps1` — anahtar, vhdx yeri/boyutu,
+   hedef diskte yer var mı, konteyner sayısı, ClickHouse satır sayısı. Çıkış 0 değilse durulur.
+2. **El frenini çek:** `New-Item C:\srv\cry\doldurucu-dur` — bekçi doldurucuyu geri başlatmasın.
+3. **Doldurucuyu durdur** (öldürmek zararsız, kapsam tablosu yeri biliyor).
+4. **Çöpü at:** `docker builder prune -f`. (2026-09-23'te bir kez yapıldı, 13,7 GB.) `docker image
+   prune -f` 0 döndü: 3,6 GB "geri alınabilir" imaj ETİKETLİ ama kullanılmayan imajlar ve `-a`
+   olmadan silinmiyorlar — `-a` KULLANILMAZ, çalışan konteynerlerin imajını da götürebilir.
+5. **İçeriden trim:** `wsl -d docker-desktop -e fstrim -av`.
+6. **Docker'ı KAPAT** — `docker desktop stop` sonra `wsl --shutdown`. **Zorla kapatma**
+   (`Stop-Process -Force`) Docker'ı "Inference manager" hatasıyla açılıp kapanır hâle getiriyor.
+7. **Küçült (YÖNETİCİ):** `diskpart` → `select vdisk file="D:\Docker\wsl\disk\docker_data.vhdx"`
+   → `attach vdisk readonly` → `compact vdisk` → `detach vdisk`. Bir kez 125 → 9,3 GB yapmıştı.
+8. **Taşı:** `D:\Docker\wsl` klasörünü yeni diske kopyala (taşıma değil KOPYALA; eski kalsın).
+9. **Anahtarı değiştir:** Docker KAPALIYKEN `settings-store.json` içindeki `CustomWslDistroDir`
+   metin olarak yeni yola çevrilir. **BOM eklenmez** — `ConvertTo-Json` + `Set-Content -Encoding UTF8`
+   BOM ekliyor ve dosyayı bozuyor; tek değer `[regex]::Replace` ile değiştirilip
+   `UTF8Encoding($false)` ile yazılır (`kur.ps1`'deki AutoStart deseninin aynısı).
+10. **Doğrula:** Docker açılır; kontrol `settings-store.json`a BAKARAK YAPILMAZ —
+    backend API'sinden okunur: `\.\pipe\dockerBackendApiServer`, `GET /app/settings` →
+    `vm.resources.wslDataFolder`. Sonra `docker ps` (6 konteyner) ve ClickHouse satır sayısı
+    göçten önceki sayıyla karşılaştırılır.
+11. **El frenini kaldır:** `Remove-Item C:\srv\cry\doldurucu-dur`. Bekçi 15 dk içinde doldurucuyu
+    kendisi başlatır.
+12. Eski `D:\Docker\wsl` birkaç gün durur, sonra silinir.
+
+### Dosyaları elle taşıyıp kayıt düzenlemek YASAK
+
+WSL kaydındaki `BasePath`'i elle değiştirmek işe yaramıyor: Docker açılışta kaydı C:'ye GERİ yazıyor
+ve C:'de BOŞ yeni bir veri diski açıyor — yığın "yok olmuş" görünür, veri yerindedir. Başarısız bir
+`wsl --manage --move` de adsız bir artık kayıt bırakmıştı. Tek desteklenen yol `CustomWslDistroDir`.
+
+### Göçten sonra ne değişir
+
+- D: (465 GiB) tamamen boşalır; blok indeksi 2 TB'ta kalır.
+- Doldurucunun `--disk` parametresi yeni sürücüyü göstermeli, yoksa yanlış diskin boşunu ölçer.
+- Tam geçmiş hedefi 832 GiB; 2 TB'ta birleştirme payı, yedek ve B7 için yer kalır.
+
 ### BigQuery maliyet ölçümü — KURU KOŞU (2026-09-21)
 
 B3 geçmişi ücretsiz kaynaklardan uçtan geriye doluyor ve ~19,5 blok/sn'de tam geçmiş ~51 gün sürüyor.
