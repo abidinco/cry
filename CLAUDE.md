@@ -341,6 +341,31 @@ alıp karşılaştıran testtir.
   bir komutu bile hataya düşürür.
 - **Hetzner'daki yığının veritabanı bu yedeğin KAPSAMI DIŞINDA.**
 
+## Doldurucunun bekçisi (2026-09-22)
+
+- **Doldurucu artık kendi kendine ayakta kalıyor.** `deploy/pc/doldurucu-bekci.ps1`, zamanlanmış
+  görev `cry-doldurucu-bekci` ile **15 dakikada bir** bakar: süreç düşmüşse başlatır, çalışıyorsa
+  DOKUNMAZ. Önceden yalnızca `doldur-devam.ps1` vardı ve o sadece OTURUM AÇILIŞINDA çalışıyor —
+  gün içindeki bir düşüş bir sonraki açılışa kadar fark edilmiyordu.
+- **Bekçi asla ÖLDÜRMEZ.** Takılmadan şüphelense bile yalnızca günlüğe UYARI yazar; 2026-09-18'de
+  bir denetim tam bunu yapıp sapasağlam bir doldurucuyu boşuna yeniden başlatmıştı. Birden çok
+  süreç görürse ALARM yazar, yine dokunmaz.
+- **Başlatmadığı üç durum:** disk 55 GiB altındaysa (doldurucu 50'de kendisi durur, yeniden
+  başlatmak sonsuz döngüdür), iş gerçekten bittiyse (`bitti: taban`), ve `doldur-devam.ps1` o an
+  çalışıyorsa. Ayrıca üst üste hemen ölen bir süreçte saatte bire geri çekilir.
+- **El freni: `C:\srv\cry\doldurucu-dur`.** Bu dosya varken bekçi hiçbir şey yapmaz. Bakım için
+  duraklatmanın temiz yolu budur — yoksa siz durdurursunuz, bekçi geri başlatır.
+- **Her turda bir NABIZ satırı yazar.** Sessiz kalmak "her şey yolunda" ile "görev hiç çalışmadı"yı
+  ayırt edilemez kılardı.
+- **Süreç aramada "komut satırında geçen metin" YETMEZ** (ölçüldü): dosya adını içeren bir tanı
+  komutu kendini "devam betiği çalışıyor" sandı. Ölçüt `-File …doldur-devam.ps1` kalıbı + kendi
+  PID'ini hariç tutmak; doldurucu için `blok-okuyucu/src/doldur.ts` yolu.
+- **PowerShell tek elemanlı diziyi fonksiyondan dönerken SKALERE çevirir** ve skalerin `.Count`'u
+  `$null` olur — bekçi bu yüzden çalışan bir doldurucuyu "yok" sandı. Çağrı yerinde `@(...)` şart.
+- **`Register-ScheduledTask` hata verip akışı sürdürebiliyor** (`[TimeSpan]::MaxValue` →
+  HRESULT 0x80041318; tekrar süresi 10 yıl yazıldı). `kur.ps1` artık kayıttan SONRA
+  `Get-ScheduledTask` ile doğruluyor: koşulsuz bir "kaydedildi" satırı olmayan bir görevi var gösterir.
+
 ## Windows self-hosted runner — üç tuzak
 
 1. **`shell: bash` WSL'in bash'ine çözülüyor** (`C:\WINDOWS\system32\bash.EXE`)

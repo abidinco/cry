@@ -10,6 +10,9 @@
     - "cry-yedek" gorevi: her gun 03:15'te Postgres yedegi (yedek.ps1)
     - "cry-yedek-denemesi" gorevi: her pazar 03:45'te yedegi GERI YUKLEYEREK dogrular.
       Alinmis ama geri yuklenmemis bir yedek, yedek degildir.
+    - "cry-doldurucu-bekci" gorevi: 15 dakikada bir B3 doldurucusunun ayakta olup
+      olmadigina bakar, dusmusse yeniden baslatir. doldur-devam.ps1 yalnizca oturum
+      acilisinda calisiyor; gun ici bir dusus bir sonraki acilisa kadar fark edilmiyordu.
     - Docker Desktop'in KENDI "oturum acilisinda basla" ayarini acar
       (settings-store.json -> AutoStart). Olculdu 2026-09-15: False idi.
 
@@ -24,9 +27,10 @@ $gorevAdi = "cry-baslangic"
 $betik = Join-Path $PSScriptRoot "baslangic.ps1"
 $yedekBetik = Join-Path $PSScriptRoot "yedek.ps1"
 $denemeBetik = Join-Path $PSScriptRoot "yedek-geri-yukleme-denemesi.ps1"
+$bekciBetik = Join-Path $PSScriptRoot "doldurucu-bekci.ps1"
 
 if ($Kaldir) {
-  foreach ($g in @($gorevAdi, "cry-yedek", "cry-yedek-denemesi")) {
+  foreach ($g in @($gorevAdi, "cry-yedek", "cry-yedek-denemesi", "cry-doldurucu-bekci")) {
     Unregister-ScheduledTask -TaskName $g -Confirm:$false -ErrorAction SilentlyContinue
     Write-Output "gorev kaldirildi: $g"
   }
@@ -59,15 +63,35 @@ function Gorev([string]$Ad, [string]$Yol, $Tetik, [string]$Aciklama) {
   $a = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
     -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 30)
   $k = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
-  Register-ScheduledTask -TaskName $Ad -Action $e -Trigger $Tetik -Settings $a -Principal $k `
-    -Description $Aciklama -Force | Out-Null
-  Write-Output "gorev kaydedildi: $Ad"
+  # Kayit SONUCU DOGRULANIR. Register-ScheduledTask hata verip devam edebiliyor (olculdu:
+  # gecersiz RepetitionDuration -> HRESULT 0x80041318) ve kosulsuz bir "kaydedildi" satiri
+  # olmayan bir gorevi var gosterir.
+  try {
+    Register-ScheduledTask -TaskName $Ad -Action $e -Trigger $Tetik -Settings $a -Principal $k `
+      -Description $Aciklama -Force -ErrorAction Stop | Out-Null
+  } catch {
+    Write-Output "HATA ($Ad): gorev KAYDEDILEMEDI - $($_.Exception.Message)"
+    return
+  }
+  if (Get-ScheduledTask -TaskName $Ad -ErrorAction SilentlyContinue) {
+    Write-Output "gorev kaydedildi: $Ad"
+  } else {
+    Write-Output "HATA ($Ad): kayit sonrasi gorev bulunamadi"
+  }
 }
 
 Gorev "cry-yedek" $yedekBetik (New-ScheduledTaskTrigger -Daily -At 3:15am) `
   "cry: Postgres yedegi E: diskine (deploy\pc\yedek.ps1). Blok indeksi yedeklenmez - yeniden turetilebilir."
 Gorev "cry-yedek-denemesi" $denemeBetik (New-ScheduledTaskTrigger -Weekly -DaysOfWeek Sunday -At 3:45am) `
   "cry: en yeni yedegi gecici bir veritabanina geri yukleyip satir sayilarini karsilastirir (deploy\pc\yedek-geri-yukleme-denemesi.ps1)."
+
+# Bekci 15 dakikada bir. Sure 10 yil: `[TimeSpan]::MaxValue` Task Scheduler tarafindan
+# REDDEDILIYOR (HRESULT 0x80041318, olculdu). Oturum acilisinda da 2 dk gecikmeyle bir kez daha calisir:
+# doldur-devam.ps1 o sirada zaten devrede olabilir, bekci ona yol verir.
+$bekciTetik = New-ScheduledTaskTrigger -Once -At (Get-Date).Date.AddMinutes(1) `
+  -RepetitionInterval (New-TimeSpan -Minutes 15) -RepetitionDuration (New-TimeSpan -Days 3650)
+Gorev "cry-doldurucu-bekci" $bekciBetik $bekciTetik `
+  "cry: B3 doldurucusu dusmusse yeniden baslatir; calisiyorsa DOKUNMAZ (deploy\pc\doldurucu-bekci.ps1). El freni: C:\srv\cry\doldurucu-dur"
 
 # Docker Desktop'in kendi otomatik baslatma ayari.
 $dosya = Join-Path $env:APPDATA "Docker\settings-store.json"
