@@ -356,6 +356,23 @@ alıp karşılaştıran testtir.
 - **Yol dağılımı adaptörün kendi sayacından okunur** (`BlokIndeksliAdaptor.sayac`). "Hızlandı"
   demek yetmez; hangi taramanın hangi yoldan geçtiği sayılmadan süre açıklanamaz.
 
+## Koşu KÖKÜ kendisi tarar (2026-09-23)
+
+- **`takipKos` kökü tohumdan ÖNCE indeksler.** Tohum Postgres'ten okunuyor; hiç taranmamış bir kökle
+  tohum boş çıkıyor ve koşu tek düğümde "bitti" diye kapanıyordu (ölçüldü M4: 10,9 sn, 0 kenar,
+  hatasız). Yürüyüş kökü zaten indeksliyor ama tohum ondan ÖNCE hesaplanıyor. Düzeltmeden sonra
+  aynı taze adres 7 düğüm / 92 kenar verdi. Yalnızca `bilinmiyor` durumdaki kök taranır; `kismi`/
+  `tam` olan yeniden taranmaz, koşunun başına gereksiz dakika eklemesin.
+- **Kök taranamazsa koşu DURMAZ ama SESSİZ de kalmaz:** sebep `stats.kokTaramasi`ya yazılır ve
+  ekranda görünür. Gerçek koşuda ateşlendi: kök taraması TronGrid hız sınırına takıldı, koşu
+  "bitti · 1 düğüm" kapandı. Boş bir graf "para hareket etmemiş" diye okunur; oysa cevap "köke
+  BAKILAMADI" olabilir. Karar saf katmanda ve testli: `kokTaramasiSorunu` (`lib/kosu-durum`).
+- **`kosuyuKapat` artık eski `stats`i KORUYOR, beyaz listeye almıyor.** Önceden yalnızca
+  devamlar/devamHatalari/durdurmalar taşınıyor, koşu sırasında yazılan başka her anahtar sessizce
+  düşüyordu — `kokTaramasi` eklenince tam bu yaşandı: kayıt yazıldı, kapanışta yok oldu. Bir listeye
+  eklemeyi unutmak bilginin kaybolması demek; varsayılan KORUMAK olmalı. Atılan iki geçici anahtar:
+  `iptal` ve `ilerleme`.
+
 ## Boşluk, "biraz eksik veri" değildir (2026-09-22)
 
 - **Pencere boşluksuz son aralıktır; bir boşluk ALTINDAKİ HER ŞEYİ motora kapatır.** Tam geçmiş

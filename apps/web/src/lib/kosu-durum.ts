@@ -37,3 +37,31 @@ export function ilerlemeMetni(
   }
   return { metin: temel, uyari: false };
 }
+
+/** Koşunun başında kök adres tarandıysa sonucu; taranamadıysa sebebi. */
+export type KokTaramasi = {
+  yeniHareket?: number;
+  tamamlandi?: boolean;
+  kaynak?: string | null;
+  atlanmaSebebi?: string | null;
+  hata?: string;
+};
+
+/**
+ * Kökün taranmasında ekrana YAZILMASI gereken bir sorun var mı?
+ *
+ * Neden ayrı ve saf: boş bir graf iki farklı şeyin sonucu olabilir — para hareket etmemiştir ya da
+ * KÖKE BAKILAMAMIŞTIR. İkisi aynı ekranda aynı görünürse ikincisi "temiz" diye okunur ("yok" ile
+ * "bakılamadı" ayrı cevaplardır). Gerçek koşuda ölçüldü (2026-09-22): kök taraması TronGrid hız
+ * sınırına takıldı, koşu "bitti · 1 düğüm" olarak kapandı ve sebep yalnızca `stats`te kaldı.
+ *
+ * `null` dönmesi "kök sorunsuz tarandı" ya da "zaten taranmıştı" demektir; ikisi de sessiz kalır.
+ */
+export function kokTaramasiSorunu(kt: KokTaramasi | null | undefined): string | null {
+  if (!kt) return null;
+  if (kt.hata) return `Sebep: ${kt.hata}`;
+  if (kt.atlanmaSebebi) return `Sebep: ${kt.atlanmaSebebi}`;
+  // `tamamlandi: false` = sayfa sınırına ya da kaynak sınırına takıldı; kökün geçmişi EKSİK okundu.
+  if (kt.tamamlandi === false) return "Kök taraması yarıda kaldı (kaynak sınırı); kökün geçmişi eksik okundu.";
+  return null;
+}

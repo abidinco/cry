@@ -22,7 +22,7 @@
 //     --adres=T... [--hop=2] [--dugum=12] [--sakla]
 import { prisma } from "@cry/db";
 import { takipKos } from "../../apps/worker/src/takip.ts";
-import { adresIndeksle, adaptorAl } from "../../apps/worker/src/indeksle.ts";
+import { adaptorAl } from "../../apps/worker/src/indeksle.ts";
 import { BlokIndeksliAdaptor } from "../../apps/worker/src/blok-indeksli-adaptor.ts";
 import { ayarOku, pencereOku } from "@cry/blok-indeks";
 
@@ -44,13 +44,8 @@ const adaptor = adaptorAl("tron");
 const sayacli = adaptor instanceof BlokIndeksliAdaptor ? adaptor : null;
 sayacli?.sayaciSifirla();
 
-// 1) Kökü indeksle - kullanıcının "adresi yapıştırdım" anı.
-const i0 = performance.now();
-const indeksSonucu = await adresIndeksle("tron", ADRES);
-const indeksSure = (performance.now() - i0) / 1000;
-console.log(`kök indekslendi: ${indeksSure.toFixed(1)} sn · ${indeksSonucu.yeniHareket} yeni hareket · ${indeksSonucu.okunanSayfa} sayfa · durum ${indeksSonucu.tamamlandi ? "tam" : "kısmi"}`);
-console.log(`   hareket kaynağı: ${indeksSonucu.hareketKaynagi ?? "bilinmiyor"}`);
-
+// Kök artık `takipKos` tarafından indeksleniyor (tohumdan ÖNCE); burada elle yapılmaz.
+// Ölçülen şey kullanıcının TEK adımda beklediği süre: adresi verdi, koşuyu aldı.
 const kosu = await prisma.traceRun.create({
   data: {
     caseId: vaka.id, chain: "tron", rootAddress: ADRES, taintRule: "fifo",
@@ -77,7 +72,8 @@ const son = await prisma.traceRun.findUnique({
 });
 
 console.log(`\n=== SONUÇ ===`);
-console.log(`kullanıcının beklediği toplam: ${(indeksSure + sure).toFixed(1)} sn (kök indeksleme ${indeksSure.toFixed(1)} + koşu ${sure.toFixed(1)})`);
+console.log(`kullanıcının beklediği toplam: ${sure.toFixed(1)} sn (kök taraması dahil)`);
+console.log(`kök taraması: ${JSON.stringify((son?.stats as Record<string, unknown>)?.kokTaramasi ?? "yapılmadı (kök zaten taranmıştı)")}`);
 console.log(`koşu ${sure.toFixed(1)} sn · durum ${son?.status} · başlık sebep ${son?.stopReason} · ${son?._count.nodes} düğüm / ${son?._count.edges} kenar`);
 if (hata) console.log(`HATA: ${(hata as Error).message.slice(0, 200)}`);
 console.log(`durma dağılımı: ${JSON.stringify((son?.stats as Record<string, unknown>)?.durma ?? {})}`);

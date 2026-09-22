@@ -15,7 +15,7 @@ import { DEVAM_EK_HOP, devamEdilebilir } from "@cry/motor";
 import TakipIskeleti from "./TakipIskeleti";
 import TutarAraligi from "./TutarAraligi";
 import { islemGezgini, kisaHash } from "@/lib/gezgin";
-import { ilerlemeMetni, type Ilerleme } from "@/lib/kosu-durum";
+import { kokTaramasiSorunu, ilerlemeMetni, type Ilerleme } from "@/lib/kosu-durum";
 import { Adres, Bos, Tarih, Tutar } from "@/components/ui";
 import { kisaTutar, sayi, tarih, tutarParcala } from "@/lib/bicim";
 import { cizilecekler } from "@/lib/graf-secim";
@@ -50,6 +50,8 @@ type Kosu = {
     devamHatalari?: { adres: string; mesaj: string; zaman: string }[];
     ilerleme?: Ilerleme;
     durdurmalar?: { kalan?: number; devamAdres?: string; baslamadan?: boolean; zaman: string }[];
+    /** Kök adres koşunun BAŞINDA tarandıysa sonucu; taranamadıysa sebebi. */
+    kokTaramasi?: { yeniHareket?: number; tamamlandi?: boolean; kaynak?: string | null; atlanmaSebebi?: string | null; hata?: string };
   } | null;
   params: Record<string, unknown> | null;
   startedAt: string;
@@ -260,6 +262,9 @@ export default function TakipGorunumu({ id }: { id: string }) {
     </div>
   );
 
+  // Kökün taranmasında bir sorun oldu mu? Karar saf katmanda ve testli (lib/kosu-durum).
+  const kokSorunu = kokTaramasiSorunu(kosu.stats?.kokTaramasi);
+
   if (!model || !gorunurModel || kosu.dugumler.length === 0) {
     return (
       <>
@@ -267,7 +272,11 @@ export default function TakipGorunumu({ id }: { id: string }) {
         <Bos>
           {suruyor
             ? "Koşu başladı; adresler bulundukça burada görünecek."
-            : "Bu koşu hiç hareket üretmedi. Kök adresin indekslenmiş girişi yoksa takip edilecek para da yoktur."}
+            : kokSorunu
+              ? // "Hareket yok" ile "bakılamadı" AYRI cevaplardır (CLAUDE.md). Kök taranamadıysa
+                // boş graf bir BULGU değildir; ekran bunu bulgu gibi göstermemeli.
+                `Kök adrese BAKILAMADI, bu yüzden takip edilecek giriş bulunamadı — "hareket yok" demek değildir. ${kokSorunu}`
+              : "Bu koşu hiç hareket üretmedi. Kök adresin indekslenmiş girişi yoksa takip edilecek para da yoktur."}
         </Bos>
       </>
     );
@@ -311,6 +320,13 @@ export default function TakipGorunumu({ id }: { id: string }) {
   return (
     <>
       {baslik}
+      {kokSorunu && (
+        // Graf DOLU olsa bile kök eksik okunduysa iz eksiktir; bunu söylemeyen bir ekran, yarım
+        // bir grafi tam gösterir ("yok" ile "bakılamadı" ayrı cevaplardır).
+        <div className="veri m3" style={{ color: "var(--hata)", padding: "0 1rem 0.5rem" }}>
+          Kök adresin taraması eksik — bu grafta görünmeyen giriş olabilir. {kokSorunu}
+        </div>
+      )}
       <div className="takip-govde">
         <section className="takip-sol" aria-label="para akışı">
           <div className="akis-lejant">

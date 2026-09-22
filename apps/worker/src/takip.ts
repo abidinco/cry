@@ -74,6 +74,35 @@ async function durumuTemizle(traceRunId: bigint): Promise<void> {
     update trace_runs set stats = coalesce(stats, '{}'::jsonb) - 'iptal' - 'ilerleme' where id = ${traceRunId}`;
 }
 
+/**
+ * Kökü tohumdan ÖNCE indeksler — yalnızca hiç taranmamışsa.
+ *
+ * `kismi`/`tam` bir kökte yeniden taramaz: yürüyüş zaten delta çekiyor ve koşunun başına
+ * gereksiz dakikalar eklemek, kullanıcının beklediği süreyi uzatır.
+ *
+ * Tarama başarısız olursa koşu DURMAZ ama sessiz de kalmaz: sebep `stats.kokTaramasi`na yazılır.
+ * Boş bir graf "iz yok" diye okunur; oysa cevap "köke bakılamadı" olabilir ("yok" ≠ "bakılamadı").
+ */
+async function kokuHazirla(traceRunId: bigint, zincir: string, kok: string): Promise<void> {
+  const kayit = await prisma.address.findUnique({
+    where: { chain_address: { chain: zincir, address: kok } },
+    select: { indexState: true },
+  });
+  if (kayit && kayit.indexState !== "bilinmiyor") return;
+
+  try {
+    const s = await adresIndeksle(zincir as ChainId, kok, { maxSayfa: 10 });
+    await durumYaz(traceRunId, "kokTaramasi", {
+      yeniHareket: s.yeniHareket,
+      tamamlandi: s.tamamlandi,
+      kaynak: s.hareketKaynagi ?? null,
+      atlanmaSebebi: s.atlanmaSebebi ?? null,
+    });
+  } catch (e) {
+    await durumYaz(traceRunId, "kokTaramasi", { hata: (e as Error).message.slice(0, 200) });
+  }
+}
+
 export async function takipKos(traceRunId: bigint): Promise<Ozet> {
   const kosu = await prisma.traceRun.findUniqueOrThrow({ where: { id: traceRunId } });
   const p = (kosu.params ?? {}) as Parametreler;
@@ -83,8 +112,13 @@ export async function takipKos(traceRunId: bigint): Promise<Ozet> {
     data: { status: "calisiyor", startedAt: new Date() },
   });
 
-  const tohum = await tohumGirisleri(kosu.chain, kosu.rootAddress, p.tohumTx);
   await durumuTemizle(traceRunId);
+  // Tohum, kökE GİREN paradır ve Postgres'ten okunur. Kök hiç taranmamışsa orada satır yoktur:
+  // tohum boş çıkar, yürüyüş ilk düğümde biter ve koşu "bitti" görünür. Ölçüldü (M4, 2026-09-22):
+  // taze bir adreste koşu 10,9 sn sürdü ve 0 kenar verdi — hata vermeden, boş bir graf olarak.
+  // Yürüyüş kökü zaten indeksliyor ama tohum ONDAN ÖNCE hesaplanıyor; sıra bu yüzden burada.
+  await kokuHazirla(traceRunId, kosu.chain, kosu.rootAddress);
+  const tohum = await tohumGirisleri(kosu.chain, kosu.rootAddress, p.tohumTx);
   const sonuc = await yuru({
     traceRunId,
     zincir: kosu.chain,
@@ -236,12 +270,20 @@ async function kosuyuKapat(
       status: durdurma ? "durduruldu" : "bitti",
       finishedAt: new Date(),
       stopReason: kosuDurmaSebebi(durma),
+      // Eski `stats` KORUNUR, beyaz listeye alınmaz. Önceden yalnızca devamlar/devamHatalari/
+      // durdurmalar taşınıyordu ve koşu sırasında yazılan başka her anahtar sessizce düşüyordu —
+      // `kokTaramasi` eklendiğinde tam bu yaşandı: kayıt yazıldı, kapanışta yok oldu. Bir listeye
+      // eklemeyi unutmak, bilginin kaybolması demek; varsayılan KORUMAK olmalı.
+      // Geçici olan iki anahtar bilerek atılır: `iptal` bayrağı ve `ilerleme` yoklaması.
       stats: {
+        ...(() => {
+          const { iptal: _iptal, ilerleme: _ilerleme, ...kalan } = eskiStats as Record<string, unknown>;
+          return kalan;
+        })(),
         dugum,
         kenar,
         durma,
         ...(devamlar.length ? { devamlar } : {}),
-        ...(eskiStats.devamHatalari ? { devamHatalari: eskiStats.devamHatalari } : {}),
         ...(durdurmalar.length ? { durdurmalar } : {}),
       } as object,
     },
