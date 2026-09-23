@@ -528,6 +528,25 @@ adlarını isterdi.
   Bitget, HTX, KuCoin, Gate, Paribu, Poloniex, Bitfinex, BitMart, Coinone, MEXC, CEX.IO). Yani
   yapısal keşif GERÇEKTEN borsa buluyor — ama bunu ancak bir kaynak söyleyebiliyor. Sıra sabit:
   `--kaynak=kesif-blok --uygula` → `--kaynak=tronscan --kapsam=aday --uygula`.
+- **Doğrulayamadığın borsayı YOK SAYMA, MUHTEMEL yaz** (kullanıcı kararı 2026-09-23: "doğrulayamadığın
+  borsa adreslerini muhtemel olarak ekle, kararı bana bırak, ama tıklayıp tetkik edebileceğim hâlde
+  sun"). Üç kademe var: sözlükte var → DOĞRULANMIŞ `exchange_hot`, motor `terminal` der · sözlükte yok
+  ama etiket servis işareti taşıyor (`exchange`, `hot wallet`, `custody`, `deposit`) → DOĞRULANMAMIŞ
+  `exchange_hot`, motor `terminal_aday` der ve insana sorulur · hiçbiri → `diger`. Önceden orta kademe
+  yoktu ve `MaskEX Hot Wallet 17` gibi gerçek olabilecek bir borsadan iz hiç durmadan geçiyordu.
+  Köprü/sahte biçimler işaret taşısa da elenir (`BORSA_DEGIL`).
+- **Karar verilecek bir kayıt SORULMADIKÇA bitmemiştir: `/etiket`.** 764 doğrulanmamış borsa iddiası
+  yazılmıştı ve hiçbirini onaylayacak ekran yoktu — "yazıldı ama hiçbir sayfa sormuyor". Sayfa iddiayı
+  gerekçesi, arşivdeki ağırlığı ve gezgin bağlantısıyla sunar; sıra ölçütü `incelemeSirasi`de ve
+  testli: **önce GERÇEKTEN bir izi durdurmuş olanlar.** Bir etiketin bedeli koşuyu durdurduğunda
+  ödenir; hiç karşılaşılmamış adresin doğru etiketlenmesi bugün hiçbir raporu değiştirmiyor.
+  Kimliği zaten doğrulanmış adres listeye GİRMEZ (ölçüldü: keşif Binance-Hot 1'e de aday yazmış ve
+  liste insana bildiği şeyi soruyordu).
+- **İnsan kaynağı ezer, kaynak insanı EZEMEZ** (`INSAN_IMZASI`, `@cry/db`). `verified_by` değeri
+  `kullanici:` ile başlıyorsa `etiketleriYaz` o satıra DOKUNMAZ. Bu kural olmasaydı `/etiket`te
+  "borsa değil" denen bir kayıt, bir sonraki `--kaynak=tronscan --uygula` turunda sessizce
+  `exchange_hot`a dönerdi. "Borsa değil" kararı da etiketi SİLMEZ, `diger`e çeker — silinen kayıt
+  bir sonraki keşif turunda yeniden aday olarak doğar; "buna baktım" bilgisi kaydın kendisinde durur.
 - **Borsanın ESKİ adı da sözlüğe girer.** TronScan `TEPSrSYP…` için "MXC" yazıyor (MEXC'in eski
   adı); sözlük `^mexc` aradığı için gerçek bir borsa `diger` yazılmıştı. Kapalı liste dar olmalı
   ama BAYAT olmamalı. Aynı turda bilerek DIŞARIDA bırakılanlar: FixedFloat (takas), Cobo Custody

@@ -65,6 +65,27 @@ export const BORSA_SOZLUGU: { desen: RegExp; ad: string }[] = [
 /** Borsa adı taşısa da borsa CÜZDANI olmayan biçimler. */
 const BORSA_DEGIL = /\b(bridge|contract|token|scam|fake|phish|hack|exploit)\b/i;
 
+/**
+ * Sözlükte OLMAYAN ama saklamalı bir servis cüzdanı işareti taşıyan etiketler — "MUHTEMEL borsa".
+ *
+ * Kullanıcı kararı 2026-09-23: "doğrulayamadığın borsa adreslerini muhtemel olarak ekle, kararı bana
+ * bırak, ama tıklayıp tetkik edebileceğim hâlde sun." Önceden bunlar `diger` yazılıyordu, yani motor
+ * için YOKTULAR: `MaskEX Hot Wallet 17` gerçek bir borsa olabilecekken iz oradan hiç durmadan
+ * geçiyordu ve kimse bakmıyordu. Şimdi DOĞRULANMAMIŞ `exchange_hot` olarak yazılıyorlar; motor
+ * `terminal_aday` der (devam edilebilir bir duraktır, hüküm değil) ve `/etiket` sayfası insana sorar.
+ *
+ * Ölçüt metnin KENDİSİNDE arandı, adın tanınmışlığında değil: tanımadığım bir borsayı "tanımıyorum"
+ * diye elemek, tam da kaynağın söylediğini görmezden gelmek olurdu.
+ */
+const BORSA_SUPHESI = /\b(exchange|hot\s*wallet|cold\s*wallet|custody|custodian|deposit)\b/i;
+
+/** Etiket metni saklamalı bir servis işareti taşıyor mu — sözlükte olmasa bile. */
+export function borsaSuphesiVarMi(etiket: string): boolean {
+  const metin = etiket.trim();
+  if (BORSA_DEGIL.test(metin)) return false;
+  return BORSA_SUPHESI.test(metin);
+}
+
 /** Yanıtın bu dosyanın okuduğu parçası — gerisi kanıta ham girmez. */
 export type TronscanYaniti = {
   address?: string;
@@ -122,15 +143,21 @@ export function tronscanCoz(
   };
 
   if (kamu) {
-    const borsa = YAKMA_ADRESLERI.has(adres) ? null : borsaAdi(kamu);
+    const yakma = YAKMA_ADRESLERI.has(adres);
+    const borsa = yakma ? null : borsaAdi(kamu);
+    // Üç kademe: sözlükte var → DOĞRULANMIŞ borsa (terminal) · sözlükte yok ama servis işareti
+    // taşıyor → MUHTEMEL borsa (terminal_aday, insana sorulur) · ikisi de değil → yalnızca bilgi.
+    const supheli = !yakma && !borsa && borsaSuphesiVarMi(kamu);
     etiketler.push({
       chain: "tron",
       address: adres,
       title: kamu,
       description: borsa
         ? `TronScan kamu etiketi; borsa sözlüğünde "${borsa}"`
-        : "TronScan kamu etiketi; borsa sözlüğünde yok — terminal SAYILMAZ",
-      category: borsa ? "exchange_hot" : "diger",
+        : supheli
+          ? "TronScan kamu etiketi servis cüzdanı işareti taşıyor ama borsa sözlüğünde YOK — MUHTEMEL borsa, kimlik kararı insanın"
+          : "TronScan kamu etiketi; borsa sözlüğünde yok — terminal SAYILMAZ",
+      category: borsa || supheli ? "exchange_hot" : "diger",
       exchange: borsa,
       source: "tronscan",
       sourceUrl: tronscanSayfasi(adres),
@@ -138,7 +165,7 @@ export function tronscanCoz(
       // kendisi "kim doğruladı" sorusunun cevabıdır (OFAC gibi). Sözlüğe
       // uymayan etiket bilgi olarak durur ama doğrulanmış bir BORSA iddiası
       // taşımadığı için onay da taşımaz.
-      confidence: borsa ? 0.8 : 0.5,
+      confidence: borsa ? 0.8 : supheli ? 0.45 : 0.5,
       dogrulanmisMi: borsa !== null,
       dogrulayan: borsa ? "tronscan" : null,
       evidence: kanit,

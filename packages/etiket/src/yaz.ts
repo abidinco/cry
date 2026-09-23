@@ -10,7 +10,7 @@
  *    "bakıldı" görüntüsü vermek "yok ≠ bakılamadı" kuralını çiğner.
  */
 
-import { prisma } from "@cry/db";
+import { prisma, INSAN_IMZASI } from "@cry/db";
 import type { TohumEtiket } from "./tipler";
 
 export type YazmaRaporu = {
@@ -18,6 +18,8 @@ export type YazmaRaporu = {
   yeniEtiket: number;
   guncellenen: number;
   degismeyen: number;
+  /** İnsanın karara bağladığı ve bu yüzden DOKUNULMAYAN etiket. */
+  insanKarari: number;
   /** Kuru koşuda hiçbir şey yazılmadı. */
   uygulandi: boolean;
 };
@@ -36,6 +38,7 @@ export async function etiketleriYaz(
     yeniEtiket: 0,
     guncellenen: 0,
     degismeyen: 0,
+    insanKarari: 0,
     uygulandi: secenekler.uygula,
   };
 
@@ -73,8 +76,14 @@ export async function etiketleriYaz(
 
     const mevcut = await prisma.label.findFirst({
       where: { addressId: adresId, source: e.source, title: e.title },
-      select: { id: true, category: true, confidence: true, verifiedAt: true },
+      select: { id: true, category: true, confidence: true, verifiedAt: true, verifiedBy: true },
     });
+
+    // İnsan karara bağlamışsa kaynak onu EZMEZ (bkz. INSAN_IMZASI).
+    if (mevcut?.verifiedBy?.startsWith(INSAN_IMZASI)) {
+      rapor.insanKarari++;
+      continue;
+    }
 
     if (!mevcut) {
       rapor.yeniEtiket++;

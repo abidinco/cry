@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { borsaAdi, tronscanCoz } from "../packages/etiket/src/tronscan";
+import { borsaAdi, borsaSuphesiVarMi, tronscanCoz } from "../packages/etiket/src/tronscan";
 import { servisAdaylari } from "../packages/etiket/src/kesif";
 
 // Adresler 2026-09-14 ölçümünde TronScan'a sorulan GERÇEK adreslerdir.
@@ -47,12 +47,37 @@ describe("borsa sözlüğü", () => {
     expect(borsaAdi("CEX.IO")).toBe("CEX.IO");
   });
 
-  it("takas/saklama servisi borsa SAYILMAZ — sözlük bilerek dar", () => {
-    // Aynı turda çıktılar ve bilerek DIŞARIDA bırakıldı: para havuza girmiyor ya da
-    // saklama farklı işliyor. Yanlış bir "borsaya girdi" hükmü eksik etiketten pahalıdır.
+  it("takas/saklama servisi DOĞRULANMIŞ borsa sayılmaz — sözlük bilerek dar", () => {
+    // Aynı turda çıktılar ve sözlüğe bilerek ALINMADI: kimliklerini doğrulayamadım.
     expect(borsaAdi("FixedFloat Exchange Hot Wallet")).toBeNull();
     expect(borsaAdi("Cobo Custody")).toBeNull();
     expect(borsaAdi("HiFiSwap cross-chain 11")).toBeNull();
+  });
+
+  it("sözlükte olmayan servis işareti MUHTEMEL borsadır — insana sorulur, yok sayılmaz", () => {
+    // Kullanıcı kararı 2026-09-23: doğrulayamadığını "muhtemel" olarak yaz, kararı bana bırak.
+    expect(borsaSuphesiVarMi("MaskEX Hot Wallet 17")).toBe(true);
+    expect(borsaSuphesiVarMi("FixedFloat Exchange Hot Wallet")).toBe(true);
+    expect(borsaSuphesiVarMi("Cobo Custody")).toBe(true);
+    // İşareti olmayan servis şüpheli DEĞİLDİR: ödeme ve enerji kiralama borsa değil.
+    expect(borsaSuphesiVarMi("UPay SG 18")).toBe(false);
+    expect(borsaSuphesiVarMi("TronLucky Energy Fee")).toBe(false);
+    // Köprü, işaret taşısa bile elenir: para havuza girmiyor, zincir değiştiriyor.
+    expect(borsaSuphesiVarMi("HiFiSwap cross-chain 11")).toBe(false);
+    expect(borsaSuphesiVarMi("Binance Bridge Hot Wallet")).toBe(false);
+  });
+
+  it("muhtemel borsa DOĞRULANMAMIŞ yazılır ve TronScan bağlantısını taşır", () => {
+    const c = tronscanCoz(BINANCE, { address: BINANCE, publicTag: "MaskEX Hot Wallet 17" }, GUN);
+    expect(c.tur).toBe("etiket");
+    const e = (c as { etiketler: { category: string; dogrulanmisMi: boolean; exchange: string | null; sourceUrl: string | null; confidence: number }[] }).etiketler[0]!;
+    // exchange_hot ki motor `terminal_aday` desin; doğrulanmamış ki `terminal` DEMESİN.
+    expect(e.category).toBe("exchange_hot");
+    expect(e.dogrulanmisMi).toBe(false);
+    expect(e.exchange).toBeNull();
+    expect(e.confidence).toBeLessThan(0.5);
+    // "Tıklayıp tetkik edebileceğim hâlde sun": kanıtın bağlantısı olmadan karar verilemez.
+    expect(e.sourceUrl).toContain(BINANCE);
   });
 });
 

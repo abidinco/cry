@@ -117,6 +117,7 @@ async function main() {
   console.log(
     `\n${uygula ? "YAZILDI" : "KURU KOŞU"} — yeni adres ${rapor.yeniAdres} · ` +
       `yeni etiket ${rapor.yeniEtiket} · güncellenen ${rapor.guncellenen} · ` +
+      `insan kararı korundu ${rapor.insanKarari} · ` +
       `değişmeyen ${rapor.degismeyen}`,
   );
 
