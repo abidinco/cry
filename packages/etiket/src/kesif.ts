@@ -31,8 +31,9 @@ export type AdresIstatistigi = {
   hareketSayisi: number;
   /**
    * Göndericilerden kaçı bu adrese YALNIZCA toz tutar gönderdi (blok indeksi keşfi, kullanıcı kararı
-   * 2026-09-17: sayım eşiksiz, toz AYRI gösterilir). Adres zehirleme gibi toz gönderimleri karşı taraf
-   * sayısını şişirebilir; sayı gerekçede görünür ki insan ayırt edebilsin. Verilmezse bilinmiyor.
+   * 2026-09-17: sayım eşiksiz, toz AYRI gösterilir). Sayım hâlâ eşiksizdir — gerekçe ham sayıyı
+   * gösterir — ama ŞEKİL ölçütü tozu SAYMAZ: adres zehirleme tam bu sayıyı şişiriyor ve zehirleyicinin
+   * kendisi "dağıtıcı servis" görünüyordu (M5, 2026-09-23). Verilmezse bilinmiyor, toplam kullanılır.
    */
   tozGonderenSayisi?: number;
   /** Alıcılardan kaçına YALNIZCA toz tutar gönderdi. */
@@ -109,19 +110,25 @@ export function servisAdaylari(
     const altSinirMi = s.indeksDurumu === "kismi";
     const gonderen = s.gonderenSayisi;
     const alici = s.aliciSayisi;
-    const enKalabalik = Math.max(gonderen, alici);
+    // ŞEKİL, yalnızca toz gönderen karşı tarafları SAYMAZ (ölçüldü 2026-09-23, M5). Toz sayısı
+    // biliniyorsa karar gerçek karşı taraflarla verilir; bilinmiyorsa (arşiv keşfi) toplam kullanılır
+    // ve gerekçe zaten hangi sayıyı gösterdiğini söyler.
+    const gercekGonderen = gonderen - (s.tozGonderenSayisi ?? 0);
+    const gercekAlici = alici - (s.tozAliciSayisi ?? 0);
+    const enKalabalik = Math.max(gercekGonderen, gercekAlici);
 
     if (enKalabalik < esikler.karsiTarafEsigi) {
       eşiginAltinda++;
       continue;
     }
 
-    const ikisiDe = gonderen >= esikler.gecisEsigi && alici >= esikler.gecisEsigi;
-    const sekil: Sekil = ikisiDe ? "gecis" : gonderen > alici ? "toplayici" : "dagitici";
+    const ikisiDe = gercekGonderen >= esikler.gecisEsigi && gercekAlici >= esikler.gecisEsigi;
+    const sekil: Sekil = ikisiDe ? "gecis" : gercekGonderen > gercekAlici ? "toplayici" : "dagitici";
 
-    const toz = (n?: number) => (n ? ` (${n}'i yalnızca toz)` : "");
+    const toz = (n: number | undefined, gercek: number) => (n ? ` (${n}'i yalnızca toz → gerçek ${gercek})` : "");
     const gerekce: string[] = [
-      `${gonderen} farklı adresten alıyor${toz(s.tozGonderenSayisi)}, ${alici} farklı adrese gönderiyor${toz(s.tozAliciSayisi)}` +
+      `${gonderen} farklı adresten alıyor${toz(s.tozGonderenSayisi, gercekGonderen)}, ` +
+        `${alici} farklı adrese gönderiyor${toz(s.tozAliciSayisi, gercekAlici)}` +
         (altSinirMi ? ` (${s.altSinirNotu ?? "kısmi tarama"} — bunlar ALT SINIR)` : ""),
       `${s.hareketSayisi} hareket`,
     ];

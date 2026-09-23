@@ -515,6 +515,25 @@ adlarını isterdi.
   liste `packages/etiket/src/yakma.ts` — keşif onu indeks durumundan ÖNCE
   eler ve adıyla raporlar; TronScan kaynağı da onu borsa saymaz. Bir
   yapısal ölçüt, şekli aynı ama anlamı zıt olan adresi ayırt edemez.
+- **Keşfin ŞEKİL ölçütü tozu SAYMAZ — zehirleyicinin kendisi "servis" görünüyordu** (M5,
+  2026-09-23). Sayım hâlâ eşiksiz ve toz gerekçede AYRI yazılı (kullanıcı kararı 2026-09-17,
+  değişmedi); değişen şey kararın hangi sayıyla verildiği. 126 günlük pencerede toz dahil sayıyla
+  3.860 aday çıkıyordu, gerçek karşı taraflarla **740**: aradaki **3.120'si yalnızca adres
+  zehirlemeydi**. En uç örnek `TWDDUF6J…`: 20.087 alıcının 20.085'i toz, yani GERÇEK alıcısı 2 —
+  eşiğin 400 katı görünüp `exchange_hot` yazılacaktı, oysa o bir servis cüzdanı değil zehirlemenin
+  KAYNAĞI. Toz bir yönü şişirince ŞEKİL de yanlış çıkıyor: 95 adres "geçiş" sanılmışken "dağıtıcı".
+  Toz sayısı bilinmiyorsa (arşiv keşfi) toplam kullanılır ve gerekçe bunu söyler.
+- **Adayı yazmak yarısı; kimliği SORMAK öteki yarısı.** 739 aday yazıldıktan sonra TronScan'a
+  soruldu ve doğrulanmış borsa 7'den **28'e** çıktı (11 Binance sıcak cüzdanı, Kraken, Bybit, OKX,
+  Bitget, HTX, KuCoin, Gate, Paribu, Poloniex, Bitfinex, BitMart, Coinone, MEXC, CEX.IO). Yani
+  yapısal keşif GERÇEKTEN borsa buluyor — ama bunu ancak bir kaynak söyleyebiliyor. Sıra sabit:
+  `--kaynak=kesif-blok --uygula` → `--kaynak=tronscan --kapsam=aday --uygula`.
+- **Borsanın ESKİ adı da sözlüğe girer.** TronScan `TEPSrSYP…` için "MXC" yazıyor (MEXC'in eski
+  adı); sözlük `^mexc` aradığı için gerçek bir borsa `diger` yazılmıştı. Kapalı liste dar olmalı
+  ama BAYAT olmamalı. Aynı turda bilerek DIŞARIDA bırakılanlar: FixedFloat (takas), Cobo Custody
+  (saklama), HiFiSwap (köprü), Heleket/UPay (ödeme), TronLucky (enerji kiralama) — hiçbiri paranın
+  borsa havuzuna girdiği yer değil. `MaskEX Hot Wallet` bir CEX gibi duruyor ama doğrulanmadı;
+  kimlik iddiası kaynaktan ya da insandan gelir.
 - **Yanıtlar `.onbellek/tronscan/` altında durur** (gitignore'da): aynı
   adrese ikinci kez ağa çıkılmaz, `--tazele` yok sayar. Kanıttaki
   `olcumTarihi` yanıtın ALINDIĞI gündür.

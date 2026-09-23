@@ -64,7 +64,7 @@ describe("yapısal keşif", () => {
     expect(s.eşiginAltinda).toBe(1);
   });
 
-  it("toz sayımdan ELENMEZ ama gerekçede AYRI görünür (blok indeksi keşfi)", () => {
+  it("sayım eşiksiz kalır — gerekçe HAM sayıyı ve tozun payını birlikte söyler", () => {
     // Gerçek pencereden (2026-09-17): 3.069 göndericinin 3.053'ü yalnızca toz gönderdi.
     const [c] = servisAdaylari([
       ist({
@@ -73,14 +73,40 @@ describe("yapısal keşif", () => {
       }),
     ]).adaylar;
     expect(c!.gerekce[0]).toBe(
-      "3069 farklı adresten alıyor (3053'i yalnızca toz), 128231 farklı adrese gönderiyor (blok indeksi penceresi — bunlar ALT SINIR)",
+      "3069 farklı adresten alıyor (3053'i yalnızca toz → gerçek 16), 128231 farklı adrese gönderiyor (blok indeksi penceresi — bunlar ALT SINIR)",
     );
-    // Toz sayısı adaylığı ve güveni DEĞİŞTİRMEZ: karar eşiksiz sayıyla verilir.
+    // Toz sayısı BİLİNMİYORSA toplam kullanılır (arşiv keşfi böyle) ve gerekçe sessiz kalır.
     const [tozsuz] = servisAdaylari([
       ist({ address: "A", indeksDurumu: "kismi", gonderenSayisi: 3069, aliciSayisi: 128231 }),
     ]).adaylar;
-    expect(c!.guven).toBe(tozsuz!.guven);
     expect(tozsuz!.gerekce[0]).toContain("(kısmi tarama — bunlar ALT SINIR)");
+    expect(tozsuz!.gerekce[0]).not.toContain("toz");
+  });
+
+  it("ŞEKİL ölçütü tozu SAYMAZ: zehirleyici 'dağıtıcı servis' sayılmaz", () => {
+    // Gerçek adres (M5, 2026-09-23): TWDDUF6J… 20.087 adrese gönderiyor, 20.085'i yalnızca toz.
+    // Yani GERÇEK alıcısı 2. Toz dahil sayılınca eşiğin 400 katıydı ve `exchange_hot` yazılacaktı;
+    // oysa bu adres bir servis cüzdanı değil, adres zehirlemenin KAYNAĞI.
+    const s = servisAdaylari([
+      ist({
+        address: "Z", indeksDurumu: "kismi", altSinirNotu: "blok indeksi penceresi",
+        gonderenSayisi: 1, tozGonderenSayisi: 1, aliciSayisi: 20087, tozAliciSayisi: 20085,
+        hareketSayisi: 20100,
+      }),
+    ]);
+    expect(s.adaylar).toHaveLength(0);
+    expect(s.eşiginAltinda).toBe(1);
+  });
+
+  it("toz bir yönü şişirince ŞEKİL de yanlış çıkıyordu: geçiş sanılan adres dağıtıcıymış", () => {
+    // 126 günlük pencerede ikisinde de aday kalan 95 adresin şekli bu yüzden değişti.
+    const [c] = servisAdaylari([
+      ist({
+        address: "A", indeksDurumu: "kismi",
+        gonderenSayisi: 400, tozGonderenSayisi: 380, aliciSayisi: 300, tozAliciSayisi: 0,
+      }),
+    ]).adaylar;
+    expect(c!.sekil).toBe("dagitici");
   });
 
   it("eşik bir SEÇİMDİR: değiştirilince sonuç değişir", () => {

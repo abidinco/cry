@@ -17,39 +17,38 @@ fiyat: 0       rapor: 0          deposit adayı: 0
 
 ---
 
-## 1. Etiketlerin KİMLİĞİ yok: "bir servis" biliniyor, "hangi borsa" bilinmiyor
+## 1. Etiketlerin KİMLİĞİ: 28 borsa adıyla biliniyor, 739 aday hâlâ adsız
 
-**Ne bozuk:** `labels` tablosunda **336 etiket** var (OFAC 320 + 4 aday +
-12 yapısal keşif adayı) ve ölçüt artık gerçekten ateşleniyor — gerçek
-koşuda `terminal_aday` çıktı. Eksik olan şey artık etiketin VARLIĞI değil
-KİMLİĞİ: keşif "burası bir servis cüzdanı" diyebiliyor, "burası BtcTurk"
-diyemiyor.
+**Ne bozuk:** `labels` tablosunda **1.117 etiket** var ve iki sebep de
+ateşleniyor — doğrulanmış borsada `terminal`, adayda `terminal_aday`. Eksik
+olan şey artık etiketin VARLIĞI değil, adayların KİMLİĞİ: keşif "burası bir
+servis cüzdanı" diyebiliyor, o 739 adres için "burası hangi borsa" diyemiyor.
 
 **Nasıl görülür:** rapor "para bir borsa ADAYINA girdi" der, borsanın adını
 vermez. Adli bir yazıda beklenen cümle ikincisidir.
 
-**Ölçüm (2026-09-09):**
+**Ölçüm (2026-09-23):**
 ```bash
 docker exec cry-db psql -U cry -d cry -c "select source,category,count(*) from labels group by 1,2;"
-docker exec cry-db psql -U cry -d cry -c "select stop_reason, stats->'durma' from trace_runs order by id desc limit 2;"
+docker exec cry-db psql -U cry -d cry -c \
+  "select l.title from labels l where l.source='tronscan' and l.verified_at is not null order by 1;"
 ```
-→ `ofac/sanction:320 · kullanici/exchange_hot:4 · kesif/exchange_hot:12`;
-son koşu `terminal_aday`, `{"butce":8,"dallanma":2,"terminal_aday":1}`.
+→ `ofac/sanction:320 · kesif_blok/exchange_hot:739 · tronscan/exchange_hot:28 ·
+kesif/exchange_hot:17 · tronscan/diger:9 · kullanici/exchange_hot:4`.
 
-**Nerede:** kimlik ancak bir kaynaktan gelir. **TronScan kaynağı yazıldı
-(2026-09-14)** — `npx tsx packages/etiket/src/cli.ts --kaynak=tronscan`.
-Varsayılan kapsamdaki 55 adresin 8'i etiketli çıktı: 7 borsa (Binance,
-KuCoin, OKX, HTX, Poloniex, Bitfinex, Paribu) doğrulanmış `exchange_hot`
-olarak yazıldı; biri `Black Hole Address(0)` (bkz. aşağısı).
+**Bugün yapılan:** blok keşfinin 739 adayı yazıldı, sonra hepsi TronScan'a
+soruldu. Doğrulanmış borsa **7 → 28**: 11 Binance sıcak cüzdanı, Kraken, Bybit,
+OKX, Bitget, HTX 1/4, KuCoin 2/4, Gate, Paribu, Poloniex, Bitfinex, BitMart,
+Coinone, MEXC, CEX.IO. Yapısal keşif gerçekten borsa buluyor — ama adını ancak
+bir kaynak koyabiliyor.
 
 **Kalan:**
-- BtcTurk adayı `TD32z28Q…` ve keşfin 8 adayı TronScan'da etiketsiz — kimlik
-  hâlâ yok, `terminal_aday` üretmeye devam ederler.
-- Keşif bugün 25 aday veriyor (arşiv 23 bin TRON adresine büyüdü); 14'ü
-  YAZILMADI, liste okunmadan `--uygula` çalıştırılmaz.
-- Koşu 5 ve 6 donmuş kayıtlardır: Binance-Hot 1 orada hâlâ `terminal_aday`
-  görünür. Yeni etiketin etkisi ancak YENİ bir koşuda görülür, ve konteyner
-  worker'ı push edilmemiş kodu çalıştırmıyor.
+- **739 adayın 711'i TronScan'da etiketsiz.** Kimlik başka bir kaynak ister;
+  bugünkü tek kaynak TronScan ve o da bu adresler için susuyor.
+- `MaskEX Hot Wallet 17` bir CEX gibi duruyor ama sözlüğe ALINMADI —
+  doğrulanmamış bir borsa adı yanlış bir "borsaya girdi" hükmü üretir.
+- BtcTurk adayı `TD32z28Q…` hâlâ etiketsiz.
+- Eski koşular donmuş kayıttır: yeni etiketin etkisi ancak YENİ koşuda görünür.
 
 ---
 

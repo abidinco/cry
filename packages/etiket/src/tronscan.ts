@@ -43,7 +43,12 @@ export const BORSA_SOZLUGU: { desen: RegExp; ad: string }[] = [
   { desen: /^kucoin\b/i, ad: "KuCoin" },
   { desen: /^bybit\b/i, ad: "Bybit" },
   { desen: /^gate(\.io)?\b/i, ad: "Gate" },
-  { desen: /^mexc\b/i, ad: "MEXC" },
+  // "MXC" MEXC'in ESKİ adı ve TronScan hâlâ onu yazıyor — ölçüldü 2026-09-23: `TEPSrSYP…` etiketi
+  // "MXC" olduğu için `^mexc\b` tutmadı ve gerçek bir borsa `diger` yazıldı.
+  { desen: /^mexc\b|^mxc\b/i, ad: "MEXC" },
+  { desen: /^bitmart\b/i, ad: "BitMart" },
+  { desen: /^coinone\b/i, ad: "Coinone" },
+  { desen: /^cex\.io\b/i, ad: "CEX.IO" },
   { desen: /^bitget\b/i, ad: "Bitget" },
   { desen: /^kraken\b/i, ad: "Kraken" },
   { desen: /^coinbase\b/i, ad: "Coinbase" },

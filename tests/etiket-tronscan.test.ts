@@ -32,6 +32,28 @@ describe("borsa sözlüğü", () => {
     expect(borsaAdi("Black Hole Address(0)")).toBeNull();
     expect(borsaAdi("Tether Treasury")).toBeNull();
   });
+
+  it("borsanın ESKİ adı da tanınır — TronScan hâlâ onu yazıyor olabilir", () => {
+    // Ölçüldü 2026-09-23: keşif adayı `TEPSrSYP…` TronScan'da "MXC" yazıyor (MEXC'in eski adı) ve
+    // sözlük `^mexc` aradığı için gerçek bir borsa `diger` yazılmıştı.
+    expect(borsaAdi("MXC")).toBe("MEXC");
+    expect(borsaAdi("MEXC")).toBe("MEXC");
+  });
+
+  it("aynı turda çıkan iki borsa daha sözlüğe girdi", () => {
+    // Ölçüldü 2026-09-23, blok keşfinin ilk 200 adayı arasında.
+    expect(borsaAdi("BitMart Hot Wallet")).toBe("BitMart");
+    expect(borsaAdi("Coinone")).toBe("Coinone");
+    expect(borsaAdi("CEX.IO")).toBe("CEX.IO");
+  });
+
+  it("takas/saklama servisi borsa SAYILMAZ — sözlük bilerek dar", () => {
+    // Aynı turda çıktılar ve bilerek DIŞARIDA bırakıldı: para havuza girmiyor ya da
+    // saklama farklı işliyor. Yanlış bir "borsaya girdi" hükmü eksik etiketten pahalıdır.
+    expect(borsaAdi("FixedFloat Exchange Hot Wallet")).toBeNull();
+    expect(borsaAdi("Cobo Custody")).toBeNull();
+    expect(borsaAdi("HiFiSwap cross-chain 11")).toBeNull();
+  });
 });
 
 describe("TronScan yanıtı → etiket", () => {
