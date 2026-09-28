@@ -96,22 +96,91 @@ adres sayfasında indeksleme başlatılamaz.
 
 **Ölçüm:** `grep -n "doldurulacak" packages/chain/src/adapters/evm.ts` → 3 satır.
 
-**Nerede:** `packages/chain/src/adapters/evm.ts`. Şekil TRON adaptöründe hazır
-(sayfalama, imleç, onay filtresi, ham tam sayı); Etherscan'in `txlist` +
-`tokentx` uçları bloklu sayfalama kullandığı için imleç TRON'unkinden
-BASİTTİR — devam noktası blok numarasıdır ve kalıcıdır.
+**Engel ANAHTAR DEĞİL; üç uç da bugün çalışıyor (ölçüldü 2026-09-29).**
+`ETHERSCAN_API_KEY` dolu (34 karakter) ve Etherscan V2 üç hesap ucunun
+üçünü de veriyle döndürdü: `txlist`, `tokentx` ve **`txlistinternal`** — hepsi
+`status: "1"`. Yani yazılacak şey bir erişim müzakeresi değil, TRON'daki
+aynı şeklin (sayfalama, imleç, onay süzgeci, ham tam sayı) EVM karşılığını
+yazmak. Ölçümün komutu (ağ erişimi ve anahtar konteynerde):
+
+```bash
+docker exec cry-worker node -e '
+const k = process.env.ETHERSCAN_API_KEY;
+const u = "https://api.etherscan.io/v2/api?chainid=1&module=account" +
+  "&address=0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045&page=1&offset=2&sort=desc&apikey=" + k;
+(async () => { for (const a of ["txlist","tokentx","txlistinternal"]) {
+  const r = await fetch(u + "&action=" + a); console.log(a, r.status, (await r.text()).slice(0,120));
+} })();'
+```
+
+**İki tuzak ölçülerek doğrulandı:**
+
+- **Hata HTTP 200 ile gelir ve metni `result` alanında durur.** Anahtarsız aynı
+  çağrı `{"status":"0","message":"NOTOK","result":"Missing/Invalid API Key"}`
+  döndürdü — `!!result` diye bakan bir kontrol bunu "bulundu" sayar. Yoklama
+  katmanında kural zaten var (`etherscanHatasi`, `network-probe.ts`); adaptör
+  doldurulurken **aynı kural orada da uygulanmalı**, çünkü bu projede "bir kural
+  bir yerde uygulanıp kardeşinde unutulabiliyor".
+- **Anahtar depo kökündeki `.env`'de BOŞ** (uzunluk 0); dolu olanlar
+  `C:\srv\cry\.env` ve `apps/web/.env.local`. Yalnızca kök `.env` yükleyen bir
+  betik "Missing/Invalid API Key" alır ve **bunu hata olarak değil 200 olarak**
+  alır. Yerel betik iki dosyayı birden yükler (CLAUDE.md → çalışma ortamı).
+
+**Yeni kapı: `capabilities.internalTransfers: true` EVM'de de bugün İDDİA.**
+TRON'dan farkı var — orada kaynak zaten vermiyor (§4), EVM'de kaynak **veriyor**
+(`txlistinternal` ölçüldü) ama adaptör okumuyor. Adaptör doldurulurken bu uç
+okunmazsa bayrak `false` yapılır; okunursa iki liste birleştirilir ve
+`(chain, txHash, occurrence)` tekilliği ikisini de kapsar.
+
+**Sınır, ölçülmüş olan:** ücretsiz plan **BSC'yi kapsamıyor** (§1b) ve istek
+başına 1.000 kayıt / 5 çağrı sn sınırı var. Sayfalama blok numarasıyla
+olduğu için devam noktası TRON'un fingerprint'inin aksine KALICIDIR.
+
+**Nerede:** `packages/chain/src/adapters/evm.ts`.
 
 ---
 
-## 3. Bitcoin ve Solana adaptörleri de boş
+## 3. Bitcoin ve Solana adaptörleri de boş — ama engelleri AYRI cinsten
 
-**Ne bozuk:** ikisi de aynı şekilde `throw`. Bitcoin ayrıca UTXO motoru
-istiyor (hesap modeli değil), yani FIFO atıfı olduğu gibi uygulanamaz.
+**Ne bozuk:** ikisi de her yöntemde `throw`.
 
-**Nasıl görülür:** BTC txid yoklanıyor (mempool.space), sonrası yok.
+**Ölçüldü (2026-09-29): ikisinde de engel KAYNAK değil, MODEL.** Anahtarsız
+ve ücretsiz kaynaklar bugün cevap veriyor:
 
-**Nerede:** `adapters/bitcoin.ts`, `adapters/solana.ts`. Sıra Faz 2/3;
-buradaki not, "unutuldu mu?" sorusunun cevabı olsun diye.
+| Zincir | Ölçülen çağrı | Sonuç |
+|---|---|---|
+| bitcoin | `https://mempool.space/api/address/<adres>/txs` | HTTP 200, 141.704 bayt (tek adres, tek sayfa) |
+| solana | `getSignaturesForAddress` (api.mainnet-beta.solana.com) | HTTP 200, imzalar `blockTime` ile |
+| solana | `getTransaction` (`jsonParsed`) | HTTP 200, `innerInstructions` ve SPL `mint` alanları dolu |
+
+Yani "kaynak yok" diye bir engel YOK; engel her ikisinde de veriyi bizim
+hareket modelimize çevirmek.
+
+**Bitcoin — bu bir adaptör işi DEĞİL.** UTXO modelinde "kimden kime" diye
+tek bir çift yok: bir işlemin n girdisi ve m çıktısı var, para üstü çıktısı
+göndericinin kendisine dönüyor ve hangi çıktının para üstü olduğu bir
+TAHMİNDİR. Ortak girdi sahipliği kümelemesi ve CoinJoin ayıklaması da aynı
+cinsten. Yani **atıf kuralının kendisi yeniden yazılır** (FIFO olduğu gibi
+uygulanamaz) ve bu, `listTransfers` doldurmakla bitmez — ikinci bir motor
+ister. CLAUDE.md'deki "atıf kuralı bir SEÇİMDİR ve rapora YAZILIR" kuralı
+burada iki kat önemli: para üstü tahmini de rapora yazılmalı.
+
+**Solana — engel SAHİPLİK çözümlemesi.** SPL token'ları cüzdanda değil
+türetilmiş token hesaplarında (ATA) durur; `jsonParsed` bir transferde
+karşı taraf olarak **token hesabını** verir, cüzdanı değil. Sahibi
+çözülmeden çizilen bir graf, aynı cüzdanı her token'da ayrı bir düğüm
+gösterir. İkinci mesele arşiv derinliği: genel RPC `getFirstAvailableBlock`
+için **0** diyor, ama bu düğümün İDDİASI — eski bir slot'la sınanmadı ve
+genel RPC'lerin eski işlemi reddetmesi bilinen bir durum. Karar verilmeden
+önce ölçülecek: yıllar öncesine ait bir imza `getTransaction` ile geliyor mu.
+
+**Sıra ve gerekçesi:** EVM → Solana → Bitcoin. EVM'de şekil hazır ve kaynak
+ölçülü; Solana bir çözümleme katmanı ekler; Bitcoin bir motor ekler.
+**Hiçbirinde blok indeksi yok** — TRON'daki pencere kazancı (M1) o zincirlerde
+yok, her soru kaynağa gider. Zincirler arası köprü takibi de ayrı bir iştir ve
+hiçbir adaptör onu tek başına çözmez.
+
+**Nerede:** `packages/chain/src/adapters/bitcoin.ts`, `adapters/solana.ts`.
 
 ---
 
