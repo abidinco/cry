@@ -385,6 +385,8 @@ bitecek büyüklükte bölünür (görev disiplini, `docs/gorevler/README.md`).
     kimden 16,2 · kime 8,2 · tutar 2,9 · blok+zaman 3,3. B0'ın 19 Mn satırlık örneği 34,5–52,1 vermişti;
     küçük ve tek saatlik bir aralık adres tekrarını az görüyor. **Tam geçmiş 52–63 B/satırla
     525–630 GiB** — ~465 GB bütçeyi aşar. Bütçeye kabaca **2023 başına** kadar sığar.
+    *(2026-09-28: D: 2 TB Lexar'a taşındı, 1.775,9 GiB boş. Ayna dahil ölçülen ~82 B/satırla tam geçmiş
+    ≈ 825 GiB — bütçe artık kısıt değil. Ayrıntı CLAUDE.md → Blok indeksi.)*
   - **Kaynaklar** (aynı 10 blokta TronGrid'le satır satır karşılaştırma + kapısız/kapılı hız):
 
     | Kaynak | Geçmiş | TronGrid'le aynı | Hız (hatasız) |

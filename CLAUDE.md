@@ -125,9 +125,14 @@ Kullanıcının verdiği dört karar:
   canlı uç sürekli yazıyor ve ek servis sorun değil. Postgres 324,5
   bayt/satır ve yoğun adreste ~490 ms ile elendi.
 - **Eşiksiz** ve **tam geçmiş** hedefleniyor (9,7 Mr satır, 335–505 GB);
-  disk D:'nin tamamı. Bugün 198 GB boş, kullanıcı ~267 GB daha açacak.
-  Kötümser sınırda bu bütçe de yetmez, o yüzden sıra **önce canlı uç,
-  geçmiş geriye doğru** ve **dolan disk bir DURMA ölçütüdür.**
+  disk D:'nin tamamı. Kötümser sınırda eski bütçe (~465 GB) yetmiyordu, o
+  yüzden sıra **önce canlı uç, geçmiş geriye doğru** ve **dolan disk bir
+  DURMA ölçütüdür.**
+  **D: 2026-09-28'den beri Lexar NM620 2 TB** (MLD M300 500 GB söküldü;
+  anakartta iki M.2 slotu var ve ikisi de dolu, C: Kingston 1 TB). Taşımadan
+  sonra ölçüldü: 1.775,9 GiB boş; indeks + ayna bugün 87,4 GiB / 1,14 Mr
+  satır, yani ~82 B/satır — tam geçmiş (~10,8 Mr) ≈ 825 GiB, artık sığıyor.
+  Ölçüm: `system.parts`'ta `blok_indeks` + `blok_indeks_giden` boyutu.
 - **Veri D:'de tutulur** — volume ile DEĞİL, Docker'ın veri diskini D:'ye
   alarak (aşağıda). ÖLÇÜLDÜ: Windows klasörünü bağlamak ClickHouse'u tamamen
   kırıyor — parçayı `tmp_insert_…` diye yazıp rename ediyor, 9p
