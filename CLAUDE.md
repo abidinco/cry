@@ -328,8 +328,16 @@ alıp karşılaştıran testtir.
 ## Yedek — ne yedeklenir, ne yedeklenmez (2026-09-22)
 
 - **Yedeklenen: yalnızca Postgres.** Vaka, takip koşusu, etiket, rapor ve denetim kaydı zincirden
-  yeniden TÜRETİLEMEZ ve hepsi **57 MB**. `deploy/pc/yedek.ps1` her gün 03:15'te E:'ye alır (14
+  yeniden TÜRETİLEMEZ ve hepsi **57 MB**. `deploy/pc/yedek.ps1` her gün 03:15'te alır (14
   kopya). Aynı fiziksel diske yedek, yedek değildir.
+- **Hedef HARFLE değil FİZİKSEL DİSKLE seçilir** (`deploy/pc/yedek-hedefi.ps1`, 2026-09-28). Sabit
+  `E:\04_Yedek\cry` harici disk takılı değilken yedeği 27.09'dan itibaren sessizce durdurdu — bekçi
+  bunu sormuyordu. Sıra: kökünde `04_Yedek\cry` olan ve D: ile aynı fiziksel diskte OLMAYAN sürücü;
+  yoksa GEÇİCİ `C:\srv\cry\yedek` (C: Kingston, D: Lexar — ayrı disk; disk arızasına karşı korur,
+  makine kaybına karşı KORUMAZ ve günlük bunu her seferinde yazar). Yeni harici diski hedef yapmak
+  için o klasörü açmak yeter; geri yükleme denemesi en yeni dump'ı bütün adaylarda arar. Plan:
+  sökülen MLD USB kutusuyla harici hedef olacak. Ölçüldü: geçici hedefe 17,3 MB / 22 tablo, geri
+  yükleme 11 tablo / 363.166 satır birebir.
 - **Blok indeksi BİLEREK yedeklenmiyor** (688 Mn satır / 53 GiB): türetilebilir, bedeli zaman.
   Yedek günlüğü yine de indeksin hangi bloğa kadar dolu olduğunu yazar — kayıpta ne kadar yeniden
   okunacağı bilinsin diye. Tam geçmiş yüklenince bu karar yeniden düşünülür (cozulmesi-gerekenler §11).

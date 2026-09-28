@@ -12,7 +12,8 @@
 # Elle: powershell -NoProfile -ExecutionPolicy Bypass -File deploy\pc\yedek-geri-yukleme-denemesi.ps1
 [CmdletBinding()]
 param(
-  [string]$Hedef = "E:\04_Yedek\cry\postgres",
+  # Bos: yedek-hedefi.ps1'in butun adaylarindaki en yeni dump. Verilirse yalnizca o klasor.
+  [string]$Hedef = "",
   [string]$Gunluk = "C:\srv\cry\yedek.log",
   [string]$DenemeDb = "cry_geri_deneme"
 )
@@ -51,8 +52,13 @@ function Say([string]$Db) {
 
 $cikis = 0
 try {
-  $dump = Get-ChildItem $Hedef -Filter "cry-*.dump" -ErrorAction Stop | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-  if (-not $dump) { throw "yedek dosyasi yok: $Hedef" }
+  if ($Hedef) {
+    $dump = Get-ChildItem $Hedef -Filter "cry-*.dump" -ErrorAction Stop | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+  } else {
+    . (Join-Path $PSScriptRoot "yedek-hedefi.ps1")
+    $dump = EnYeniYedek
+  }
+  if (-not $dump) { throw "yedek dosyasi yok (hedef: $(if ($Hedef) { $Hedef } else { 'yedek-hedefi adaylari' }))" }
   Yaz "deneniyor: $($dump.Name) ($([math]::Round($dump.Length/1MB,1)) MB)"
 
   $sure = [Diagnostics.Stopwatch]::StartNew()

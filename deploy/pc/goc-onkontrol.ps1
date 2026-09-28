@@ -69,9 +69,9 @@ if ($pg) { Tamam "Postgres $($pg.Trim()) hareket - GOC SONRASI AYNI OLMALI" } el
 
 # 5) Yedek: goc oncesi taze bir yedek SART. Gocun kendisi veriyi tasimiyor olsa bile,
 #    diskin fiziksel olarak sokulecegi bir islemde tek kopya kabul edilemez.
-$yedek = Get-ChildItem "E:\04_Yedek\cry\postgres" -Filter "cry-*.dump" -ErrorAction SilentlyContinue |
-  Sort-Object LastWriteTime -Descending | Select-Object -First 1
-if (-not $yedek) { Sorun "E:'de Postgres yedegi YOK" }
+. (Join-Path $PSScriptRoot "yedek-hedefi.ps1")
+$yedek = EnYeniYedek
+if (-not $yedek) { Sorun "Postgres yedegi YOK (yedek-hedefi adaylarinin hicbirinde)" }
 elseif (((Get-Date) - $yedek.LastWriteTime).TotalHours -gt 26) { Sorun "en yeni yedek $([math]::Round(((Get-Date) - $yedek.LastWriteTime).TotalHours,1)) saatlik - goc oncesi yenile" }
 else { Tamam "yedek taze: $($yedek.Name)" }
 

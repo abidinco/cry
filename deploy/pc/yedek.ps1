@@ -5,7 +5,9 @@
 # ~98 gun) ve zaten 53 GiB, buyuyor. Yeri doldurulamayan veri 57 MB - onu yedeksiz birakmak,
 # "kanit dondurma" iddiasindaki bir raporu kanitsiz birakmaktir.
 #
-# NEREYE: E: (harici disk). Ayni fiziksel diske yedek, yedek degildir.
+# NEREYE: yedek-hedefi.ps1 secer - once "04_Yedek\cry" klasoru olan harici disk, yoksa GECICI
+# olarak C:\srv\cry\yedek. Ikisi de D: ile ayni fiziksel diskte olamaz: ayni fiziksel diske yedek,
+# yedek degildir. -Hedef verilirse secim atlanir.
 #
 # DOGRULAMA: dosyanin var olmasi yedek oldugunu GOSTERMEZ. Her kosu `pg_restore --list` ile
 # arsivi okur (bozuk dump burada yakalanir). Ayrica dump'in YANINA o anki satir sayilari yazilir
@@ -18,7 +20,7 @@
 # Elle: powershell -NoProfile -ExecutionPolicy Bypass -File deploy\pc\yedek.ps1
 [CmdletBinding()]
 param(
-  [string]$Hedef = "E:\04_Yedek\cry",
+  [string]$Hedef = "",
   [int]$Saklanan = 14,
   [string]$Gunluk = "C:\srv\cry\yedek.log"
 )
@@ -43,7 +45,18 @@ function Yaz([string]$Metin) {
 $cikis = 0
 try {
   New-Item -ItemType Directory -Force -Path (Split-Path $Gunluk) | Out-Null
-  if (-not (Test-Path (Split-Path $Hedef -Qualifier))) {
+  if (-not $Hedef) {
+    . (Join-Path $PSScriptRoot "yedek-hedefi.ps1")
+    $secim = YedekHedefi
+    if (-not $secim) {
+      Yaz "HATA: yedek hedefi yok - ne '04_Yedek\cry' klasorlu bir harici disk var, ne de C: D:'den ayri bir fiziksel disk."
+      exit 2
+    }
+    $Hedef = $secim.Yol
+    if ($secim.Tur -eq "gecici") {
+      Yaz "UYARI: harici yedek diski takili degil - GECICI hedef $Hedef (C:, D:'den ayri fiziksel disk). Disk arizasina karsi korur, makine kaybina karsi KORUMAZ."
+    }
+  } elseif (-not (Test-Path (Split-Path $Hedef -Qualifier))) {
     Yaz "HATA: hedef surucu yok ($Hedef). Harici disk takili mi?"
     exit 2
   }
