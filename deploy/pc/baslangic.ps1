@@ -10,6 +10,8 @@
        servis baslatmak yonetici ister, gorev kullanici haklariyla calisir)
     4. Saglik: http://localhost:1337/giris
     5. Yerel gelistirme sunucusu (3005) - -GelistirmeYok ile atlanir
+    6. B3 gecmis doldurucusu: yarim kalmis kosuyu devam ettirir, bittiginde
+       Windows + Telegram bildirimi gonderir (doldur-devam.ps1, ayri surec)
 
   Neden var (2026-09-15): Docker Desktop'in kendi AutoStart ayari kapaliydi;
   makine acildiginda butun yigin dusuk kaldi ve belirti "sayfa acilmiyor" idi.
@@ -138,6 +140,21 @@ if ($GelistirmeYok) {
   $devGunluk = Join-Path $Depo ".dev-3005.log"
   Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "npm.cmd run dev > `"$devGunluk`" 2>&1" -WorkingDirectory $Depo -WindowStyle Hidden
   Yaz "gelistirme sunucusu baslatildi: http://localhost:3005 (gunluk: $devGunluk)"
+}
+
+# 6. B3 gecmis doldurucusu ----------------------------------------------------
+# Ayri, gizli bir surec olarak baslatilir: gunlerce calisabilir, acilis
+# akisini BLOKE ETMEZ. Kendi mantigi (deploy\pc\doldur-devam.ps1) zaten
+# calisiyorsa ya da son kosu bitmisse dokunmaz; yarimsa ayni komutla devam
+# eder ve bittiginde Windows + Telegram bildirimi gonderir.
+$devamBetigi = Join-Path $PSScriptRoot "doldur-devam.ps1"
+if (Test-Path $devamBetigi) {
+  Start-Process -FilePath "powershell.exe" `
+    -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$devamBetigi`"", "-Depo", "`"$Depo`"" `
+    -WindowStyle Hidden
+  Yaz "B3 doldurma devam denetimi baslatildi (ayri surec)"
+} else {
+  Yaz "doldur-devam.ps1 bulunamadi, B3 devam denetimi atlandi" "UYARI"
 }
 
 Yaz "--- bitti ---"
