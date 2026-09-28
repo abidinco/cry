@@ -267,8 +267,8 @@ gerekiyor.
 bir şey izlemiyor: `watches` tablosu boş.
 
 **Nerede:** GitHub → Actions → deploy-watcher → **Run workflow** (elle
-tetikleme) + sunucuda `.env`. Zamanlaması bir karar
-([bekleyen-kararlar](bekleyen-kararlar.md) §5).
+tetikleme) + sunucuda `.env`. Sıklık ve eşik karara bağlandı (CLAUDE.md → Kalan kararlar): 15 dakikada bir,
+eşik üstü harekette mesaj, küçükler günlük özete.
 
 ---
 
@@ -289,8 +289,8 @@ ikinci kez bakılmasın diye yazıldı.
 token cinsinden ("9.512.155.590,98 USDT"). Adli bir yazıda karşılığın TL
 olarak yazılması gerekir.
 
-**Nerede:** Görev 09. Kaynağın ve ANIN seçimi karar
-([bekleyen-kararlar](bekleyen-kararlar.md) §5).
+**Nerede:** Görev 09. Kaynak ve AN karara bağlandı (CLAUDE.md → Kalan kararlar): iki kur birden
+yazılır, USD/TRY TCMB'den, token→USD CoinGecko'dan.
 
 ---
 

@@ -27,16 +27,16 @@ Her dosya **tek oturumda bitecek** büyüklükte, kendi bitiş ölçütünü ta�
 - **Canlı veride kalan koşular:** 5, 6, 7, 9. Koşu 9 dört devamla büyütüldü
   (86 adres); 8, 10, 11 deneme koşularıydı ve silindi.
 - **Kullanıcının seçtiği yön: görev 11 (yerel blok indeksi).** B0 ölçümleri, B1 (şema + ayrıştırıcı + kursör) ve B2 (blok okuyucu + doğrulama kapısı) bitti; kapsam kararı verildi (CLAUDE.md → Blok indeksi). B3: geçmiş doldurucu (`apps/blok-okuyucu/src/doldur.ts`) ücretsiz kaynaklardan geriye doğru dolduruyor, disk dolunca durur. B4: canlı uç okuyucusu (`cry-blok-okuyucu`) yazıldı ve konteynerde doğrulandı; 24 saat boşluksuz ölçütü sürüyor. B5: giden yön aynası, blok indeksinden keşif (kuru koşu 50 aday) ve adres sayfasında blok indeksi bölümü yapıldı; keşif etiketlerinin yazılması onay bekliyor.
-- Görev 08 (deposit sezgiseli + aktivasyon kümelemesi); karar
-  bekleyenler `bekleyen-kararlar.md` §1b ve §2–§7'da, eksikler
-  `cozulmesi-gerekenler.md` §1–§15'te.
+- Görev 08 (deposit sezgiseli + aktivasyon kümelemesi); bekleyen karar
+  kalmadı (hepsi CLAUDE.md → Kalan kararlar'a yazıldı), eksikler
+  `cozulmesi-gerekenler.md`'de.
 
 **Sıra karara bağlanmıştı ve karar verildi (2026-09-09): önce etiket,
 sonra graf.** Etiket tohumlaması yapıldı — ama ölçüm sırayı doğrulamakla
 kalmadı, sorunun yerini de değiştirdi: 324 etiket yazıldı ve arşivdeki
 14.798 adresle kesişimi **0**. Yani graf bugün çizilirse hâlâ "hangi borsa"
 diyemez, ama sebebi artık "etiket yok" değil, "TRON'da ücretsiz borsa
-etiketi kaynağı yok" ([bekleyen-kararlar §1](../bekleyen-kararlar.md)).
+etiketi kaynağı yok" ([cozulmesi-gerekenler §1](../cozulmesi-gerekenler.md)).
 Graf bu yüzden bekletilmiyor: kalan iş etiketin KAYNAĞI, grafın kendisi
 değil.
 

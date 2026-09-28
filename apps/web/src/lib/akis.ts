@@ -605,7 +605,7 @@ export function yakinlastir(g: Gorunum, px: number, py: number, carpan: number):
  * ("1 TRX + 1 USDT" diye bir büyüklük yok) ve diyagram yalnızca o varlığı
  * çiziyor; filtre de aynı birimde konuşur. Farklı varlıkları tek aralıkta
  * karşılaştırmak bir FİYAT ister ve fiyat tablosu henüz boş
- * (bekleyen-kararlar §5). O güne kadar varlık değişince aralık o varlığın
+ * (fiyat kuralı: CLAUDE.md → Kalan kararlar). O güne kadar varlık değişince aralık o varlığın
  * kendi en küçük–en büyük şeridine sıfırlanır.
  *
  * Aralık dışında kalan şeritlerin kenarları çıkar; bu varlıkta şeridi kalmayan
