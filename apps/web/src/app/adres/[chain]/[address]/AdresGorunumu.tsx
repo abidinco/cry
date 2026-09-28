@@ -6,6 +6,7 @@ import { islemGezgini } from "@/lib/gezgin";
 import { Adres, Bos, Kayit, Rozet, Satir, Tarih, Tutar, type Koken } from "@/components/ui";
 import { hareketsizGun, kisaAdres, sayi, tarih } from "@/lib/bicim";
 import BlokIndeksi from "./BlokIndeksi";
+import { butceNotu, esikleriDogrula, SINIRLAR } from "@/lib/kosu-baslatma";
 
 type Etiket = {
   id: number;
@@ -77,6 +78,13 @@ export default function AdresGorunumu({ chain, address }: { chain: string; addre
   const [sayfa, setSayfa] = useState(0);
   const [yon, setYon] = useState<"" | "gelen" | "giden">("");
   const [hata, setHata] = useState<string | null>(null);
+  // Koşu sınırları: alanlar METİN tutar, sayıya `esikleriDogrula` çevirir. Sayı state'i, silinen
+  // bir alanı 0 yapar ve 0 geçersizdir — kullanıcı alanı temizleyince hata görmemeli, varsayılana
+  // dönmeli. Boş metin "verilmedi" demektir, sıfır DEĞİL.
+  const [esik, setEsik] = useState({ maxHop: "", maxDugum: "", dallanmaEsigi: "" });
+  const [sinirlarAcik, setSinirlarAcik] = useState(false);
+
+  const esikOnizleme = esikleriDogrula(esik);
 
   const taban = `/api/adres/${chain}/${encodeURIComponent(address)}`;
 
@@ -127,10 +135,23 @@ export default function AdresGorunumu({ chain, address }: { chain: string; addre
   /** Takip koşusu: kural ve eşikler kayda yazılır, koşu worker'da yürür. */
   async function takipBaslat(kural: string) {
     setHata(null);
+    // Eşikler ARTIK gönderiliyor. Önceden yalnızca `taintRule` gidiyordu ve `VARSAYILAN_ESIKLER`
+    // her koşuda sessizce geçerliydi — alanlar API'de vardı, hiçbir ekran sormuyordu.
+    // Aynı doğrulama sunucuda da koşar; buradaki, kullanıcıyı bir tur beklemekten kurtarır.
+    const dogrulama = esikleriDogrula(esik);
+    if ("hata" in dogrulama) {
+      setHata(dogrulama.hata);
+      return;
+    }
     const yanit = await fetch("/api/takip", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ chain, address: ozet?.address ?? address, taintRule: kural }),
+      body: JSON.stringify({
+        chain,
+        address: ozet?.address ?? address,
+        taintRule: kural,
+        ...dogrulama.esikler,
+      }),
     });
     const govde = (await yanit.json().catch(() => ({}))) as {
       traceRunId?: string;
@@ -192,6 +213,12 @@ export default function AdresGorunumu({ chain, address }: { chain: string; addre
               {calisiyor ? "taranıyor" : ozet.biliniyor ? "yeniden tara" : "zincirden çek"}
             </button>
             <button
+              onClick={() => setSinirlarAcik((a) => !a)}
+              title="Sıçrama ve düğüm bütçesini bu koşu için değiştir"
+            >
+              sınırlar
+            </button>
+            <button
               className="birincil"
               onClick={() => takipBaslat("fifo")}
               disabled={!ozet.biliniyor || calisiyor}
@@ -202,6 +229,55 @@ export default function AdresGorunumu({ chain, address }: { chain: string; addre
           </div>
         }
       >
+        {sinirlarAcik && (
+          <div className="panel satirlar">
+            <Satir ad="sıçrama bütçesi" not={`${SINIRLAR.maxHop[0]}–${SINIRLAR.maxHop[1]}`}>
+              <input
+                type="number"
+                inputMode="numeric"
+                placeholder="5 (varsayılan)"
+                value={esik.maxHop}
+                min={SINIRLAR.maxHop[0]}
+                max={SINIRLAR.maxHop[1]}
+                onChange={(e) => setEsik((o) => ({ ...o, maxHop: e.target.value }))}
+              />
+            </Satir>
+            <Satir ad="düğüm bütçesi" not={`${SINIRLAR.maxDugum[0]}–${SINIRLAR.maxDugum[1]}`}>
+              <input
+                type="number"
+                inputMode="numeric"
+                placeholder="300 (varsayılan)"
+                value={esik.maxDugum}
+                min={SINIRLAR.maxDugum[0]}
+                max={SINIRLAR.maxDugum[1]}
+                onChange={(e) => setEsik((o) => ({ ...o, maxDugum: e.target.value }))}
+              />
+            </Satir>
+            <Satir
+              ad="dallanma eşiği"
+              not="bir düğümün çıkışı bunu aşarsa terminal sayılır"
+            >
+              <input
+                type="number"
+                inputMode="numeric"
+                placeholder="50 (varsayılan)"
+                value={esik.dallanmaEsigi}
+                min={SINIRLAR.dallanmaEsigi[0]}
+                max={SINIRLAR.dallanmaEsigi[1]}
+                onChange={(e) => setEsik((o) => ({ ...o, dallanmaEsigi: e.target.value }))}
+              />
+            </Satir>
+            {/* Sayıyı büyütmek serbest, ama bedeli SESSİZ kalmamalı: her düğüm bir adres
+                taramasıdır ve pencere öncesi geçmiş kaynaktan okunuyor (M4: ~25 sn/adres). */}
+            <p className="koken-notu" data-koken={"hata" in esikOnizleme ? "supheli" : undefined}>
+              {"hata" in esikOnizleme ? esikOnizleme.hata : butceNotu(esikOnizleme.esikler)}
+            </p>
+            <p className="koken-notu">
+              Çizim 100 düğümde durur; fazlası &quot;ve N düğüm daha&quot; diye sayılır. Bütçeyi
+              büyütmek grafı değil, TARANAN alanı büyütür.
+            </p>
+          </div>
+        )}
         <div className="panel satirlar">
           <Satir ad="indeks">
             <span className="veri">{indeksMetni(ozet)}</span>

@@ -509,6 +509,26 @@ adlarını isterdi.
 - **Sembol kimlik değildir, SÖZLEŞME kimliktir.** Arşivde "U S D T" adlı
   (boşluklu) taklit bir token var ve gerçek USDT'den ayırt eden tek şey
   sözleşme adresi.
+- **Tek işlem okumasında TOKEN hareketi AYRI bir uçtadır** (2026-09-28).
+  `gettransactionbyid` yalnızca sözleşme çağrısını döndürüyor; TRC20 transferi bir OLAYdır ve
+  `gettransactioninfobyid`nin `log` dizisinde durur. `getTransaction` yalnızca `nativeCevir`
+  çağırdığı için gerçek bir USDT transferi **0 hareketle** dönüyordu — ekran onu "bu işlem değer
+  hareketi üretmemiş" diye gösterecekti. Kaynağın EKSİĞİ veri gibi görünüyordu. Ölçüldü: aynı tx
+  düzeltmeden sonra 1 hareket verdi ve Postgres'teki kayıtla birebir aynı (USDT, 421000000000,
+  aynı adresler, occurrence 0). `listTransfers` bu tuzağa düşmüyor çünkü TRC20 için ayrı bir uç
+  kullanıyor — **bir kural bir yerde uygulanıp kardeşinde unutulabiliyor.**
+- **Tek işlem okumasında tekillik sayacı YEREL olmalı.** Tur sayacı kullanılsaydı aynı işlemin
+  ikinci okuması 0,1 yerine 2,3 derdi. Sayfalanan okumada tur sayacı doğru (bir işlemin kayıtları
+  sayfa sınırında bölünüyor), tek işlemde bütün tx elde olduğu için yerel sayaç doğru.
+- **Ondalığı BİLİNMEYEN tutar çevrilmez.** Tek işlem ucu token meta verisi vermiyor; sözleşmeden
+  tanınan yalnızca USDT. Tanınmayan token'ı 0 ondalıkla basmak yanlış bir BÜYÜKLÜK gösteriyor
+  (ölçüldü: `12300000000000000`). Ham sayı, ham olduğu SÖYLENEREK basılır; kimlik sözleşmede durur.
+- **İşlem listesi bir EKSİKSİZLİK iddiası değildir.** `nativeCevir` yalnızca TransferContract ve
+  TransferAssetContract tanıyor; sözleşme çağrısının taşıdığı TRX (`call_value`) ve iç transferler
+  görünmüyor. Ölçüldü: 2018 tarihli bir `CreateSmartContract` işlemi Postgres'te TRX hareketi
+  taşıyor ama tek işlem okumasında yalnızca log'daki Transfer olayı çıkıyor. Ekran bunu yazar.
+  Aynı işlemde `from=0x0, to=0x0` bir Transfer olayı da ÖLÇÜLDÜ — çözme hatası değil, zincirde
+  gerçekten öyle.
 
 ## Etiket kaynağı — ölçülmüş olan, varsayılan değil
 
@@ -814,6 +834,24 @@ işaret), renk kanalları ayrık, yazı tipleri build anında gömülü.
   sıçramadaki bir adrese giden para ileri şeritlerle karışmasın diye ayrı bir
   alt şeritten okla döner. Koşu 7'de köke 3,85 Mn USDT geri dönmüş — eski
   grafta bu hiç görünmüyordu.
+- **İşlemden takip başlatılabilir ve kök ADRESİ İNSAN seçer** (2026-09-28). Motor `tohumTx`'i
+  destekliyordu ama hiçbir ekran sormuyordu — "yazıldı ama hiçbir sayfa sormuyor"un bir örneği
+  daha. `/islem/[chain]/[hash]` işlemin hareketlerini listeler ve her ALICI için takip düğmesi
+  verir; gönderene düğme konmaz, çünkü tohum köke GİREN paradır ve o koşu boş biterdi. Bir işlemin
+  birden çok alıcısı olabilir; hangisinin izleneceğini sayfa kendi seçmez.
+  **Tohum boş çıkarsa koşu SESSİZ kalmaz:** `stats.tohum` yazılır ve ekran "bu işlem bu adrese para
+  GETİRMİYOR" der — boş grafın üçüncü sebebi budur (ötekiler: kök taranamadı, gerçekten hareket
+  yok) ve üçü aynı boş grafı üretir. Karar saf katmanda ve testli (`tohumSorunu`).
+- **İşlem hash'inde zincir belirsizken de link VERİLİR, adreste verilmez.** İşlem sayfası zincire
+  GİDİP sorar ve "bu zincirde bakıldı, yok" diyebilir — bu bir cevaptır. Adres sayfası arşivden
+  okuyor; orada "kayıt yok" bakılmamış bir yeri temiz gösterirdi. Aynı ayrımın iki yönü.
+- **Sıçrama/düğüm/dallanma bütçesi artık EKRANDAN geliyor** (kullanıcı isteği 2026-09-28:
+  "istediğim kadar sıçrama yapabilirim"). Önceden yalnızca `taintRule` gönderiliyordu ve
+  `VARSAYILAN_ESIKLER` her koşuda sessizce geçerliydi. Sınırlar GENİŞ (hop 1–50, düğüm 1–10.000)
+  ve amaçları makineyi korumak değil ANLAMSIZ girdiyi (NaN, ondalık, negatif) kapıda tutmak;
+  bedeli ekran söyler. **Hatalı değer sessizce varsayılana DÜŞMEZ, hata olur** — 500 isteyip 300
+  koşan bir rapor kendi yazdığı sınırla çelişir. Doğrulama saf ve testli (`esikleriDogrula`),
+  sunucuda da koşar: arayüzün göndermemesi bir güvence değildir.
 - **Çizilen düğüm sayısı 100 ile sınırlı, gerisi "ve N düğüm daha" diye
   SAYILIR.** Düğüm sınırı 300 ve kabaca on katı kenar okunmaz bir yumak
   verir; ama kırpılan kısım sessizce yok sayılmaz — kaç düğümün

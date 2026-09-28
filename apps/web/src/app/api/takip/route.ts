@@ -8,6 +8,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@cry/db";
 import { registryFromEnv, type ChainId } from "@cry/chain";
 import { VARSAYILAN_ESIKLER } from "@cry/motor";
+import { esikleriDogrula } from "@/lib/kosu-baslatma";
 import { apiOturum } from "@/lib/yetki";
 import { takipIstegi, zamanAsimi } from "@/lib/kuyruk";
 
@@ -52,6 +53,22 @@ export async function POST(istek: Request) {
     return NextResponse.json({ error: `bilinmeyen atıf kuralı: ${kural}` }, { status: 400 });
   }
 
+  // Eşikler artık ARAYÜZDEN geliyor (2026-09-28), yani doğrulanmaları şart. Hatalı değer sessizce
+  // varsayılana düşmez: 500 isteyip 300 koşan bir rapor kendi yazdığı sınırla çelişir.
+  const esikSonuc = esikleriDogrula(govde);
+  if ("hata" in esikSonuc) {
+    return NextResponse.json({ error: esikSonuc.hata }, { status: 400 });
+  }
+  const esikler = esikSonuc.esikler;
+
+  // Tohum işlemi: koşu adresin bütün girişlerinden değil, SEÇİLEN işlemden başlar. Biçimi burada
+  // sınanır; o işlemin köke gerçekten para getirip getirmediğini worker ÖLÇER ve `stats.tohum`a
+  // yazar — kapıda "getirmiyor" demek için tarama gerekir, tarama da koşunun kendi işidir.
+  const tohumTx = govde.tohumTx?.trim();
+  if (tohumTx !== undefined && tohumTx !== "" && !/^(0x)?[0-9a-fA-F]{64}$/.test(tohumTx)) {
+    return NextResponse.json({ error: "işlem hash'i 64 onaltılık karakter olmalı" }, { status: 400 });
+  }
+
   // Vaka zorunlu (şema kararı): koşu bir dosyaya ait olmalı ki denetim kaydı
   // ve rapor bir yere bağlansın. Vaka verilmezse o adres için biri açılır.
   const vaka = govde.caseId
@@ -73,12 +90,12 @@ export async function POST(istek: Request) {
       taintRule: kural,
       // Eşikler kayda YAZILIR: rapor hangi sınırlarla üretildiğini söylemeli.
       params: {
-        maxHop: govde.maxHop ?? VARSAYILAN_ESIKLER.maxHop,
-        maxDugum: govde.maxDugum ?? VARSAYILAN_ESIKLER.maxDugum,
-        dallanmaEsigi: govde.dallanmaEsigi ?? VARSAYILAN_ESIKLER.dallanmaEsigi,
+        maxHop: esikler.maxHop,
+        maxDugum: esikler.maxDugum,
+        dallanmaEsigi: esikler.dallanmaEsigi,
         minTutar: govde.minTutar ?? VARSAYILAN_ESIKLER.minTutar.toString(),
         pencereSaat: govde.pencereSaat ?? 24,
-        tohumTx: govde.tohumTx ?? null,
+        tohumTx: tohumTx || null,
       },
     },
   });
@@ -99,7 +116,7 @@ export async function POST(istek: Request) {
       userId: oturum.userId,
       action: "takip.baslat",
       target: `${chain}:${kok}`,
-      meta: { traceRunId: kosu.id.toString(), kural },
+      meta: { traceRunId: kosu.id.toString(), kural, ...esikler, tohumTx: tohumTx || null },
     },
   });
 

@@ -119,6 +119,12 @@ export async function takipKos(traceRunId: bigint): Promise<Ozet> {
   // Yürüyüş kökü zaten indeksliyor ama tohum ONDAN ÖNCE hesaplanıyor; sıra bu yüzden burada.
   await kokuHazirla(traceRunId, kosu.chain, kosu.rootAddress);
   const tohum = await tohumGirisleri(kosu.chain, kosu.rootAddress, p.tohumTx);
+  // Tek bir İŞLEMDEN başlatılan koşuda tohumun boş çıkması sessiz kalmamalı: graf "1 düğüm · bitti"
+  // görünür ve "para hareket etmemiş" diye okunur. En sık sebebi YÖNdür — tohum köke GİREN paradır,
+  // kök o işlemde gönderen taraf olabilir. Kararı saf katman veriyor (`tohumSorunu`), burası ölçümü
+  // yazıyor. Adresin bütün girişlerinden başlayan koşuda yazılmaz: orada boş tohum ayrı bir şey
+  // söyler (adrese hiç para girmemiş) ve zaten `kokTaramasi` konuşur.
+  if (p.tohumTx) await durumYaz(traceRunId, "tohum", { tohumTx: p.tohumTx, bulunan: tohum.length });
   const sonuc = await yuru({
     traceRunId,
     zincir: kosu.chain,

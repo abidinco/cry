@@ -167,6 +167,20 @@ export default function AramaKutusu() {
                           >
                             {a.network}
                           </a>
+                        ) : a.network && sonuc.kind === "tx" ? (
+                          /* İŞLEMDE kural TERSİNE döner ve belirsizken de link verilir: işlem
+                             sayfası zincire GİDİP sorar ve "bu zincirde bakıldı, yok" diyebilir —
+                             bu bir cevaptır. Adres sayfası ise arşivden okuyor; orada "kayıt yok"
+                             cümlesi bakılmamış bir yeri temiz gösterirdi. Aynı ayrım:
+                             "yok" ≠ "bakılamadı". Hazır olmayan adaptörde uç 501 döner ve sayfa
+                             bunu söyler; sessiz boş liste dönmez. */
+                          <a
+                            className="veri"
+                            href={`/islem/${a.network}/${encodeURIComponent(sonuc.normalized)}`}
+                            title={`Bu işlemi ${a.network} zincirinde aç`}
+                          >
+                            {a.network}
+                          </a>
                         ) : (
                           <span className="veri">{a.network ?? a.family}</span>
                         )}

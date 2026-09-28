@@ -25,6 +25,18 @@ const SAYFA_UST_SINIR = 200;
 
 const TRX: Asset = { chain: "tron", contract: null, symbol: "TRX", decimals: 6 };
 
+/** keccak256("Transfer(address,address,uint256)") — TRC20/ERC20 ortak olay imzası. */
+export const TRANSFER_KONUSU = "ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+
+/**
+ * USDT-TRC20 sözleşmesi (TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t), hex, `41` öneki OLMADAN.
+ *
+ * Sembol kimlik değildir, SÖZLEŞME kimliktir: arşivde "U S D T" adlı (boşluklu) taklit bir token
+ * var ve gerçeğinden ayıran tek şey bu adres. Blok indeksindeki `USDT_TRC20_HEX` ile aynı değer;
+ * kopyalanmasının sebebi zincir adaptörünün indeks paketine bağımlı OLMAMASI.
+ */
+const USDT_SOZLESME_HEX = "a614f803b6fd780986a42c78ec9c7f77e6ded13c";
+
 type TronGridYanit<T> = {
   data?: T[];
   success?: boolean;
@@ -290,8 +302,15 @@ export class TronAdapter implements ChainAdapter {
     };
   }
 
-  /** Bir TRON tx'i birden çok sözleşme taşıyabilir; her biri ayrı harekettir. */
-  private nativeCevir(k: any): Transfer[] {
+  /**
+   * Bir TRON tx'i birden çok sözleşme taşıyabilir; her biri ayrı harekettir.
+   *
+   * `sayac` verilmezse adaptörün TUR sayacı kullanılır (sayfalanan okumada doğrusu odur). Tek bir
+   * işlem okunurken YEREL bir sayaç verilir: orada bütün tx elde olduğu için numaralar kendi
+   * içinde tamdır ve aynı işlem ikinci kez okunduğunda AYNI numaraları verir — tur sayacı
+   * kullanılsaydı ikinci okuma 0,1 yerine 2,3 derdi.
+   */
+  private nativeCevir(k: any, sayac: TekrarSayaci = this.tekrarSayaci): Transfer[] {
     const sozlesmeler = k.raw_data?.contract ?? [];
     const basarili = k.ret?.[0]?.contractRet === "SUCCESS";
     const ucret = k.ret?.[0]?.fee ?? null;
@@ -316,7 +335,7 @@ export class TronAdapter implements ChainAdapter {
           txHash: k.txID,
           // Sözleşmenin işlem içindeki sırası — sayfadan bağımsız, kararlı.
           index: i,
-          occurrence: this.tekrarSayaci.sonraki(String(k.txID), from, to, varlik.contract, tutar),
+          occurrence: sayac.sonraki(String(k.txID), from, to, varlik.contract, tutar),
           blockNumber: k.blockNumber ?? null,
           ts: isoZaman(k.block_timestamp ?? k.raw_data?.timestamp),
           from,
@@ -340,19 +359,106 @@ export class TronAdapter implements ChainAdapter {
     );
     if (!yanit || !yanit.txID) return null;
 
-    const transfers = this.nativeCevir(yanit);
+    // Tek işlem okuması KENDİ İÇİNDE tamdır: yerel sayaç, aynı işlemin her okumasında aynı
+    // `occurrence` numaralarını verir.
+    const sayac = new TekrarSayaci();
+    const yerli = this.nativeCevir(yanit, sayac);
+
+    // TRC20 hareketleri BU uçta YOK: `gettransactionbyid` yalnızca sözleşme çağrısını döndürüyor,
+    // token transferi bir OLAYdır ve `gettransactioninfobyid`nin log'larında durur. Ölçüldü
+    // (2026-09-28): bir USDT transferi burada 0 hareketle dönüyordu ve ekran onu "bu işlem değer
+    // hareketi üretmemiş" diye gösterecekti — kaynağın EKSİĞİ veri gibi görünüyordu.
+    const bilgi = await this.islemBilgisi(hash, signal);
+    const { transfers: tokenlar, cozulemeyen } = this.trc20LoglariCevir(yanit, bilgi, sayac);
+
+    const transfers = [...yerli, ...tokenlar];
     return {
       chain: "tron",
       hash: yanit.txID,
-      blockNumber: yanit.blockNumber ?? null,
+      blockNumber: yanit.blockNumber ?? bilgi?.blockNumber ?? null,
       ts: isoZaman(yanit.raw_data?.timestamp),
       success: yanit.ret?.[0]?.contractRet === "SUCCESS",
       from: transfers[0]?.from ?? null,
       to: transfers[0]?.to ?? null,
       feeRaw: yanit.ret?.[0]?.fee == null ? null : String(yanit.ret[0].fee),
       transfers,
-      raw: yanit,
+      // Çözülemeyen log SAYILIR: "0 hareket" ile "hareketi çözemedim" ayrı cevaplardır. Bunu
+      // yutan bir ekran, bakılmamış bir işlemi temiz gösterirdi.
+      raw: { ...yanit, bilgi, cozulemeyenLog: cozulemeyen },
     };
+  }
+
+  /** `gettransactioninfobyid`: olay günlükleri burada. Ulaşılamazsa `null` — uydurma boş dizi DEĞİL. */
+  private async islemBilgisi(hash: string, signal?: AbortSignal): Promise<any | null> {
+    await this.kapi.gec();
+    try {
+      const b = await getJson<any>(
+        `${this.baseUrl}/wallet/gettransactioninfobyid?value=${encodeURIComponent(hash)}`,
+        { chain: "tron", headers: this.basliklar, signal },
+      );
+      return b && (b.id || b.log) ? b : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * TRC20 `Transfer(address,address,uint256)` olaylarını harekete çevirir.
+   *
+   * Sözleşme KİMLİKTİR: USDT sözleşmesi adıyla değil adresiyle tanınır (arşivde "U S D T" adlı
+   * taklit bir token var). Tanınmayan token'ın ondalığı bilinmiyor — uydurulmaz, `decimals: 0` ve
+   * `symbol: "?"` ile geçer ve sözleşme adresi kayıtta kalır, böylece kimlik kaybolmaz.
+   */
+  private trc20LoglariCevir(
+    tx: any,
+    bilgi: any | null,
+    sayac: TekrarSayaci,
+  ): { transfers: Transfer[]; cozulemeyen: number } {
+    const loglar = (bilgi?.log ?? []) as any[];
+    if (!Array.isArray(loglar) || loglar.length === 0) return { transfers: [], cozulemeyen: 0 };
+
+    const basarili = tx.ret?.[0]?.contractRet === "SUCCESS";
+    const zaman = isoZaman(tx.raw_data?.timestamp);
+    const transfers: Transfer[] = [];
+    let cozulemeyen = 0;
+
+    loglar.forEach((l, i) => {
+      const konular = (l.topics ?? []) as string[];
+      if (konular[0]?.toLowerCase() !== TRANSFER_KONUSU) return;
+      // from/to 32 baytlık konuda sağa yaslı 20 bayt; sözleşme 41 öneksiz hex geliyor.
+      const from = hexKonudanAdres(konular[1]);
+      const to = hexKonudanAdres(konular[2]);
+      const tutar = hexTutar(l.data);
+      if (from === null || to === null || tutar === null) {
+        cozulemeyen++;
+        return;
+      }
+      const sozlesmeHex = String(l.address ?? "").toLowerCase();
+      const usdt = sozlesmeHex === USDT_SOZLESME_HEX;
+      const sozlesme = adresNormalize("41" + sozlesmeHex) ?? null;
+      transfers.push({
+        chain: "tron",
+        txHash: tx.txID,
+        index: i,
+        occurrence: sayac.sonraki(String(tx.txID), from, to, sozlesme, tutar),
+        blockNumber: bilgi?.blockNumber ?? null,
+        ts: zaman,
+        from,
+        to,
+        asset: {
+          chain: "tron",
+          contract: sozlesme,
+          symbol: usdt ? "USDT" : "?",
+          decimals: usdt ? 6 : 0,
+        },
+        amountRaw: tutar,
+        kind: "token",
+        success: basarili,
+        raw: l,
+      });
+    });
+
+    return { transfers, cozulemeyen };
   }
 
   /**
@@ -382,6 +488,27 @@ export class TronAdapter implements ChainAdapter {
 }
 
 /* ---------------- yardımcılar ---------------- */
+
+/**
+ * 32 baytlık bir olay konusundan TRON adresi: son 20 bayt, başına `41` eklenerek base58'e çevrilir.
+ * Şekli tutmayan konu `null` döner — yanlış bir adres üretmektense hiç üretmemek gerekir.
+ */
+export function hexKonudanAdres(konu: unknown): string | null {
+  const s = String(konu ?? "").replace(/^0x/, "");
+  if (!/^[0-9a-fA-F]{64}$/.test(s)) return null;
+  return adresNormalize("41" + s.slice(24));
+}
+
+/** Olay verisindeki 32 baytlık tutar, ONDALIK metin olarak. `BigInt` şart: 2^256-1 gerçekten var. */
+export function hexTutar(veri: unknown): string | null {
+  const s = String(veri ?? "").replace(/^0x/, "");
+  if (!/^[0-9a-fA-F]{1,64}$/.test(s)) return null;
+  try {
+    return BigInt("0x" + s).toString();
+  } catch {
+    return null;
+  }
+}
 
 function trc10AdCoz(hexAd: unknown): string {
   const s = String(hexAd ?? "");

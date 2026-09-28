@@ -65,3 +65,28 @@ export function kokTaramasiSorunu(kt: KokTaramasi | null | undefined): string | 
   if (kt.tamamlandi === false) return "Kök taraması yarıda kaldı (kaynak sınırı); kökün geçmişi eksik okundu.";
   return null;
 }
+
+/** Koşu tek bir İŞLEMDEN başlatıldıysa, o işlemin kökte kaç giriş ürettiği. */
+export type TohumDurumu = {
+  /** Kullanıcının seçtiği işlem hash'i; yoksa koşu adresin BÜTÜN girişlerinden başlamıştır. */
+  tohumTx?: string | null;
+  /** O işlemden kökte bulunan giriş sayısı. */
+  bulunan?: number;
+};
+
+/**
+ * Seçilen işlem kökte hiç giriş üretmediyse ekrana yazılacak cümle; ürettiyse `null`.
+ *
+ * Neden ayrı ve saf: işlemden başlatılan bir koşuda tohum boşsa yürüyüş ilk düğümde biter ve graf
+ * "1 düğüm · bitti" görünür — `kokTaramasiSorunu`nun yaşadığı tuzağın aynısı. Boş graf "para
+ * hareket etmemiş" diye okunur; oysa cevap "o işlem bu adrese para GETİRMEMİŞ" olabilir. İkisi
+ * ayrı cevaplardır.
+ *
+ * Yaygın sebebi kullanıcı hatası değil YÖNdür: tohum, köke GİREN paradır. İşlemde kök gönderen
+ * taraftaysa o işlemin kökte girişi yoktur.
+ */
+export function tohumSorunu(t: TohumDurumu | null | undefined): string | null {
+  if (!t?.tohumTx) return null;
+  if (t.bulunan === undefined || t.bulunan > 0) return null;
+  return `Seçilen işlem (${t.tohumTx.slice(0, 12)}…) bu adrese para GETİRMİYOR: kökte 0 giriş bulundu. Takip köke giren paradan başlar — bu işlemde kök gönderen taraf olabilir. Boş graf "para hareket etmedi" demek DEĞİLDİR.`;
+}
