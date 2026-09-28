@@ -174,3 +174,81 @@ turunda değiştirilir.
 **Karar yeri:** Görev 10 + `apps/watcher`.
 
 ---
+
+## 8. BigQuery: tam geçmiş satın alınsın mı, yoksa 87 gün beklensin mi
+
+**Soru:** TRON'un tam geçmişi BigQuery'den PARAYLA bir haftada mı yüklensin, yoksa doldurucu
+kendi hızıyla ~87 günde mi getirsin?
+
+**Ölçüm (2026-09-28):** indeks 1,15 Mr satır / 87,8 GiB; doldurucu 10,9 blok/sn ile GERİYE gidiyor
+ve taban ~87 gün uzakta. Disk artık kısıt DEĞİL (2 TB, 1.776 GiB boş; tam geçmiş ~825 GiB).
+Bedeli ölçen asıl sayı M4'ten: **10–12 düğümlük bir takip koşusu ~200 saniye ve bunun ~198'i
+pencere ÖNCESİ geçmişi TronGrid'den okumak.** Tam geçmiş diskteyse aynı koşu birkaç saniye.
+Kaynak `bigquery-public-data.goog_blockchain_tron_mainnet_us`; talep başına 6,25 $/TiB, ayda
+1 TiB ücretsiz (her ay sıfırlanır). Google ücretsiz denemesi BİTTİ, yani kart bağlanması gerekir.
+
+**Seçenekler:**
+1. **Beklemek (bugünkü hâl)** — 0 ₺, ~87 gün. Bu süre boyunca eski adresli her koşu ~200 sn.
+2. **Tam geçmiş, tek seferde** — ~89–127 $. Bir haftada biter.
+3. **Üç takvim ayına yayarak** — ~25 $ (aylık 1 TiB ücretsiz kotayla). Beklemekten hızlı, en ucuz
+   satın alma; ama ayları beklemek gerekir.
+4. **Yalnızca 2018–2022** — ~22–35 $. Dava döneminiz orası; doldurucu oraya EN SON varır.
+
+**Karar verilmezse:** doldurucu çalışmaya devam eder ve iş yine biter — yalnızca 87 gün sonra.
+Bu bir tıkanma değil, bir HIZ tercihi.
+
+**Doğrulanmamış varsayım:** BigQuery şemasında "`input = '0x'` ⇒ TransferContract" eşitliği
+ölçülmedi. Ücretsiz Sandbox'ta tek sorguyla sınanabilir; satın almadan önce sınanmalı.
+
+**Geri alınabilir:** para geri alınmaz. Yüklenen veri kalıcıdır.
+
+**Karar yeri:** `docs/yol-haritasi-blok-indeks.md` → B3 + CLAUDE.md.
+
+---
+
+## 9. 739 borsa adayının kaçı incelenecek, kim inceleyecek
+
+**Soru:** `/etiket` 739 doğrulanmamış borsa iddiası gösteriyor. Hepsi mi elden geçecek, bir
+kısmı mı, yoksa yalnızca bir koşuyu durdurdukça mı bakılacak?
+
+**Ölçüm (2026-09-28):** 792 doğrulanmamış `exchange%` etiketi, **0'ı** insan kararına bağlanmış.
+Sayfa sırayı zaten doğru kuruyor: önce GERÇEKTEN bir izi durdurmuş olanlar (en üstte 4 koşuda
+görünüp 3 kez duran bir adres). TronScan bu 739'un hiçbirine ad veremedi — kimlik için ikinci bir
+kaynak yok.
+
+**Seçenekler:**
+1. **Tembel: yalnızca karşılaşılınca** (önerim) — bir koşu bir adayda durduğunda o satır incelenir.
+   Emek işin geldiği yere harcanır; hiç karşılaşılmayan 700 adres bugün hiçbir raporu değiştirmiyor.
+2. **En ağır N tanesi peşinen** — ilk 50'yi bir oturumda bitirmek, sonraki koşuları temiz başlatır.
+3. **Hepsi** — 739 satır × gezginde bakmak; günler sürer ve çoğu hiç kullanılmaz.
+
+**Karar verilmezse:** liste durur, koşular `terminal_aday` demeye devam eder — yanlış bir şey
+olmaz, yalnızca raporlar "borsa ADAYINA girdi" demeyi sürdürür.
+
+**Geri alınabilir:** evet. Karar etiketi silmez, `diger`e çeker; kaynak turları insan kararını
+EZMEZ (`INSAN_IMZASI`).
+
+**Karar yeri:** çalışma düzeni; sonuç [cozulmesi-gerekenler](cozulmesi-gerekenler.md) §17'ye.
+
+---
+
+## 10. Doldurucu hangi dönemi önce doldursun
+
+**Soru:** Doldurucu uçtan GERİYE gidiyor ve şu an 81,8 Mn'da (~2022 sonu). Dava dönemi
+2019–2022 ise oraya sırayla en son varır. Sıra değişsin mi?
+
+**Ölçüm (2026-09-28):** pencere 81.834.230 – 86.646.047, ~167 gün. Doldurucu `--taban` ile
+istenen bloktan başlatılabiliyor.
+
+**Seçenekler:**
+1. **Uçtan geriye, kesintisiz** (bugünkü hâl) — pencere hep BOŞLUKSUZ ve tek parça kalır.
+   Pencerenin değeri de bundan geliyor: bir boşluk altındaki her şeyi motora kapatır.
+2. **Dava dönemine atlamak** — o dönem erken gelir ama arada KOCA bir boşluk kalır ve pencere
+   ikiye bölünür; alttaki parça, üstteki boşluk kapanana kadar motora KAPALI olur.
+
+**Karar verilmezse:** 1 numara sürer. Bu güvenli seçenek.
+
+**Dikkat:** 2 numara "daha hızlı sonuç" gibi görünür ama boşluk kapanana kadar o veriyi motor
+kullanamaz — yalnızca diskte durur. Bu yüzden ancak 2019–2022'nin TAMAMI yüklenecekse anlamlı.
+
+**Karar yeri:** `apps/blok-okuyucu/src/doldur.ts` çağrısı + `deploy/pc/doldurucu-bekci.ps1`.

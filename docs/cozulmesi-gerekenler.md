@@ -7,13 +7,21 @@ yapılmamış. Karar bekleyenler ayrı ([bekleyen-kararlar.md](bekleyen-kararlar
 Her madde: **ne bozuk · nasıl görülür · ölçüm · nerede.** Ölçümü olmayan
 madde yazılmaz; "sanırım şu eksik" bir sonraki turda kanıya dönüşür.
 
-Ölçüm tarihi: **2026-09-09**, yerel veritabanı (`docker exec cry-db psql -U cry -d cry`):
+Ölçüm tarihi: **2026-09-28**, yerel yığın.
 
 ```
-etiket: 0      adres: 14.798     tam indeksli: 19    hareket: 23.895
-koşu: 0        düğüm: 0          izleme: 0           vaka: 0
-fiyat: 0       rapor: 0          deposit adayı: 0
+# Postgres — docker exec cry-db psql -U cry -d cry
+etiket: 1.117  adres: 90.843     hareket: 268.182    koşu: 5     vaka: 2
+izleme: 0      fiyat: 0          rapor: 0
+
+# Blok indeksi — docker exec cry-clickhouse clickhouse-client --database cry
+satır: 1,15 Mr        disk: 87,8 GiB        okunan aralık: 81.826.048 – 86.646.047
+pencere (boşluksuz):  81.834.230 – 86.646.047  (~167 gün)
+doldurucu: 10,9 blok/sn, geriye doğru · taban ~87 gün uzakta · D:'de 1.776 GiB boş
 ```
+
+Disk artık bağlayıcı kısıt DEĞİL (2 TB takıldı, 2026-09-28). Sırayı belirleyen
+şey bundan sonra ZAMAN: tam geçmiş bu hızla ~87 gün.
 
 ---
 
@@ -33,11 +41,11 @@ docker exec cry-db psql -U cry -d cry -c "select source,category,count(*) from l
 docker exec cry-db psql -U cry -d cry -c \
   "select l.title from labels l where l.source='tronscan' and l.verified_at is not null order by 1;"
 ```
-→ `ofac/sanction:320 · kesif_blok/exchange_hot:739 · tronscan/exchange_hot:28 ·
-kesif/exchange_hot:17 · tronscan/diger:9 · kullanici/exchange_hot:4`.
+→ `ofac/sanction:320 · kesif_blok/exchange_hot:739 · tronscan/exchange_hot:32 ·
+kesif/exchange_hot:17 · tronscan/diger:5 · kullanici/exchange_hot:4`.
 
 **Bugün yapılan:** blok keşfinin 739 adayı yazıldı, sonra hepsi TronScan'a
-soruldu. Doğrulanmış borsa **7 → 28**: 11 Binance sıcak cüzdanı, Kraken, Bybit,
+soruldu. Doğrulanmış borsa **7 → 32**: 11 Binance sıcak cüzdanı, Kraken, Bybit,
 OKX, Bitget, HTX 1/4, KuCoin 2/4, Gate, Paribu, Poloniex, Bitfinex, BitMart,
 Coinone, MEXC, CEX.IO. Yapısal keşif gerçekten borsa buluyor — ama adını ancak
 bir kaynak koyabiliyor.
@@ -159,9 +167,11 @@ kadar bekler (yoklama adresler arasında).
 
 ---
 
-## 7. İndeks kapsamı çok sığ: 14.798 adresin 19'u taranmış
+## 7. İndeks kapsamı çok sığ: 90.843 adresin 105'i taranmış
 
-**Ne bozuk:** kayıtlı adreslerin **%0,13'ü** tam indeksli. Geri kalanı
+**Ne bozuk:** kayıtlı adreslerin **%0,12'si** tam indeksli (2026-09-28: tam 105 · kısmi 33 ·
+bilinmiyor 90.705). Blok indeksi bu tabloyu DOLDURMUYOR — adres taraması ayrı bir iş.
+Geri kalanı
 hareketlerin karşı tarafı olarak açılmış boş düğümler. Takip motoru
 taranmamış düğümü kendisi indeksliyor, ama düğüm sınırına gelince kalanlar
 `indekssiz` sebebiyle duruyor.
@@ -170,7 +180,7 @@ taranmamış düğümü kendisi indeksliyor, ama düğüm sınırına gelince ka
 iz gerçekten bitti mi, biz mi bakmadık — ayırt edilebiliyor (iyi), ama
 kapsam dar.
 
-**Ölçüm:** `select index_state, count(*) from addresses group by 1;`
+**Ölçüm:** `docker exec cry-db psql -U cry -d cry -c "select index_state, count(*) from addresses group by 1;"`
 
 **Nerede:** ayar meselesi (hop bütçesi, düğüm sınırı) + tarama hızı
 ([oneriler](oneriler.md) §4: önce ÖLÇ, sonra paralelleştir).
@@ -215,19 +225,20 @@ olarak yazılması gerekir.
 
 ---
 
-## 11. Blok indeksinin yedeği YOK — bu bir KARAR (2026-09-22)
+## 11. Blok indeksinin yedeği YOK — karar YENİDEN DÜŞÜNÜLECEK (2026-09-28)
 
-**Ne var, ne yok:** Postgres yedekleniyor (`deploy/pc/yedek.ps1`, günlük 03:15, E: diskine,
-14 kopya). Blok indeksi (688 Mn satır / 53 GiB) yedeklenMİYOR.
+**Ne var, ne yok:** Postgres yedekleniyor (`deploy/pc/yedek.ps1`, günlük 03:15, 14 kopya). Blok
+indeksi (1,15 Mr satır / 87,8 GiB) yedeklenMİYOR.
 
-**Neden karar:** yeri doldurulamayan veri Postgres'te ve **57 MB** — vaka, takip koşusu, etiket,
-rapor, denetim kaydı. Blok indeksi zincirden yeniden türetilebilir; bedeli para değil ZAMAN
-(bu hızla tam geçmiş ~98 gün). 53 GiB'lik ve büyüyen bir tabloyu 103 GiB boşu olan bir USB diske
-yedeklemek, tam geçmiş geldiğinde (832 GiB) zaten imkânsız.
+**Neden böyle karar verilmişti:** yeri doldurulamayan veri Postgres'te ve **17 MB** — vaka, takip
+koşusu, etiket, rapor, denetim kaydı. Blok indeksi zincirden yeniden türetilebilir; bedeli para
+değil ZAMAN.
 
-**Ne zaman yeniden düşünülür:** 2 TB disk gelip tam geçmiş yüklendiğinde. O noktada yeniden
-türetme maliyeti aylara çıkar ve indeksin de bir kopyası gerekir — muhtemelen ClickHouse'un kendi
-`BACKUP TABLE` komutuyla, ayrı bir fiziksel diske.
+**Kararın şartı GERÇEKLEŞTİ:** "2 TB disk gelip tam geçmiş yüklendiğinde yeniden düşünülür"
+deniyordu. Disk takıldı (2026-09-28). Yeniden türetme maliyeti bugün bile ~87 gün; tam geçmiş
+yüklendiğinde indeksi kaybetmek bir çeyrek demek. Sıradaki iş: ClickHouse'un kendi `BACKUP TABLE`
+komutunu **D:'den AYRI bir fiziksel diske** ölçmek (süre, boyut, geri yükleme denemesi). Bugün
+böyle bir disk MAKİNEDE TAKILI DEĞİL (bkz. §16).
 
 **Kapsam dışı:** bu yedek PC'nin Postgres'ini kapsar. Hetzner'daki yığının veritabanı ayrıdır ve
 onun yedeği YOKTUR.
@@ -284,3 +295,49 @@ indekslenmesi (en çok 10 sayfa) sürerken iptal o tarama bitene kadar bekler.
 
 **Nerede:** `apps/worker/src/indeksle.ts` sayfa döngüsüne iptal kontrolü
 (koşu kimliği parametre olarak) — ya da kabul: en kötü durum birkaç dakika.
+
+---
+
+## 16. Dış yedek diski TAKILI DEĞİL — yedek 4 gün SESSİZCE alınamadı
+
+**Ne bozuk:** 2 TB SSD takılırken eski E: diski (931 GB, yedek hedefi) makineden çıktı.
+`yedek.ps1` `E:\04_Yedek\cry` yoluna gömülüydü ve **24–28 Eylül arasında hiç yedek alınmadı**.
+Görev koştu, günlüğe "HATA: hedef surucu yok" yazdı ve kimse bakmadı; geri yükleme denemesi de
+"A drive with the name 'E' does not exist" dedi.
+
+**Ne düzeltildi (285668a):** hedef artık harf değil FİZİKSEL DİSK ile seçiliyor
+(`deploy/pc/yedek-hedefi.ps1`): `04_Yedek\cry` klasörü olan ve D:'nin diskinde OLMAYAN bir birim
+aranır, bulunamazsa `C:\srv\cry\yedek`e düşülür ve günlüğe UYARI yazılır. Ölçüldü: 17,3 MB dump,
+11 tablo / 363.166 satır geri yüklendi.
+
+**Kalan — bu bir DONANIM işi:** bugünkü hedef C:, yani veriyle **aynı makinede**. Disk arızasına
+karşı korur, makine kaybına (hırsızlık, yangın, anakart) KORUMAZ. Harici diski geri tak ya da
+yenisini ayır; üstünde `04_Yedek\cry` klasörü olsun, gerisi kendiliğinden çalışır.
+
+**Asıl ders bunun ötesinde:** sessiz kalan bir görev "çalışıyor" ile "hiç koşmadı"yı ayırt
+edilemez kılıyor. Doldurucunun bekçisi her turda NABIZ yazıyor (CLAUDE.md); yedeğin böyle bir
+nabzı yok — bir hafta üst üste başarısız olsa yine kimse görmez. Yedek de bir nabız yazmalı
+(ya da başarısızlığı Telegram'a düşmeli, kanal zaten hazır).
+
+---
+
+## 17. 739 borsa adayı doğrulanmayı bekliyor — inceleyen yok
+
+**Ne bozuk:** blok keşfi 739 aday yazdı ve TronScan bunların hiçbirine ad veremedi. Her biri
+motorda `terminal_aday` üretiyor: iz orada duruyor ama "borsaya girdi" denemiyor.
+
+**Nasıl görülür:** `/etiket` sayfası açılır ve liste **739 satır** gösterir; insan kararı sayacı
+**0**. Sayfa 2026-09-23'te yazıldı, hiç kullanılmadı.
+
+**Ölçüm:**
+```bash
+docker exec cry-db psql -tA -U cry -d cry -c \
+  "select count(*) from labels where category like 'exchange%' and verified_at is null"
+docker exec cry-db psql -tA -U cry -d cry -c \
+  "select count(*) from labels where verified_by like 'kullanici:%'"
+```
+→ 792 / **0**.
+
+**Nerede:** insan işi, kod işi değil. Sıra `/etiket`te zaten doğru kurulu: önce GERÇEKTEN bir izi
+durdurmuş adaylar. Kaç tanesinin inceleneceği bir TERCİH
+([bekleyen-kararlar](bekleyen-kararlar.md) §9).

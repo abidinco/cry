@@ -876,7 +876,20 @@ yapıştır, koşuyu al" diye tek adımlık bir akış yazılacaksa kök indeksl
 iner. Yani hedefteki "çok uzun olmayan süre" bugün 3,5 dakika, tam geçmişle saniyeler.
 Bu, BigQuery kararının somut karşılığıdır.
 
-## 2 TB diske göç — hazırlık ve sıra (2026-09-23)
+## 2 TB diske göç — YAPILDI (2026-09-28)
+
+**Göç tamamlandı.** D: artık *Lexar NM620 2 TB* (1.907,7 GB; 1.775,7 GiB boş) ve yığın üstünde
+çalışıyor: 6 konteyner ayakta, blok indeksi 1,15 Mr satır / 87,8 GiB, doldurucu 10,9 blok/sn ile
+geriye devam ediyor. Ölçülen satır maliyeti ~82 B (ana tablo + ayna), yani tam geçmiş (~10,8 Mr
+satır) ~825 GiB — **disk artık bağlayıcı kısıt değil.** Bundan sonra sırayı belirleyen şey ZAMAN:
+bu hızla taban ~87 gün uzakta (bekleyen-kararlar §8).
+
+**Göçün getirdiği tek yeni sorun:** çıkan disk yedek hedefiydi (E:) ve yedek 4 gün sessizce
+alınamadı — çözümü ve kalanı [çözülmesi gerekenler §16](cozulmesi-gerekenler.md).
+
+Aşağısı göç ÖNCESİNDE yazılan hazırlık ve sıradır; bir daha disk değişirse aynı sıra izlenir.
+
+### Hazırlık notları (2026-09-23'te yazıldı)
 
 Disk: **Lexar NM620 2 TB, PCIe 3.0 M.2** (sipariş verildi). Yerine takılacak: D: = *MLD M300 NVMe
 465,8 GiB*. Her iki M.2 yuvası dolu, o yüzden bu bir TAKAS; çıkan 465 GiB disk boşta kalır.
