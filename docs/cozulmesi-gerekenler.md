@@ -339,5 +339,9 @@ docker exec cry-db psql -tA -U cry -d cry -c \
 → 792 / **0**.
 
 **Nerede:** insan işi, kod işi değil. Sıra `/etiket`te zaten doğru kurulu: önce GERÇEKTEN bir izi
-durdurmuş adaylar. Kaç tanesinin inceleneceği bir TERCİH
-([bekleyen-kararlar](bekleyen-kararlar.md) §9).
+durdurmuş adaylar.
+
+**Karar (2026-09-28): TEMBEL — yalnızca bir koşu o adayda DURDUĞUNDA incelenir.** Peşinen liste
+taramak yok; emek işin geldiği yere harcanır. Yani bu madde bir "yapılacak iş" DEĞİL, bir çalışma
+düzenidir: sayacın 0 kalması bir eksik değil, beklenen hâldir. Rapor `terminal_aday` demeye devam
+eder ve bu yanlış değil, eksik doğrulanmış bir iddiadır (CLAUDE.md → Geçmişin SIRASI ve BEDELİ).

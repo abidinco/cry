@@ -882,7 +882,10 @@ Bu, BigQuery kararının somut karşılığıdır.
 çalışıyor: 6 konteyner ayakta, blok indeksi 1,15 Mr satır / 87,8 GiB, doldurucu 10,9 blok/sn ile
 geriye devam ediyor. Ölçülen satır maliyeti ~82 B (ana tablo + ayna), yani tam geçmiş (~10,8 Mr
 satır) ~825 GiB — **disk artık bağlayıcı kısıt değil.** Bundan sonra sırayı belirleyen şey ZAMAN:
-bu hızla taban ~87 gün uzakta (bekleyen-kararlar §8).
+bu hızla taban ~87 gün uzakta ve **beklenecek** — BigQuery satın alması 2026-09-28'de
+reddedildi (CLAUDE.md → Geçmişin SIRASI ve BEDELİ). Ölçüldü: blok 81.830.000 = 2026-04-14, yani
+dava dönemi 2019–2022 buradan 36–76 Mn blok aşağıda; 933 bin blok/günle 2022 sonu ~38, 2019 başı
+~82 gün uzakta. Doldurucu uçtan geriye KESİNTİSİZ gider; atlamak pencereyi ikiye böler.
 
 **Göçün getirdiği tek yeni sorun:** çıkan disk yedek hedefiydi (E:) ve yedek 4 gün sessizce
 alınamadı — çözümü ve kalanı [çözülmesi gerekenler §16](cozulmesi-gerekenler.md).

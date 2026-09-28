@@ -174,6 +174,27 @@ Geçmiş doldurma (B3) — kullanıcı kararı 2026-09-17:
 - **İki kaynak aynı bloğa farklı satır verirse blok YAZILMAZ.** Hangisinin doğru olduğu bilinemez;
   boşluk kalır ve raporlanır (her 500. blok çapraz denetlenir).
 
+Geçmişin SIRASI ve BEDELİ karara bağlandı (2026-09-28):
+
+- **BigQuery SATIN ALINMADI; geçmiş beklenerek dolar.** Ölçülen tercih: 0 ₺ / ~87 gün ⟷ ~89–127 $ /
+  1 hafta. Ara seçenek (üç takvim ayına yayarak ~25 $) ölçüldüğünde ÇÖKTÜ — beklemek zaten ~2,9 ay,
+  yani para verip aynı süre bekleniyordu. Bedeli M4 söylüyor: 10–12 düğümlük koşu ~200 sn ve bunun
+  ~198'i pencere ÖNCESİ geçmişi TronGrid'den okumak; bu maliyet 87 gün boyunca ÖDENMEYE devam edecek
+  ve bu bilerek kabul edildi. Karar yeniden açılırsa önce ücretsiz Sandbox'ta `input = '0x'` ⇒
+  TransferContract eşitliği ÖLÇÜLÜR — bugün ölçülmemiş bir varsayım ve satın alma ona dayanıyor.
+- **Doldurucu uçtan geriye KESİNTİSİZ gider; dava dönemine ATLAMAK reddedildi.** Pencerenin bütün
+  değeri boşluksuz tek parça olmasından geliyor: atlayıp yüklenen bölge, aradaki boşluk kapanana
+  kadar diskte durur ve motora KAPALIDIR (`--taban` bunu yapabilir, yapılmayacak).
+- **Blok numarası TARİHE ancak ÖLÇÜLEREK çevrilir.** Bekleyen kararlar 81,8 Mn'ı "~2022 sonu"
+  sanıyordu; indekse sorulunca blok 81.830.000 = **2026-04-14** çıktı — dava dönemi 36–76 Mn blok
+  daha AŞAĞIDA. Yanlış eşleme "dava dönemi hemen altımızda" diye bir aciliyet üretmişti. Ölçüm:
+  `select min(zaman) from blok_indeks where blok = <n>`. Bugünkü hızla (10,8 blok/sn = 933 bin
+  blok/gün) 2022 sonu ~38 gün, 2019 başı ~82 gün uzakta.
+- **739 borsa adayı TEMBEL incelenir: yalnızca bir koşu o adayda DURDUĞUNDA.** Peşinen liste
+  taramak yok. Gerekçe `/etiket`in sıra ölçütüyle aynı: bir etiketin bedeli koşuyu durdurduğunda
+  ödenir, hiç karşılaşılmamış adres bugün hiçbir raporu değiştirmiyor. Rapor `terminal_aday`
+  demeye devam eder ve bu YANLIŞ değil, eksik doğrulanmış bir iddiadır.
+
 Canlı uç (B4) — ölçülerek konanlar (2026-09-17):
 
 - **Canlı uç konteynerdir (`cry-blok-okuyucu`), kaynağı publicnode'dur, TronGrid yedektir.** 10 dk'lık kapıda
