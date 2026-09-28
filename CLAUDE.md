@@ -200,6 +200,13 @@ Canlı uç (B4) — ölçülerek konanlar (2026-09-17):
 - **Canlı uç konteynerdir (`cry-blok-okuyucu`), kaynağı publicnode'dur, TronGrid yedektir.** 10 dk'lık kapıda
   publicnode'un ucu hiç geri gitmedi ve 188 blok TronGrid'le satır satır aynıydı. tronstack uçta işe yaramıyor:
   yeni blokların bilgisi 30 sn sonra da eksikti.
+- **Kursör AÇILIŞTA kapsama sorulur; okunmuş bloklar yeniden okunmaz.** Ölçüldü (2026-09-28): kursör
+  86.592.190'da takılıyken kapsam 86.646.047'ye kadar doluydu ve okuyucu 52.457 bloğu BAŞTAN okuyordu —
+  ~5 saat publicnode kotası, sıfır yeni satır. Sebep `canli.ts`te açıktaydı: kapsam tablosuna yalnızca
+  kursör BOŞSA bakılıyordu. `bitisikKursor` tam bu iş için yazılmıştı ama yalnızca tur içinde
+  kullanılıyordu; veritabanı karşılığı `kapsamdanIlerlet`. Bu, "boşlukla ilerlenmez" kuralının ihlali
+  DEĞİL — yalnızca kapsamın okundu dediği bloklar atlanır. **Veri bozulmuyordu, iş boşunaydı**: mükerrer
+  okuma tekillikle birleşiyor, o yüzden hiçbir hata vermeden aylarca sürebilirdi.
 - **Yeni kesinleşen blokta işlem bilgisi EKSİK gelebilir** (188'de 4, 3–13 sn'de tamamlandı). Bu bir boşluk
   değildir; okuyucu bekleyip aynı bloğu yeniden okur. **Canlı uç kursörü okunmamış bloğun üstüne ATLAMAZ**
   (`bitisikKursor`): ilerleme durur, gecikme büyür ve günlükte görünür.

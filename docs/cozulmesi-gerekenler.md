@@ -345,3 +345,60 @@ durdurmuş adaylar.
 taramak yok; emek işin geldiği yere harcanır. Yani bu madde bir "yapılacak iş" DEĞİL, bir çalışma
 düzenidir: sayacın 0 kalması bir eksik değil, beklenen hâldir. Rapor `terminal_aday` demeye devam
 eder ve bu yanlış değil, eksik doğrulanmış bir iddiadır (CLAUDE.md → Geçmişin SIRASI ve BEDELİ).
+
+---
+
+## 18. Canlı okuyucu 46 saat geride "healthy" diyor — sağlık denetimi NABZI ölçüyor, İLERLEMEYİ değil
+
+**Ne bozuk:** konteynerin sağlık denetimi (`docker-compose.yml`, `cry-blok-okuyucu`) yalnızca
+`/tmp/canli-nabiz` dosyasının 120 sn içinde yazıldığına bakar. Okuyucu sağ olduğu sürece uçtan ne
+kadar kopmuş olursa olsun YEŞİL görünür.
+
+**Nasıl görüldü (2026-09-28 19:31):** konteyner "Up 12 minutes (healthy)" derken günlüğü
+`geride 54.668 blok · zincire gecikme 164.108 sn` yazıyordu — **45,6 saat.** Kopmayı ancak elle
+bakınca gördük; bir gün daha bakılmasa aynı yeşil duruyordu.
+
+**Ölçüm:**
+```bash
+docker ps --format "{{.Names}}	{{.Status}}" | grep okuyucu   # healthy der
+docker logs --tail 2 cry-blok-okuyucu                          # gerçek gecikmeyi yazar
+```
+
+**Neden önemli:** pencerenin üst ucu canlı okuyucudan geliyor. Uç sessizce geride kalırsa motor
+pencere DIŞI kalan son günleri TronGrid'den okumaya döner — yani M1'in 17,6 katlık kazancı, kimse
+fark etmeden ve hata vermeden erir.
+
+**Ne yapılmalı:** sağlık denetimi bir GECİKME eşiği de görmeli (ör. 1 saatten fazla geride kalmak
+`unhealthy`), ya da doldurucunun bekçisi gibi bir nabız satırı Telegram'a düşmeli. Kural CLAUDE.md'de
+zaten yazılı ama kardeşine uygulanmamış: *"bir sürecin takılıp takılmadığı damgayla değil İLERLEMEYLE
+ölçülür."* Burada ilerleme var, uca YETİŞME yok — ölçülmesi gereken üçüncü şey bu.
+
+**İlgili:** 46 saatlik kopmanın kendisi (kursörün zaten okunmuş 52.457 bloğu yeniden okuması)
+düzeltildi; bu madde kopmanın GÖRÜLMEMESİ hakkında.
+
+---
+
+## 19. `block_cursors.missing_ranges` bayat: 30 boşluğun 30'u kapanmış, liste budanmıyor
+
+**Ne bozuk:** kayıt 30 tekil boşluk listeliyor (82,3 Mn – 83,3 Mn arası). Otuzunu da kapsam
+tablosuna sordum: **otuzu da okunmuş.** Boşluk doldurucu (`cry-bosluk-doldur`) onları kapatmış ama
+listeden düşmemiş; liste yalnızca `eksikleriGuncelle` ile BÜYÜYOR.
+
+**Ölçüm:**
+```bash
+docker exec cry-db psql -tA -U cry -d cry -c   "select string_agg((r->>'bas'), ',') from block_cursors, jsonb_array_elements(missing_ranges) r"
+# cikan listeyi ClickHouse'a sor:
+#   select count(distinct blok) from blok_okundu where blok in (<liste>)
+```
+→ 30 kayıt, 30'u kapsamda.
+
+**Zararı bugün SINIRLI ve bunu söylemek önemli:** bu alan hiçbir karar için OKUNMUYOR. Pencere
+(`pencereOku`) kapsam tablosundan hesaplanıyor, `missing_ranges` yalnızca yazılıyor
+(`doldur.ts`, `oku.ts`). Yani motor yanlış cevap vermiyor.
+
+**Yine de düzeltilmeli:** bu kayıt bir İNSANA "30 bilinen boşluğumuz var" diyor ve bu doğru değil.
+Projenin "yok ≠ bakılamadı" kuralının ters yüzü: bakılmış bir yeri bakılmamış göstermek. Bir gün
+bir rapor ya da ekran bu alanı okursa, sessizce eksik bir kapsam iddia eder. Boşluk doldurucu bir
+boşluğu kapattığında listeden DÜŞÜRMELİ; kapatamadıklarını sebebiyle bırakmalı (bu ayrımı zaten
+yapıyor, yalnızca yazmıyor).
+

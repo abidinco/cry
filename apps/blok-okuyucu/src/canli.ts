@@ -18,6 +18,11 @@
  *   boşluksuz" iddiasını sessizce bozardı.
  * - İlk açılış: kursör boşsa kapsam tablosundaki en yüksek bloktan devam eder (B3 doldurucusu uçtan başlayıp
  *   geriye indiği için bu, onun başladığı yerdir); o da yoksa kesinleşmiş uçtan.
+ * - Kursör varsa da AÇILIŞTA kapsama sorulur ve ZATEN OKUNMUŞ bitişik blokların üstüne alınır. Ölçüldü
+ *   (2026-09-28): kursör 86.592.190'da, kapsam 86.646.047'ye kadar doluydu; okuyucu 54.668 bloğu yeniden
+ *   okuyordu (~5 saat publicnode kotası). Veri bozulmuyordu — tekillik mükerreri birleştiriyor — ama iş
+ *   boşunaydı. Bu, "boşlukla ilerleme" kuralının İHLALİ DEĞİL: yalnızca kapsamın okundu dediği bloklar
+ *   atlanır, okunmamış ilk bloğun üstüne yine geçilmez.
  * - Durdurma (docker stop → SIGTERM): eldeki bloklar yazılır, kursör kaydedilir, 0 ile çıkılır.
  * - Nabız: her başarılı yoklamada `--nabiz` dosyasına zaman yazılır; konteynerin sağlık denetimi ona bakar.
  * - ClickHouse/Postgres yeniden başlarken (her deploy'da oluyor) yazıcı ve kursör yazımı bekleyip yeniden dener.
@@ -74,6 +79,23 @@ async function ucOku(): Promise<number> {
   }
 }
 
+/**
+ * Kursörün üstünde, kapsam tablosunun OKUNDU dediği bloklarla kesintisiz ulaşılabilen en yüksek blok.
+ * `bitisikKursor`un veritabanı karşılığı: aynı kural (okunmamış bloğun üstüne atlanmaz), ama tur içindeki
+ * kümede değil kapsamın tamamında. Pencere sıralı olduğu için satır numarası ile blok numarası ancak
+ * kesintisiz önekte birlikte artar; ilk boşluktan sonra fark bir daha kapanmaz.
+ */
+async function kapsamdanIlerlet(kursor: number): Promise<number> {
+  const ham = (await sorgu(a, `
+    SELECT max(blok) FROM (
+      SELECT blok, row_number() OVER (ORDER BY blok) AS sira
+      FROM (SELECT DISTINCT blok FROM ${KAPSAM_TABLO} WHERE blok > ${kursor})
+    ) WHERE toUInt64(blok) = toUInt64(${kursor}) + sira
+    FORMAT TSV`)).trim();
+  const ust = Number(ham);
+  return Number.isSafeInteger(ust) && ust > kursor ? ust : kursor;
+}
+
 // ---- başlangıç ----
 if (UYGULA) for (const sql of SEMALAR) await geciciyseTekrarla("şema", () => sorgu(a, sql));
 const kayit = await geciciyseTekrarla("kursör", () => prisma.blockCursor.findUnique({ where: { chain: "tron" } }));
@@ -81,7 +103,16 @@ let kursor: number;
 let nereden: string;
 const baslangic = deger("baslangic");
 if (baslangic !== undefined) { kursor = sayi("baslangic", 0) - 1; nereden = "--baslangic"; }
-else if (kayit?.lastFinalBlock != null) { kursor = kayit.lastFinalBlock; nereden = "block_cursors.last_final_block"; }
+else if (kayit?.lastFinalBlock != null) {
+  kursor = kayit.lastFinalBlock;
+  nereden = "block_cursors.last_final_block";
+  const ilerletilmis = await geciciyseTekrarla("kapsamdan ilerletme", () => kapsamdanIlerlet(kursor));
+  if (ilerletilmis > kursor) {
+    console.log(`${ts()} kursör kapsamdan ilerletildi: ${kursor} → ${ilerletilmis} (${ilerletilmis - kursor} blok zaten okunmuş, yeniden okunmayacak)`);
+    kursor = ilerletilmis;
+    nereden = "block_cursors.last_final_block + kapsam";
+  }
+}
 else {
   const enYuksek = Number((await geciciyseTekrarla("kapsam", () => sorgu(a, `SELECT max(blok) FROM ${KAPSAM_TABLO} FORMAT TSV`))).trim());
   if (enYuksek > 0) { kursor = enYuksek; nereden = "kapsam tablosunun en yüksek bloğu"; }
