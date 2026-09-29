@@ -296,14 +296,61 @@ ikinci kez bakılmasın diye yazıldı.
 
 ---
 
-## 10. Fiyat ve kur tabloları boş
+## 10. ~~Fiyat ve kur tabloları boş~~ — DOLDURULDU, ama fiyat tarafı %7 (2026-09-30)
 
-**Ne bozuk:** `prices_daily` ve `fx_rates_daily` **0 satır**. Bütün tutarlar
-token cinsinden ("9.512.155.590,98 USDT"). Adli bir yazıda karşılığın TL
-olarak yazılması gerekir.
+**Yapılan:** `packages/fiyat` — iki saf ayrıştırıcı (TCMB XML, CoinGecko JSON),
+`Number`'a uğramayan bir ondalık katmanı, arşive yazan doldurucu ve
+`/api/fiyat`. Ekran: `/islem/[chain]/[hash]` her hareketin altına TL karşılığını
+İKİ kurla yazıyor. 27 yeni test (toplam 301).
 
-**Nerede:** Görev 09. Kaynak ve AN karara bağlandı (CLAUDE.md → Kalan kararlar): iki kur birden
-yazılır, USD/TRY TCMB'den, token→USD CoinGecko'dan.
+**Kur tarafı TAM. Fiyat tarafı yapısal olarak eksik ve bu bir KARAR değil, bir
+KAYNAK sınırı.**
+
+| | kapsam | sebep |
+|---|---|---|
+| USD/TRY (TCMB) | arşivin **2.842 gününün tamamı** soruldu | ücretsiz, anahtarsız, 2005'e kadar geçmişli |
+| token→USD (CoinGecko) | 12.987 çiftin **988'i** | ücretsiz katman 365 günden eskisini VERMİYOR |
+
+**Ölçüm (2026-09-30):**
+```bash
+docker exec cry-db psql -U cry -d cry -c \
+  "select (select count(*) from fx_rates_daily) kur,
+          (select count(*) from fx_lookups) kur_yoklama,
+          (select count(*) from prices_daily) fiyat;"
+docker exec cry-db psql -U cry -d cry -c \
+  "select outcome, count(*) from price_lookups group by 1 order by 2 desc;"
+```
+
+**Yol boyunca çıkan dört tuzak — dördü de koşturulunca çıktı:**
+
+1. **`today.xml` DÜNÜ veriyor.** 2026-09-30 saat 00:14'te hâlâ 29.09.2026
+   bültenini döndürüyordu (TCMB kuru öğleden sonra yayımlıyor). Adresin
+   tarihine güvenip yazmak, pazartesinin kurunu salıya yazmaktı. Bültenin
+   tarihi artık GÖVDEDEN okunuyor ve testi var.
+2. **TCMB 404'ü bir CEVAP.** Hafta sonu ve resmî tatilde bülten yok
+   (ölçüldü: 2026-09-27 Pazar, 2026-01-01). Hata sayılsaydı o günler sonsuza
+   dek yeniden sorulur, "sorulmadı" ile "yayınlanmadı" ayırt edilemezdi.
+3. **CoinGecko'nun 365 gün sınırı HTTP 401 ile geliyor** (`error_code: 10012`).
+   "Kimlik hatası" sanmak, 2015–2025 arasını "bu token'ın fiyatı yok" diye
+   okumaktı — projenin en pahalı kusur sınıfı. 11.999 çift artık ağa hiç
+   gidilmeden, SEBEBİYLE `aralik_disi` olarak kapatılıyor.
+4. **"Rapor günü" fiyatı hiç çekilmiyordu.** Doldurucu çiftleri
+   `transfers`ten türetiyor; bugün hareket olmadığı için bugünün çifti listeye
+   HİÇ girmiyordu ve kararın ikinci yarısı ("rapor günü Y ₺") her satırda boş
+   kalırdı. Kuru koşu bunu göstermedi — sayı doğruydu, EKSİK olan şey listenin
+   kendisiydi.
+
+**Kalan — ve hiçbiri kod işi değil:**
+
+- **2015–2025 arası fiyatsız** ve ücretsiz bir yolu yok. Kapatmanın bedeli
+  CoinGecko Analyst (~129 $/ay) ya da ölçülmemiş bir alternatif
+  (CryptoCompare, Kaiko). **Bir karar, bugün yok.** Rapor bu aralıkta "TL
+  karşılığı yok — kaynak 365 günden eskisini vermiyor" diyor; yanlış değil,
+  eksik.
+- **Pencere içindeki uzun kuyruk zayıf:** 87 varlığın çoğu CoinGecko'da
+  listelenmemiş. Onlar `kaynakta_yok` alıyor — "fiyatı 0" değil.
+- **Kur ile fiyat AYRI şeylerdir ve biri ötekini kurtarmaz.** Kur 2015'e kadar
+  tam; ama tokenin o günkü USD fiyatı yoksa TL karşılığı yine çıkmaz.
 
 ---
 

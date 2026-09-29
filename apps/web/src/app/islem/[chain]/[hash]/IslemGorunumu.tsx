@@ -15,6 +15,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Adres, Bos, Kayit, Rozet, Satir, Tarih, Tutar } from "@/components/ui";
 import { tarih } from "@/lib/bicim";
 import { islemGezgini } from "@/lib/gezgin";
+import { kurCumlesi } from "@cry/fiyat";
 
 type Hareket = {
   asset: { chain: string; contract: string | null; symbol: string; decimals: number };
@@ -25,6 +26,20 @@ type Hareket = {
   success: boolean;
   /** Token'ın ondalığı bilinmiyor — tutar HAM basılır, çevrilmez. */
   ondalikBilinmiyor?: boolean;
+};
+
+/**
+ * Bir hareketin TL karşılığı — `/api/fiyat`ın döndürdüğü şekil.
+ *
+ * İki kur birden taşınır (kullanıcı kararı): tek sayı hangi soruya cevap
+ * verdiğini gizler. `gerekce` boş değilse EKSİK olan şey SÖYLENİR — boş bir
+ * alan "TL karşılığı yok" diye okunurdu, oysa cevap "bakılamadı" olabilir.
+ */
+type Fiyat = {
+  tutar: string | null;
+  islemGunu: { usd: string; try: string; kurTarihi: string | null } | null;
+  raporGunu: { usd: string; try: string; kurTarihi: string | null } | null;
+  gerekce: string[];
 };
 
 type Islem = {
@@ -45,6 +60,7 @@ export default function IslemGorunumu({ chain, hash }: { chain: string; hash: st
   const [islem, setIslem] = useState<Islem | null>(null);
   const [hata, setHata] = useState<string | null>(null);
   const [baslatilan, setBaslatilan] = useState<string | null>(null);
+  const [fiyatlar, setFiyatlar] = useState<Fiyat[] | null>(null);
 
   const yukle = useCallback(async () => {
     setHata(null);
@@ -60,6 +76,42 @@ export default function IslemGorunumu({ chain, hash }: { chain: string; hash: st
   useEffect(() => {
     void yukle();
   }, [yukle]);
+
+  /**
+   * Hareketler geldikten SONRA TL karşılıkları sorulur.
+   *
+   * Ayrı bir istek olmasının sebebi: işlem ucu ZİNCİRE gider, fiyat ucu
+   * ARŞİVE. Birini ötekinin gecikmesine bağlamak, fiyat tablosu boşken işlem
+   * sayfasını da yavaşlatırdı.
+   */
+  useEffect(() => {
+    const hareketler = islem?.transfers;
+    const gun = islem?.ts?.slice(0, 10);
+    if (!hareketler?.length || !gun) return;
+    let iptal = false;
+    void (async () => {
+      const yanit = await fetch("/api/fiyat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          hareketler: hareketler.map((h) => ({
+            gun,
+            chain: h.asset.chain,
+            contract: h.asset.contract ?? "",
+            hamTutar: h.amountRaw,
+            ondalik: h.asset.decimals,
+            ondalikBilinmiyor: h.ondalikBilinmiyor,
+          })),
+        }),
+      });
+      if (iptal || !yanit.ok) return;
+      const govde = (await yanit.json().catch(() => ({}))) as { fiyatlar?: Fiyat[] };
+      if (!iptal && govde.fiyatlar) setFiyatlar(govde.fiyatlar);
+    })();
+    return () => {
+      iptal = true;
+    };
+  }, [islem]);
 
   /** Seçilen alıcı kök olur, işlem de tohum: koşu yalnızca bu işlemin getirdiği parayı izler. */
   async function takipBaslat(alici: string) {
@@ -171,10 +223,16 @@ export default function IslemGorunumu({ chain, hash }: { chain: string; hash: st
                   <Tutar ham={h.amountRaw} ondalik={h.asset.decimals} sembol={h.asset.symbol} />
                 )}
                 {!h.success && <Rozet ton="dikkat">başarısız</Rozet>}
+                <FiyatSatiri fiyat={fiyatlar?.[i]} />
               </Satir>
             ))}
           </div>
         )}
+        <p className="koken-notu">
+          TL karşılıkları işlemin <strong>UTC</strong> gününe göre hesaplanır; yukarıdaki saat
+          TSİ'dir, yani gece yarısına yakın bir işlem bir önceki günün kuruyla çevrilmiş olabilir.
+          Kur TCMB döviz alışıdır ve kullanılan bültenin tarihi satırda yazar.
+        </p>
         <p className="koken-notu">
           Bu liste bir EKSİKSİZLİK iddiası değildir: kaynağın işlem uçlarının döndürdüğü
           hareketlerdir. Sözleşme çağrısının taşıdığı TRX ve sözleşme içi (internal) transferler
@@ -211,5 +269,25 @@ export default function IslemGorunumu({ chain, hash }: { chain: string; hash: st
 
       {hata && <Bos>{hata}</Bos>}
     </>
+  );
+}
+
+
+/**
+ * Bir hareketin TL karşılığı.
+ *
+ * Cümlenin KURALI burada değil `@cry/fiyat`ta (`kurCumlesi`) — saf, testli ve
+ * rapor metniyle ORTAK. İki kopya olsaydı biri değişir öteki kalırdı; bu
+ * dosyanın işi yalnızca onu ekrana koymak.
+ *
+ * Görünür hâle gelen üç kural: iki kur birden · hangi kurun hangi TARİHTEN
+ * geldiği · "yok" ile "bakılamadı"nın ayrı olduğu.
+ */
+function FiyatSatiri({ fiyat }: { fiyat: Fiyat | undefined }) {
+  if (!fiyat) return null;
+  return (
+    <span className="koken-notu" title={fiyat.gerekce.join(" · ") || undefined}>
+      {kurCumlesi(fiyat)}
+    </span>
   );
 }

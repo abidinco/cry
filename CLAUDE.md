@@ -264,6 +264,58 @@ aynı değer aralık süzgeciyle 560.160 satır veriyor. Küçük dosyada görü
 Bu yüzden bir motorun ilk testi, bilinen bir adresin sayısını **iki farklı
 yoldan** alıp karşılaştırmaktır.
 
+## Fiyat ve kur
+
+Doldurucu `packages/fiyat` (`--kaynak=tcmb|coingecko`, varsayılan KURU koşu).
+
+- **Bültenin tarihi GÖVDEDEN okunur, adresten DEĞİL.** `today.xml` 2026-09-30
+  saat 00:14'te hâlâ **29.09.2026**'yı veriyordu (TCMB kuru öğleden sonra
+  yayımlıyor). Adrese güvenip yazmak, pazartesinin kurunu salıya yazmaktı.
+- **TCMB 404'ü hata DEĞİL, "o gün bülten yayınlanmadı"dır** (hafta sonu ve
+  resmî tatil; ölçüldü 2026-09-27 Pazar ve 2026-01-01). Kayda geçmezse o gün
+  sonsuza dek yeniden sorulur.
+- **Yazılan kur DÖVİZ ALIŞ** (kullanıcı kararı 2026-09-30, dayanağı VUK 280) ve
+  seçim `source` sütununda durur (`tcmb-doviz-alis`). Bülten dördünü de veriyor;
+  kuru söylemeyen bir TL tutarı savunulamaz.
+- **Kurda hafta sonu için geriye EN ÇOK 14 gün yürünür ve kullanılan bültenin
+  TARİHİ cevapla döner.** 14 ölçümden geldi: 2.842 günlük kayıtta en uzun
+  kesintisiz yayınlanmama **9 gün** (2018-08-18→26 ve 2021-07-17→25, Kurban
+  Bayramı + hafta sonu) ve bu bir ALT SINIR — yalnızca hareketi olan günler
+  soruldu. Bu bir SEÇİMDİR, rapora yazılır. **Fiyatta geriye
+  yürüme YOK** — kur resmî bir sayıdır ve cuma kuru cumartesi için
+  savunulabilir; kripto fiyatı 7/24 oynar, dünün fiyatını bugüne yazmak ölçüm
+  değil uydurmadır.
+- **CoinGecko ücretsiz katmanı 365 günden eskisini HTTP 401 ile reddediyor**
+  (`error_code: 10012`). 401'i kimlik hatası sanmak, 2015–2025 arasını "bu
+  token'ın fiyatı yok" diye okumaktı. Arşivin 12.900 (varlık, gün) çiftinin
+  **11.999'u** bu yüzden `aralik_disi` — ağa hiç gidilmeden, sebebiyle.
+- **CoinGecko'nun hız sınırı dar ve İSRARCI:** 6 ardışık çağrının 6'sı da 429
+  döndü. Kapı 13 sn (~4,6/dk), 429'da geri çekilme 15→120 sn. Her sonuç KALICI
+  yazılır; aynı günü ikinci kez sormanın bedeli yüksek.
+- **CoinGecko tarih biçimi GG-AA-YYYY, ISO DEĞİL.** `10-01-2025` kaynağa göre
+  10 Ocak, ISO okuyan göze göre 1 Ekim; ayın 12'sinden küçük her günde iki
+  okuma da "geçerli" görünür ve yanlış günün fiyatı HATASIZ yazılırdı.
+- **1 USDT ≈ 1 USD VARSAYILMAZ, ölçülür** (2026-09-07 için 0,999957). Depeg
+  günleri gerçek ve raporda fark eden büyüklükler üretir.
+- **Fiyat üstel yazımla gelebilir** (`3.2e-9`) ve Decimal(38,12) onu kabul
+  etmez. Küçük ondalıklı token fiyatları GERÇEK; üstel yazım ya patlar ya
+  yanlış büyüklük yazar (`fiyatMetni`).
+- **Tutar × fiyat × kur `Number`'a UĞRAMAZ** (`packages/fiyat/src/ondalik.ts`,
+  BigInt); ölçek küçültme yarıyı yukarı yuvarlar. 2^256-1 testli.
+- **Bir satırın YOKLUĞU iki şey anlatır**, o yüzden olumsuz yoklamalar ayrı
+  tabloya yazılır (`price_lookups`, `fx_lookups`): `yayinlanmadi` ·
+  `aralik_disi` · `kaynakta_yok` · `hiz_siniri` · `kaynak_hatasi`. İlk üçü
+  KALICI, son ikisi yeniden denenir. Sütunu nullable yapmak eski okuru
+  yalancı çıkarırdı; tablo eklemek geriye uyumludur.
+- **Gün sınırı baştan sona UTC'dir** ve bu SÖYLENİR. `transfers.ts` UTC saklanıyor,
+  oturum saat dilimi UTC, ekranın `ts.slice(0,10)`'u ve "bugün" de UTC — yani
+  zincir uçtan uca tutarlı. Ama ekran saatleri TSİ gösteriyor: **03:00 TSİ'deki
+  bir işlem bir ÖNCEKİ UTC gününün kuruyla çevrilir.** Söylenmezse okur TSİ
+  varsayar ve gece yarısına yakın hareketlerde bir günlük kur farkı görünmez
+  bir hata olurdu.
+- **Rapor tek sayı BASMAZ:** "işlem günü X ₺ (bugün Y ₺)" ve hangi tarihli
+  bültenin kullanıldığı satırda durur. `/islem/[chain]/[hash]` bunu gösteriyor.
+
 ## Yedek
 
 - **Yedeklenen: yalnızca Postgres** (vaka, koşu, etiket, rapor, denetim kaydı —

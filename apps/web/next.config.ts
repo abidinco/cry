@@ -5,7 +5,14 @@ const config: NextConfig = {
   // Docker imajında tek klasör çıktı — node_modules'ü taşımaya gerek kalmaz.
   output: "standalone",
   // Monorepo: workspace paketleri kaynak TypeScript olarak geliyor.
-  transpilePackages: ["@cry/blok-indeks", "@cry/chain", "@cry/db", "@cry/kuyruk", "@cry/motor"],
+  transpilePackages: [
+    "@cry/blok-indeks",
+    "@cry/chain",
+    "@cry/db",
+    "@cry/fiyat",
+    "@cry/kuyruk",
+    "@cry/motor",
+  ],
   // Standalone çıktının kökü depo kökü olmalı, apps/web değil (Next 15'te
   // üst düzey seçenek, experimental değil).
   outputFileTracingRoot: path.join(import.meta.dirname, "../.."),

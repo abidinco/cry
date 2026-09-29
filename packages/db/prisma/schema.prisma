@@ -89,6 +89,7 @@ model Asset {
 
   transfers Transfer[]
   prices    PriceDaily[]
+  lookups   PriceLookup[]
 
   @@unique([chain, contract])
   @@index([chain, symbol])
@@ -420,6 +421,44 @@ model PriceDaily {
 
   @@unique([assetId, date])
   @@map("prices_daily")
+}
+
+/// "Fiyat YOK" ile "fiyata BAKILAMADI" ayrı cevaplardır — ve `prices_daily`de
+/// satır olmaması ikisini de anlatır. Bu tablo, olumsuz biten her yoklamanın
+/// SEBEBİNİ tutar; rapor "fiyat yok" değil "kaynak 365 günden eskisini
+/// vermiyor" diyebilsin.
+///
+/// Ayrı tablo olmasının sebebi: `prices_daily.usd` zorunlu, yani bir satır
+/// "değer yok" diyemez. Sütunu nullable yapmak eski okuru yalancı çıkarırdı.
+model PriceLookup {
+  assetId Int      @map("asset_id")
+  asset   Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  date    DateTime @db.Date
+
+  /// bulundu | yayinlanmadi | aralik_disi | kaynakta_yok | hiz_siniri | kaynak_hatasi
+  outcome   String
+  source    String
+  detail    String?
+  checkedAt DateTime @default(now()) @map("checked_at")
+
+  @@id([assetId, date])
+  @@index([outcome])
+  @@map("price_lookups")
+}
+
+/// Kurun yoklama kaydı. TCMB hafta sonu ve resmî tatilde bülten YAYINLAMIYOR
+/// (ölçüldü: 2026-09-27 Pazar ve 2026-01-01 → HTTP 404) ve bu bir hata değil,
+/// bir cevaptır. Kaydedilmezse o günler sonsuza dek yeniden sorulur ve
+/// "sorulmadı" ile "yayınlanmadı" ayırt edilemez.
+model FxLookup {
+  date      DateTime @id @db.Date
+  outcome   String
+  source    String
+  detail    String?
+  checkedAt DateTime @default(now()) @map("checked_at")
+
+  @@index([outcome])
+  @@map("fx_lookups")
 }
 
 /// USD/TRY — TCMB'nin ücretsiz XML servisi; resmi kur raporda daha sağlam.
