@@ -143,8 +143,12 @@ services:
       clickhouse:
         condition: service_healthy
     healthcheck:
-      # Nabız: her başarılı uç yoklamasında yazılır (3 sn'de bir). 2 dakikadır yazılmadıysa takılmıştır.
-      test: ["CMD-SHELL", "test -f /tmp/canli-nabiz && test $$(( $$(date +%s) - $$(stat -c %Y /tmp/canli-nabiz) )) -lt 120"]
+      # Nabız dosyası `<ms> <gerideSn>` taşır ve denetim İKİSİNE bakar:
+      #  1) 2 dakikadır yazılmadıysa süreç takılmıştır,
+      #  2) kursör 1 saatten (3.600 sn) fazla geride ise süreç SAĞ ama uca yetişmiyordur.
+      # (2) olmadan okuyucu 45,6 saat geride "healthy" diyordu (ölçüldü 2026-09-28 19:31); pencerenin üst
+      # ucu buradan geldiği için kopma, hata vermeden M1'in kazancını eritiyordu.
+      test: ["CMD-SHELL", "test -f /tmp/canli-nabiz && test $$(( $$(date +%s) - $$(stat -c %Y /tmp/canli-nabiz) )) -lt 120 && test $$(cut -d' ' -f2 /tmp/canli-nabiz) -lt 3600"]
       interval: 30s
       timeout: 5s
       retries: 3

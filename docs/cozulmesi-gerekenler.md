@@ -417,35 +417,26 @@ eder ve bu yanlış değil, eksik doğrulanmış bir iddiadır (CLAUDE.md → Ge
 
 ---
 
-## 18. Canlı okuyucu 46 saat geride "healthy" diyor — sağlık denetimi NABZI ölçüyor, İLERLEMEYİ değil
+## 18. ~~Canlı okuyucu 46 saat geride "healthy" diyordu~~ — YAPILDI (2026-09-29)
 
-**Ne bozuk:** konteynerin sağlık denetimi (`docker-compose.yml`, `cry-blok-okuyucu`) yalnızca
-`/tmp/canli-nabiz` dosyasının 120 sn içinde yazıldığına bakar. Okuyucu sağ olduğu sürece uçtan ne
-kadar kopmuş olursa olsun YEŞİL görünür.
+Sağlık denetimi yalnızca nabız DAMGASINA bakıyordu; okuyucu sağ olduğu sürece uçtan ne kadar
+koparsa kopsun yeşil görünüyordu (ölçüldü 2026-09-28 19:31: "Up 12 minutes (healthy)" derken
+günlük `geride 54.668 blok · zincire gecikme 164.108 sn` yazıyordu — 45,6 saat).
 
-**Nasıl görüldü (2026-09-28 19:31):** konteyner "Up 12 minutes (healthy)" derken günlüğü
-`geride 54.668 blok · zincire gecikme 164.108 sn` yazıyordu — **45,6 saat.** Kopmayı ancak elle
-bakınca gördük; bir gün daha bakılmasa aynı yeşil duruyordu.
+Nabız dosyası artık `<ms> <gerideSn>` taşıyor (`apps/blok-okuyucu/src/canli.ts` → `gerideOlc`,
+`nabizYaz`) ve denetim ikisine birden bakıyor: damga 120 sn'den taze OLACAK **ve** gerilik 3.600
+sn'nin altında olacak. Gerilik, kursörün DEĞDİĞİ son bloğun damgasından ölçülür — uçtakinden
+değil; 46 saatlik kopmada 164.108 sn diyen ölçü buydu. Blok yazılmamışsa blok farkı 3 sn ile
+çevrilir, yani "bilinmiyor" hiç ölçülmemiş sayılmaz.
 
-**Ölçüm:**
-```bash
-docker ps --format "{{.Names}}	{{.Status}}" | grep okuyucu   # healthy der
-docker logs --tail 2 cry-blok-okuyucu                          # gerçek gecikmeyi yazar
-```
+**Ölçüldü (2026-09-29):** denetim kabuğu konteynerde gerçek dosyalarla koşturuldu —
+`57 → healthy`, `164108 → UNHEALTHY`, `3599 → healthy`, `3600 → UNHEALTHY`, bayat damga +
+gerilik 0 → `UNHEALTHY`. Okuyucu kuru koşturuldu, nabız `1790632209804 55` yazdı (günlükteki
+57 sn ile uyumlu). Hiçbir servis okuyucunun sağlığına bağlı değil (`depends_on` yok), yani
+`unhealthy` bir SİNYALDİR, kimseyi düşürmez.
 
-**Neden önemli:** pencerenin üst ucu canlı okuyucudan geliyor. Uç sessizce geride kalırsa motor
-pencere DIŞI kalan son günleri TronGrid'den okumaya döner — yani M1'in 17,6 katlık kazancı, kimse
-fark etmeden ve hata vermeden erir.
-
-**Ne yapılmalı:** sağlık denetimi bir GECİKME eşiği de görmeli (ör. 1 saatten fazla geride kalmak
-`unhealthy`), ya da doldurucunun bekçisi gibi bir nabız satırı Telegram'a düşmeli. Kural CLAUDE.md'de
-zaten yazılı ama kardeşine uygulanmamış: *"bir sürecin takılıp takılmadığı damgayla değil İLERLEMEYLE
-ölçülür."* Burada ilerleme var, uca YETİŞME yok — ölçülmesi gereken üçüncü şey bu.
-
-**İlgili:** 46 saatlik kopmanın kendisi (kursörün zaten okunmuş 52.457 bloğu yeniden okuması)
-düzeltildi; bu madde kopmanın GÖRÜLMEMESİ hakkında.
-
----
+**Kalan:** sinyali GÖREN yok. Unhealthy bir konteyner `docker ps`e bakılmadıkça sessizdir;
+doldurucunun bekçisi gibi bir Telegram nabzı hâlâ yazılmadı (kanal hazır).
 
 ## 19. `block_cursors.missing_ranges` bayat: 30 boşluğun 30'u kapanmış, liste budanmıyor
 

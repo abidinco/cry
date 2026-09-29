@@ -142,6 +142,11 @@ Plan ve ölçümler: [docs/yol-haritasi-blok-indeks.md](docs/yol-haritasi-blok-i
   gecikme büyür ve günlükte görünür.
 - **Yeni kesinleşen blokta işlem bilgisi EKSİK gelebilir** (3–13 sn); boşluk
   değildir, okuyucu bekleyip aynı bloğu yeniden okur.
+- **Sağlık denetimi YETİŞMEYİ de ölçer.** Nabız dosyası `<ms> <gerideSn>` taşır; denetim hem
+  damganın tazeliğine hem 3.600 sn eşiğine bakar. Yalnızca damgaya bakarken okuyucu **45,6 saat**
+  geride "healthy" diyordu (ölçüldü 2026-09-28 19:31). Pencerenin üst ucu buradan geldiği için
+  sessiz kopma, hata vermeden M1'in kazancını eritir. Gerilik kursörün DEĞDİĞİ son bloğun
+  damgasından ölçülür, uçtakinden değil. Yani **ilerleme ile yetişme AYRI ölçülerdir.**
 - **Her PUSH deploy'u yığını yeniden oluşturur.** Bu yüzden indekse yazan her
   süreç bağlantı ve 5xx hatalarını 10 dk yeniden dener (`geciciyseTekrarla`);
   kalıcı hata (4xx) durdurur.

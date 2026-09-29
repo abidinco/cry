@@ -24,7 +24,10 @@
  *   boşunaydı. Bu, "boşlukla ilerleme" kuralının İHLALİ DEĞİL: yalnızca kapsamın okundu dediği bloklar
  *   atlanır, okunmamış ilk bloğun üstüne yine geçilmez.
  * - Durdurma (docker stop → SIGTERM): eldeki bloklar yazılır, kursör kaydedilir, 0 ile çıkılır.
- * - Nabız: her başarılı yoklamada `--nabiz` dosyasına zaman yazılır; konteynerin sağlık denetimi ona bakar.
+ * - Nabız: her başarılı yoklamada `--nabiz` dosyasına `<ms> <gerideSn>` yazılır; konteynerin sağlık denetimi
+ *   İKİSİNE de bakar. Yalnızca damgaya bakan denetim (2026-09-28 19:31) okuyucu 45,6 saat geride iken
+ *   "healthy" diyordu: süreç sağdı, uca yetişmiyordu. Pencerenin üst ucu buradan geliyor, yani sessizce
+ *   geride kalmak M1'in kazancını hata vermeden eritir — ölçülmesi gereken üçüncü şey YETİŞME.
  * - ClickHouse/Postgres yeniden başlarken (her deploy'da oluyor) yazıcı ve kursör yazımı bekleyip yeniden dener.
  */
 import { writeFileSync } from "node:fs";
@@ -164,9 +167,26 @@ async function kursoruYaz(zorla = false) {
   s.sonKursorYazimi = Date.now();
 }
 
-const ilerleme = setInterval(() => {
+/**
+ * Kursörün uçtan kopukluğu. `gecikme` kursörün DEĞDİĞİ son bloğun zaman damgasından ölçülür (uçtakinden
+ * değil) — 46 saatlik kopmada 164.108 sn diyen ölçü buydu. Henüz blok yazılmadıysa bilinmez; o zaman
+ * blok farkı 3 sn'lik blok süresiyle çevrilir, yani "bilinmiyor" hiç ölçülmemiş sayılmaz.
+ */
+function gerideOlc() {
   const geride = s.sonUc - kursor;
   const gecikme = s.sonZaman ? Math.round(Date.now() / 1000 - s.sonZaman) : NaN;
+  const gerideSn = Math.max(Number.isFinite(gecikme) ? gecikme : 0, geride * 3);
+  return { geride, gecikme, gerideSn };
+}
+
+/** Nabız: damga + kursörün gerilik saniyesi. Sağlık denetimi ikisini birden okur. */
+function nabizYaz() {
+  if (!NABIZ) return;
+  try { writeFileSync(NABIZ, `${Date.now()} ${gerideOlc().gerideSn}`); } catch { /* nabız sağlığı etkilemez */ }
+}
+
+const ilerleme = setInterval(() => {
+  const { geride, gecikme } = gerideOlc();
   console.log(
     `${ts()} uç ${s.sonUc} · kursör ${kursor} · geride ${geride} blok · zincire gecikme ${Number.isFinite(gecikme) ? `${gecikme} sn` : "?"} · ` +
     `yazılan ${yazici.yazilan} blok / ${s.satir.toLocaleString("tr")} satır · ${birincil.ad} ${s.birincil} · ${yedek.ad} ${s.yedek}` +
@@ -184,7 +204,7 @@ while (!durdur) {
     continue;
   }
   s.sonUc = Math.max(s.sonUc, uc);
-  if (NABIZ) { try { writeFileSync(NABIZ, String(Date.now())); } catch { /* nabız sağlığı etkilemez */ } }
+  nabizYaz();
   if (uc <= kursor) { await kursoruYaz(); await uyu(YOKLAMA); continue; }
 
   const hedef = Math.min(uc, kursor + TUR_BLOK);
