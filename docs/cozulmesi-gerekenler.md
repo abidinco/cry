@@ -324,26 +324,36 @@ yazılmıyor; `addresses` tablosuna bir sebep alanı + adres sayfasında satır.
 
 ---
 
-## 13. Ucu olmayan kenarlar: düğüm sınırında kenar yazılıyor, hedef yazılmıyor
+## 13. ~~Ucu olmayan kenarlar: düğüm sınırında kenar yazılıyor, hedef yazılmıyor~~ — YAPILDI (2026-09-29)
 
-**Ne bozuk:** worker bir düğümün çıkışlarını ÖNCE kenar olarak yazıyor, sonra
-hedefleri sıraya alırken düğüm sınırına takılıp duruyor. Hedef düğüm hiç
-yazılmıyor; kenar ucu boşta kalıyor.
+Worker bir düğümün çıkışlarını ÖNCE kenar olarak yazıyor, sonra hedefleri sıraya alırken düğüm
+sınırına takılıp `break` ediyordu. Hedef düğüm hiç yazılmıyor, kenarın ucu boşta kalıyordu:
+koşu 9'da 1.342 kenarın 10'u grafta olmayan bir adrese gidiyor, başlık "1.342 hareket" defter
+"1.332 hareket" diyordu. Saf katman ucu olmayan kenarı zaten eliyor (`akisModeli` → `if (!f || !t)
+continue`) ve "çağıran onu kırpılan olarak sayar" diyor — ama çağıran saymıyordu.
 
-**Nasıl görülür:** koşu 9: 1.342 kenarın 10'u grafta olmayan bir adrese
-gidiyor. Başlık "1.342 hareket", defter "1.332 hareket" diyor ve fark hiçbir
-yerde açıklanmıyor.
+Sınıra takılan hedef artık `dugum_siniri` sebebiyle bir SINIR düğümü olarak yazılıyor
+(`apps/worker/src/takip.ts` → `yuru`). Sınır düğümü TARANMAZ; yalnızca "buraya kadar geldik ve
+sebebi bu" der. Etiketi yazıldığı anda dondurulur, yani sınırda duran bir borsa raporda görünür.
 
-**Ölçüm (2026-09-15):**
+**Ölçüldü (2026-09-29, aynı kök `TAyAA1xj…`, `maxDugum: 8` ile sınır ZORLANARAK):**
+
+| | düğüm | kenar | sınır düğümü | ucu boşta kenar |
+|---|---|---|---|---|
+| düzeltmesiz | 8 | 23 | 4 | **5** |
+| düzeltmeli | 11 | 23 | 7 | **0** |
+
+Kenar sayısı DEĞİŞMEDİ: hareket uydurulmadı, yalnızca eksik UÇ yazıldı. 5 kenarın 3 düğüme
+denk gelmesi normal — birden çok kenar aynı hedefe gidiyor. Arşivde ucu boşta kenar kalmadı:
+
 ```bash
-docker exec cry-db psql -U cry -d cry -c "select count(*) from trace_edges e left join trace_nodes n on n.trace_run_id=e.trace_run_id and n.address=e.to_address where e.trace_run_id=9 and n.address is null"
+docker exec cry-db psql -U cry -d cry -c "select e.trace_run_id, count(*) from trace_edges e left join trace_nodes n on n.trace_run_id=e.trace_run_id and n.address=e.to_address where n.address is null group by 1"
 ```
+→ tek satır: koşu 9 (donmuş kayıt; eski koşular düzeltilmez, yeni koşularda görünmez).
 
-**Nerede:** `apps/worker/src/takip.ts` → `yuru` (kenar yazımı ile `maxDugum`
-kesmesinin sırası). Ya hedef "düğüm sınırı" sebebiyle yazılır ya da ekran
-farkı sayıp söyler.
-
----
+**Bilerek böyle:** düğüm bütçesi TARANAN düğümü sınırlar, çizilen düğümü değil — 8 bütçeyle 11
+düğüm yazıldı ve 7'si `dugum_siniri` sebebi taşıyor. Alternatifi (kenarı hiç yazmamak) gerçekten
+olmuş bir para hareketini gizlerdi.
 
 ## 14. Büyük koşuda defter üzerinde gezinmek bütün sayfayı yeniden çiziyor
 

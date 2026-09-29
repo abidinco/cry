@@ -456,6 +456,13 @@ Tasarım dili: [docs/arayuz.md](docs/arayuz.md). İmza öğesi **köken oluğu**
 - **İşlem hash'inde zincir belirsizken de link VERİLİR, adreste verilmez.** İşlem
   sayfası zincire gidip sorar ve "bakıldı, yok" diyebilir; adres sayfası arşivden
   okur ve orada "kayıt yok" bakılmamış bir yeri temiz gösterirdi.
+- **Düğüm sınırında hedef düğüm YAZILIR, kenar ucu boşta bırakılmaz.** Kenar hedeften ÖNCE
+  yazılıyor ve sınıra takılınca hedef hiç yazılmıyordu: koşu 9'da 1.342 kenarın 10'u grafta
+  olmayan adrese gidiyor, başlık "1.342 hareket" defter "1.332" diyordu (saf katman ucu olmayan
+  kenarı şerit yapamıyor). Hedef artık `dugum_siniri` sebebiyle bir SINIR düğümü olarak yazılır ve
+  TARANMAZ. Ölçüldü (maxDugum 8, aynı kök): **8 düğüm / 23 kenar / 5 ucu boşta → 11 düğüm / 23
+  kenar / 0 ucu boşta.** Kenar sayısı değişmedi — hareket uydurulmadı, eksik UÇ yazıldı. **Düğüm
+  bütçesi TARANAN düğümü sınırlar**; sınır düğümleri ona ek gelir ve sebep sayımında görünür.
 - **Sıçrama/düğüm/dallanma bütçesi EKRANDAN gelir** (`esikleriDogrula`, saf ve
   testli, sunucuda da koşar). Sınırlar GENİŞ (hop 1–50, düğüm 1–10.000) ve amaç
   makineyi korumak değil anlamsız girdiyi kapıda tutmak. **Hatalı değer sessizce

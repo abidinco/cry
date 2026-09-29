@@ -346,14 +346,7 @@ async function yuru(y: Yuruyus): Promise<{ iptal: boolean; kalan: number }> {
       }
 
       const guncel = await dugumBilgisi(zincir, dugum.adres);
-      // Varlık başına ayrı toplam: TRX ile USDT toplanmaz. Tek varlık varsa
-      // düğüme yazılır, birden çok varlık varsa YAZILMAZ — çünkü karşılığı
-      // olmayan bir sayı, okuyanı yanlış bir büyüklüğe inandırır.
-      const varlikToplami = new Map<string, bigint>();
-      for (const g of dugum.girisler) {
-        const pay = (g.tutar * BigInt(Math.round(g.pay * 1e6))) / 1_000_000n;
-        varlikToplami.set(g.varlik, (varlikToplami.get(g.varlik) ?? 0n) + pay);
-      }
+      const varlikToplami = varlikToplamlari(dugum.girisler);
       // Durma ölçütündeki tutar eşiği için: en büyük tek varlık tutarı.
       const izliToplam = [...varlikToplami.values()].reduce(
         (en, v) => (v > en ? v : en),
@@ -395,7 +388,17 @@ async function yuru(y: Yuruyus): Promise<{ iptal: boolean; kalan: number }> {
 
       for (const [hedef, girisler] of hedefler) {
         if (gorulen.has(hedef)) continue; // döngü: aynı düğüm iki kez açılmaz
-        if (gorulen.size >= esikler.maxDugum) break;
+        // Düğüm sınırı: kenar ZATEN yazıldı (para gerçekten çıktı), o yüzden hedef de bir SINIR
+        // düğümü olarak yazılır. Eskiden burada `break` vardı ve kenarın ucu boşta kalıyordu:
+        // koşu 9'da 1.342 kenarın 10'u grafta olmayan bir adrese gidiyordu, başlık "1.342 hareket"
+        // defter "1.332 hareket" diyordu ve fark hiçbir yerde açıklanmıyordu. Sınır düğümü
+        // TARANMAZ; yalnızca "buraya kadar geldik, sebebi budu" der.
+        if (gorulen.size >= esikler.maxDugum) {
+          const sinir = { adres: hedef, hop: dugum.hop + 1, girisler };
+          const etiketler = (await dugumBilgisi(zincir, hedef)).etiketler;
+          await dugumYaz(traceRunId, zincir, sinir, varlikToplamlari(girisler), "dugum_siniri", etiketler);
+          continue;
+        }
         gorulen.add(hedef);
         sonraki.push({ adres: hedef, hop: dugum.hop + 1, girisler });
       }
@@ -538,6 +541,19 @@ async function hareketleriOku(zincir: string, adres: string): Promise<Hareket[]>
 }
 
 /* ---------------- yazma ---------------- */
+
+/**
+ * Varlık başına ayrı toplam: TRX ile USDT toplanmaz. Tek varlık varsa düğüme yazılır, birden
+ * çoksa YAZILMAZ — karşılığı olmayan bir sayı okuyanı yanlış bir büyüklüğe inandırır.
+ */
+function varlikToplamlari(girisler: readonly IzliGiris[]): Map<string, bigint> {
+  const toplam = new Map<string, bigint>();
+  for (const g of girisler) {
+    const pay = (g.tutar * BigInt(Math.round(g.pay * 1e6))) / 1_000_000n;
+    toplam.set(g.varlik, (toplam.get(g.varlik) ?? 0n) + pay);
+  }
+  return toplam;
+}
 
 async function dugumYaz(
   traceRunId: bigint,
