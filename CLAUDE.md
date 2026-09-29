@@ -57,7 +57,11 @@ Karara bağlanan madde bekleyenlerden **silinir**, kuralı buraya yazılır.
 - **Canlı yığında betik:** worker konteynerine kopyala ve orada koş
   (`docker cp x.mts cry-worker:/app/apps/worker/ && docker exec -w /app/apps/worker cry-worker npx tsx x.mts`),
   sonra sil. Git Bash yolu çeviriyor: önce `export MSYS_NO_PATHCONV=1`.
-  Konteynerde `curl` yok, `node -e` ile `fetch` kullan.
+  Konteynerde `curl` yok, `node -e` ile `fetch` kullan. **`MSYS_NO_PATHCONV=1` KAYNAK yolunu da
+  bozar** (`/tmp/x.mjs` yerine `C:\TMP\x.mjs` aranır): betiği depo köküne yazıp GÖRELİ yolla kopyala.
+- **Ölçüm betiği TronGrid'e giderken 429 yer** (kota canlı yığınla paylaşılıyor): tek seferlik
+  ölçümde bile geri çekilmeli — 429'da 2 sn, 4 sn, 6 sn… yoksa "kaynak boş döndü" sanılır ve
+  ölçülmemiş bir şey ölçülmüş gibi yazılır.
 - **İkinci worker SÜRECİ başlatma.** Yeni motor kodunu denemek için
   `takipKos`/`takipDevam`ı bir tsx betiğinden DOĞRUDAN çağır.
 - **Deneme koşusu açıldıysa iş bitince SİL** (`delete from trace_runs …`).
