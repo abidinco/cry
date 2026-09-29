@@ -70,7 +70,14 @@ export class TronAdapter implements ChainAdapter {
   readonly family = "tron" as const;
   readonly nativeAsset = TRX;
   readonly capabilities: Capabilities = {
-    internalTransfers: true,
+    // ÖLÇÜLDÜ (2026-09-29) ve bayrak DÜŞÜRÜLDÜ. İç transfer zincirde VAR: üç ardışık blokta
+    // 1.275 işlemin 7'si `internal_transactions` taşıyor (`gettransactioninfobyblocknum`,
+    // `callValueInfo` ile TRX tutarı dahil). Ama `listTransfers`in okuduğu HESAP ucu onları
+    // vermiyor: bir iç transferin alıcısı (`TE3yWdhDMudnhRqKw9a7JD8b97zqk3dZdj`) o uçta 3 kayıt
+    // döndürüyor ve iç transferi taşıyan işlem ARALARINDA YOK; 3 kaydın 3'ünde de alan BOŞ.
+    // Alan her kayıtta MEVCUT ama hiç dolmuyor — "kaynağın ŞEKLİ doğru diye içeriği tam değildir".
+    // Bayrağı true bırakmak, bakılmamış bir yeri kapsanmış gösterirdi.
+    internalTransfers: false,
     tokenTransfers: true,
     activation: true,
     utxo: false,

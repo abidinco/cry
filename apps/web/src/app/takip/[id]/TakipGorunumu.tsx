@@ -38,6 +38,8 @@ import Akis, { dugumAdi, SERIT_ADI, SERIT_RENK } from "./Akis";
 type Kosu = {
   id: string;
   chain: string;
+  /** Bu zincirde adaptörün GÖREMEDİKLERİ; null ise adaptör yok, yani kapsam BİLİNMİYOR. */
+  gorulemeyenler?: string[] | null;
   rootAddress: string;
   taintRule: string;
   status: string;
@@ -437,6 +439,23 @@ export default function TakipGorunumu({ id }: { id: string }) {
             seciliYol={seciliYol}
             onOdak={setAkisOdak}
           />
+          {/*
+            Grafın SÖYLEMEDİKLERİ, grafın hemen altında: çizilmeyen adres, başka varlıktaki
+            hareket ve zincirin kendi KÖRLÜĞÜ. Sonuncusu bir koşunun eksiği değil, adaptörün
+            eksiğidir ve koşu kusursuz olduğunda da durur — o yüzden ayrı bir satır.
+          */}
+          {kosu.gorulemeyenler === null && (
+            <p className="etiket" style={{ color: "var(--dikkat)", margin: 0 }}>
+              bu zincirin kapsamı BİLİNMİYOR — adaptörü yok, yani &quot;başka para hareket
+              etmedi&quot; denemez
+            </p>
+          )}
+          {kosu.gorulemeyenler && kosu.gorulemeyenler.length > 0 && (
+            <p className="etiket" style={{ color: "var(--dikkat)", margin: 0 }}>
+              bu zincirde görülemeyen: {kosu.gorulemeyenler.join(" · ")} — grafın dışında kalmış
+              olabilir
+            </p>
+          )}
           {(kirpilan > 0 || model.digerVarlikKenari > 0) && (
             // Çizilmeyen kısım SESSİZCE yok sayılmaz.
             <p className="etiket" style={{ color: "var(--dikkat)", margin: 0 }}>

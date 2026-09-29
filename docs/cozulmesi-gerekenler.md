@@ -184,27 +184,33 @@ hiçbir adaptör onu tek başına çözmez.
 
 ---
 
-## 4. `internalTransfers: true` bir İDDİA; karşılığı ölçülmedi
+## 4. ~~`internalTransfers: true` bir İDDİA~~ — ÖLÇÜLDÜ ve bayrak DÜŞÜRÜLDÜ (2026-09-29)
 
-**Ne bozuk:** TRON adaptörü yeteneklerinde `internalTransfers: true` yazıyor
-(`tron.ts:60`), ama ayrıştırıcı yalnızca `TransferContract` ve
-`TransferAssetContract` çözüyor (`tron.ts:294`). Bir sözleşme çağrısının
-İÇİNDE dönen TRX (internal transaction) ayrı bir alanda gelir.
+**Ölçüm 1 — iç transfer zincirde VAR.** Üç ardışık blokta (86.663.672–674) 1.275 işlemin **7'si**
+`internal_transactions` taşıyor; kayıtlar `callValueInfo` ile TRX tutarını da veriyor. Örnek:
+`12dcf922…` → `{caller_address, transferTo_address, callValueInfo:[{callValue:1}]}`.
 
-**Nasıl görülür:** görünmez — eksik hareket "hiç olmamış" gibi durur. Bu
-sınıfın tehlikesi tam olarak budur.
+**Ölçüm 2 — `listTransfers`in okuduğu uç onları VERMİYOR.** O iç transferin alıcısı
+(`TE3yWdhDMudnhRqKw9a7JD8b97zqk3dZdj`) hesap ucunda 3 kayıt döndürüyor ve iç transferi taşıyan
+işlem **aralarında yok**; 3 kaydın 3'ünde de `internal_transactions` alanı BOŞ. Alan her kayıtta
+MEVCUT ama hiç dolmuyor — bu projenin "kaynağın ŞEKLİ doğru diye içeriği tam değildir" kuralının
+bir örneği daha.
 
-**Ölçüm (yapılmadı, komutu bu):**
-```bash
-curl -s -H "TRON-PRO-API-KEY: $TRONGRID_API_KEY" \
-  "https://api.trongrid.io/v1/accounts/<ADRES>/transactions?limit=50" \
-  | grep -c internal_transactions
-```
-Sayı sıfırdan büyükse ya ayrıştırıcı doldurulur ya yetenek bayrağı
-`false` yapılır. **Yeteneği doğrulanmamış bayrak, kapsanmamış bir yeri
-kapsanmış gösterir** (CLAUDE.md → "yok ≠ bakılamadı").
+**Yapılan:** `tron.ts` → `internalTransfers: false`. Bayrağı true bırakmak, bakılmamış bir yeri
+kapsanmış gösterirdi. Testi var (`tests/gorulemeyen.test.ts`) — bayrak sessizce geri açılamaz.
 
----
+**Ayrıca: bayrak artık bir EKRAN tarafından soruluyor.** `gorulemeyenler()` (saf, `@cry/chain`)
+körlüğü cümleye çeviriyor, `GET /api/takip/[id]` onu yanıta koyuyor ve takip görünümü grafın
+altında yazıyor. Adaptör yoksa cevap "yok" değil **null = kapsam BİLİNMİYOR**. Ölçüldü:
+`tron → ["sözleşme içi değer hareketleri (internal transfer)"]`, `ethereum · bitcoin · solana → []`.
+Sayfanın 3005'te derlendiği doğrulandı (307 → `/giris`); **oturumlu hâli görülmedi**, çünkü ajan
+parola girmiyor.
+
+**Kalan — bu artık bir İMKÂN:** iç transferler `gettransactioninfobyblocknum` yanıtında geliyor ve
+blok okuyucumuz o yanıtı **zaten her blok için indiriyor**. Yani TRON iç transferlerini blok
+indeksine yazmak yeni bir kaynak değil, yeni bir SÜTUN meselesi — ama şema değişikliği ve okunmuş
+blokların yeniden okunması demek. Bugün yapılmadı; yapılırsa bayrak `blok-indeksli-adaptor` için
+yeniden açılır.
 
 ## 5. Vaka açacak ekran yok
 

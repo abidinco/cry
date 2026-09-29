@@ -18,3 +18,4 @@ export { SolanaAdapter } from "./adapters/solana";
 export { getJson, RateGate } from "./http";
 export { TekrarSayaci } from "./tekrar";
 export { YAKMA_ADRESLERI, yakmaAdresiMi } from "./yakma";
+export { gorulemeyenler } from "./gorulemeyen";

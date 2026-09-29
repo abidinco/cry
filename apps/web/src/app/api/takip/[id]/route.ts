@@ -6,7 +6,22 @@
  */
 import { NextResponse } from "next/server";
 import { prisma } from "@cry/db";
+import { gorulemeyenler, registryFromEnv, type ChainId } from "@cry/chain";
 import { apiOturum } from "@/lib/yetki";
+
+const registry = registryFromEnv();
+
+/**
+ * Bu zincirde NE GÖRÜLEMİYOR. Adaptör yoksa cevap "yok" değil BİLİNMİYOR'dur (null) — bakılmamış
+ * bir yeri temiz göstermemek bu projenin en çok tekrarlanan kuralı.
+ */
+function korluk(zincir: string): string[] | null {
+  try {
+    return gorulemeyenler(registry.get(zincir as ChainId).capabilities);
+  } catch {
+    return null;
+  }
+}
 
 export async function GET(_istek: Request, ctx: { params: Promise<{ id: string }> }) {
   const { yanit: kapi } = await apiOturum();
@@ -40,6 +55,7 @@ export async function GET(_istek: Request, ctx: { params: Promise<{ id: string }
     status: kosu.status,
     stopReason: kosu.stopReason,
     stats: kosu.stats,
+    gorulemeyenler: korluk(kosu.chain),
     startedAt: kosu.startedAt,
     finishedAt: kosu.finishedAt,
     vaka: kosu.case,

@@ -416,10 +416,17 @@ yoldan** alıp karşılaştırmaktır.
   **Eski koşular donmuş kayıttır**; yeni etiketin etkisi yeni koşuda görünür.
 - **Etiket görüntüsü kayıt anında DONDURULUR** (`labelSnapshot`); rapor bir anın
   tutanağıdır.
-- **Yetenek bayrağı bir İDDİADIR.** `capabilities.internalTransfers: true` TRON'da
-  bugün karşılıksız (kaynak da vermiyor); EVM'de kaynak **veriyor**
-  (`txlistinternal` ölçüldü) ama adaptör okumuyor. Doğrulanmamış bayrak,
-  bakılmamış bir yeri "kapsandı" gösterir.
+- **Yetenek bayrağı bir İDDİADIR ve ÖLÇÜLDÜ.** TRON'da `internalTransfers` **false'a çekildi**:
+  iç transfer zincirde VAR (üç blokta 1.275 işlemin 7'si, `gettransactioninfobyblocknum` →
+  `internal_transactions` + `callValueInfo`) ama `listTransfers`in okuduğu HESAP ucu vermiyor —
+  alıcı adres o işlemi listesinde HİÇ göstermiyor ve alan her kayıtta MEVCUT ama hep BOŞ. EVM'de
+  kaynak **veriyor** (`txlistinternal` ölçüldü) ama adaptör okumuyor; o bayrak hâlâ iddia.
+- **Bayrak düşürmek yarısı, EKRANDA söyletmek öteki yarısı.** `gorulemeyenler()` (saf, testli)
+  körlüğü cümleye çeviriyor ve takip görünümü grafın altında yazıyor; adaptör yoksa cevap "yok"
+  değil **"kapsam BİLİNMİYOR"**. Listeye yalnızca o zincirde VAR OLUP okuyamadığımız şey girer:
+  `utxo` ve `activation` model farkıdır — Bitcoin'de sözleşme, Ethereum'da "aktive eden" YOKTUR ve
+  onları körlük saymak olmayan bir eksiği varmış gibi gösterirdi. Ölçüldü: tron 1 madde, ethereum ·
+  bitcoin · solana 0.
 - **Boş adaptör SESSİZ kalmaz:** Bitcoin/Solana/EVM `throw` ediyor ve
   `registry.hazirMi()` onları kapıda tutuyor.
 
