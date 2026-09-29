@@ -438,27 +438,28 @@ gerilik 0 → `UNHEALTHY`. Okuyucu kuru koşturuldu, nabız `1790632209804 55` y
 **Kalan:** sinyali GÖREN yok. Unhealthy bir konteyner `docker ps`e bakılmadıkça sessizdir;
 doldurucunun bekçisi gibi bir Telegram nabzı hâlâ yazılmadı (kanal hazır).
 
-## 19. `block_cursors.missing_ranges` bayat: 30 boşluğun 30'u kapanmış, liste budanmıyor
+## 19. ~~`block_cursors.missing_ranges` bayat: kapanan boşluk listeden düşmüyordu~~ — YAPILDI (2026-09-29)
 
-**Ne bozuk:** kayıt 30 tekil boşluk listeliyor (82,3 Mn – 83,3 Mn arası). Otuzunu da kapsam
-tablosuna sordum: **otuzu da okunmuş.** Boşluk doldurucu (`cry-bosluk-doldur`) onları kapatmış ama
-listeden düşmemiş; liste yalnızca `eksikleriGuncelle` ile BÜYÜYOR.
+Liste yalnızca BÜYÜYORDU: `eksikleriGuncelle` yalnızca doldurucudan ve `oku.ts`ten çağrılıyordu,
+boşluk kapatıcı (`cry-bosluk-doldur`) bir boşluğu kapatınca listeden düşürmüyordu. Ölçülmüştü:
+30 kayıtlık listenin otuzu da kapsam tablosunda okunmuş çıkıyordu.
 
-**Ölçüm:**
+Kapatıcı artık her `--uygula` turunda `eksikListesiniGuncelle()` çağırıyor: listedeki her aralık
+kapsama sorulur (10.000 bloktan büyükler ölçülmez — onlar "henüz gelinmemiş geçmiş"tir),
+okunmuş bloklar DÜŞER, bu turun kapatamadıkları sebebiyle KALIR. Tur hiç boşluk BULMASA da
+koşar: bayat kayıtlar cephenin altında, yani betiğin hiç dokunmadığı bölgede kalabiliyor.
+
+**Ölçüldü (2026-09-29, canlı yığın):** tur öncesi liste 5 kayıt
+(`81453718, 81470641, 81482947, 81482950, 81482961`); kapatıcı cephenin üstündeki 3 boşluğu
+kapattı ve liste **5 → 2** oldu — geriye kapsamda gerçekten okunmamış olan iki blok kaldı.
+Yeniden üretim:
 ```bash
-docker exec cry-db psql -tA -U cry -d cry -c   "select string_agg((r->>'bas'), ',') from block_cursors, jsonb_array_elements(missing_ranges) r"
-# cikan listeyi ClickHouse'a sor:
-#   select count(distinct blok) from blok_okundu where blok in (<liste>)
+docker exec cry-db psql -tA -U cry -d cry -c "select jsonb_array_length(missing_ranges) from block_cursors where chain='tron'"
+node --env-file=.env --env-file=apps/web/.env.local --import tsx scripts/blok-indeks-bosluk-doldur.mts --uygula
 ```
-→ 30 kayıt, 30'u kapsamda.
 
-**Zararı bugün SINIRLI ve bunu söylemek önemli:** bu alan hiçbir karar için OKUNMUYOR. Pencere
-(`pencereOku`) kapsam tablosundan hesaplanıyor, `missing_ranges` yalnızca yazılıyor
-(`doldur.ts`, `oku.ts`). Yani motor yanlış cevap vermiyor.
-
-**Yine de düzeltilmeli:** bu kayıt bir İNSANA "30 bilinen boşluğumuz var" diyor ve bu doğru değil.
-Projenin "yok ≠ bakılamadı" kuralının ters yüzü: bakılmış bir yeri bakılmamış göstermek. Bir gün
-bir rapor ya da ekran bu alanı okursa, sessizce eksik bir kapsam iddia eder. Boşluk doldurucu bir
-boşluğu kapattığında listeden DÜŞÜRMELİ; kapatamadıklarını sebebiyle bırakmalı (bu ayrımı zaten
-yapıyor, yalnızca yazmıyor).
-
+**Bilerek yapılmayan:** doldurucuyla yarış kilitlenmedi (ikisi de oku-değiştir-yaz yapıyor, son
+yazan kazanır). Bedeli bir turluk bilgi kaybı ve bu alan **hiçbir karar için okunmuyor** —
+pencere kapsam tablosundan hesaplanıyor. Bir gün bir ekran ya da rapor bu alanı okursa önce
+burası kilitlenmeli. `lastError` ve `lastRunAt` bu betikten EZİLMİYOR: hata yalnızca bu tur bir
+boşluğu kapatamadıysa yazılır, `lastRunAt` kursörün kendi yazımıdır (`canli.ts`).

@@ -202,6 +202,14 @@ Plan ve ölçümler: [docs/yol-haritasi-blok-indeks.md](docs/yol-haritasi-blok-i
 - **Kapatıcı `scripts/blok-indeks-bosluk-doldur.mts`**, görev `cry-bosluk-doldur`
   (04:15). Hiçbir kaynak veremezse boşluk KALIR ve sebebi sayılır — sessizce
   "0 transferli blok" yazmak bakılmamış bloğu bakılmış gösterirdi.
+- **Kapatıcı eksik listesini ÖLÇEREK budar.** `block_cursors.missing_ranges` yalnızca BÜYÜYORDU;
+  kapatıcı boşluğu kapatıp listeden düşürmüyordu (ölçüldü: 30 kayıtlık listenin 30'u da kapsamda
+  okunmuş çıktı). Artık her `--uygula` turunda listedeki her aralık kapsama sorulur, okunmuş
+  bloklar DÜŞER, kapatılamayanlar sebebiyle KALIR — tur hiç boşluk bulmasa da koşar, çünkü bayat
+  kayıtlar cephenin ALTINDA kalabiliyor. Ölçüldü: 5 kayıt → 2. **"Yok ≠ bakılamadı" kuralının ters
+  yüzü de yanlıştır: bakılmış bir yeri bakılmamış göstermek.** Alan bugün hiçbir karar için
+  okunmuyor (pencere kapsamdan gelir), o yüzden doldurucuyla yarışı kilitlenmedi; bir ekran bu
+  alanı okumaya başlarsa önce kilit gelir.
 - **Doldurucunun CEPHESİNE yaklaşılmaz** (`--emniyet` 50.000): cephenin üstünde
   205 bloğun 27'si boşluk göründü, oysa oran yüz binde 3 — onlar uçuştaki bloklar.
 - **Büyük aralık boşluk DEĞİLDİR** (`--enBuyukBosluk` 1000): hiç okunmamış koca

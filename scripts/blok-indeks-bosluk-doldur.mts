@@ -14,7 +14,10 @@
 // Çalıştır (önce KURU, ne yapacağını görün):
 //   node --env-file=.env --env-file=apps/web/.env.local --import tsx scripts/blok-indeks-bosluk-doldur.mts
 //   ... --uygula [--taban=80000000] [--enFazla=500] [--kaynaklar=tronstack,trongrid]
-import { ayarOku, sorgu, bloktanSatirlar } from "@cry/blok-indeks";
+import {
+  ayarOku, sorgu, bloktanSatirlar, eksikAraliklar, eksikleriGuncelle, eksikListesiOku, type Aralik,
+} from "@cry/blok-indeks";
+import { prisma } from "@cry/db";
 import { KAYNAKLAR, TronBlokKaynagi } from "../apps/blok-okuyucu/src/kaynak.ts";
 import { Yazici, ts } from "../apps/blok-okuyucu/src/yazici.ts";
 
@@ -73,11 +76,68 @@ for (const b of bosluklar) {
   for (let n = b.bas; n <= b.son && hedefler.length < EN_FAZLA; n++) hedefler.push(n);
   if (hedefler.length >= EN_FAZLA) break;
 }
+/** Kapatılamayan blokların KENDİSİ ve sebepleri: ikisi de kursörün eksik listesine yazılıyor. */
+const kapanmayanlar: number[] = [];
+const sebepler = new Map<string, number>();
+
+/**
+ * Kursörün eksik listesini ÖLÇEREK günceller: listedeki her aralık kapsam tablosuna sorulur,
+ * okunmuş çıkan bloklar DÜŞER; bu turun bakıp da kapatamadıkları sebebiyle KALIR.
+ *
+ * Neden gerekti: liste bugüne kadar yalnızca BÜYÜYORDU (`eksikleriGuncelle` yalnızca doldurucu ve
+ * `oku.ts` içinden çağrılıyordu). 2026-09-29'da 30 tekil boşluk listeliyordu ve kapsama sorulunca
+ * OTUZU DA okunmuş çıktı. Zararı sınırlıydı — pencere bu alandan değil kapsamdan hesaplanıyor — ama
+ * kayıt bir İNSANA "30 bilinen boşluğumuz var" diyordu ve bu doğru değildi. Projenin
+ * "yok ≠ bakılamadı" kuralının ters yüzü: bakılmış bir yeri bakılmamış göstermek.
+ *
+ * Tur boşluk BULAMASA da koşar: bayat kayıtlar cephenin ALTINDA, yani bu betiğin hiç dokunmadığı
+ * bölgede kalabiliyor. Yalnızca "bu tur ne kapattı" diye bakan bir budama onları göremezdi.
+ *
+ * Doldurucuyla YARIŞIR ve bu bilerek kabul edildi: ikisi de oku-değiştir-yaz yapıyor, kilit yok, son
+ * yazan kazanır. Bedeli bir turluk bilgi kaybıdır ve bu alan HİÇBİR KARAR İÇİN OKUNMUYOR — pencere
+ * kapsam tablosundan hesaplanıyor. Kilit protokolü, yalnızca insana bilgi veren bir alan için
+ * ödenecek bedelden pahalı; bir gün bu alanı okuyan bir ekran yazılırsa önce burası kilitlenmeli.
+ */
+async function eksikListesiniGuncelle(bakilan: Aralik | null) {
+  const kayit = await prisma.blockCursor.findUnique({ where: { chain: "tron" } });
+  const eski = kayit ? eksikListesiOku(kayit.missingRanges) : [];
+  // Büyük aralıklar ölçülmez: onlar "henüz gelinmemiş geçmiş"tir (bkz. EN_BUYUK_BOSLUK), bu betiğin
+  // işi değil ve tek tek blok sormak pahalı. Olduğu gibi kalırlar.
+  const olculebilir = (r: Aralik) => r.son - r.bas + 1 <= 10_000;
+  let liste: Aralik[] = eski.filter((r) => !olculebilir(r));
+  let olculen = 0, dusenBlok = 0;
+  for (const r of eski.filter(olculebilir)) {
+    const okunan = new Set((await tsv(
+      `SELECT DISTINCT blok FROM blok_okundu WHERE blok BETWEEN ${r.bas} AND ${r.son}`,
+    )).map(([b]) => Number(b)));
+    olculen++;
+    dusenBlok += okunan.size;
+    liste.push(...eksikAraliklar(r, okunan));
+  }
+  // Bu turun bakıp da KAPATAMADIKLARI: baktığı aralığın tamamı için son söz bu turunkidir.
+  if (bakilan) liste = eksikleriGuncelle(liste, bakilan, kapanmayanlar.map((n) => ({ bas: n, son: n })));
+
+  // `lastError` yalnızca bu tur bir boşluğu kapatamadıysa yazılır; boşsa DOKUNULMAZ — doldurucunun
+  // yazdığı hatayı silmek, başka bir işin cevabını bu turun ağzından vermek olurdu. `lastRunAt` da
+  // kursörün kendi yazımıdır (canli.ts), bu betik onu sahiplenmez.
+  const sebepMetni = [...sebepler.entries()].sort((x, y) => y[1] - x[1])[0]?.[0] ?? null;
+  await prisma.blockCursor.upsert({
+    where: { chain: "tron" },
+    create: { chain: "tron", missingRanges: liste, lastError: kapanmayanlar.length ? sebepMetni : null },
+    update: { missingRanges: liste, lastError: kapanmayanlar.length ? sebepMetni : undefined },
+  });
+  console.log(
+    `${ts()} eksik listesi: ${eski.length} kayıt → ${liste.length} · ${olculen} kayıt kapsama soruldu, ` +
+    `${dusenBlok} blok okunmuş çıktı · bu turun kapatamadığı ${kapanmayanlar.length} blok listede kalıyor`,
+  );
+}
+
 // `process.exit()` KULLANILMIYOR: ClickHouse istemcisinin açık tutamaçları varken süreç
 // zorla kapanınca libuv "Assertion failed" basıyor ve zamanlanmış görevin günlüğü
 // sağlıklı bir turu hatalı gösteriyor (ölçüldü).
 if (hedefler.length === 0) {
   console.log(`${ts()} kapatılacak boşluk yok`);
+  if (UYGULA) await eksikListesiniGuncelle(null);
 } else {
 console.log(`${ts()} bu turda ${hedefler.length} blok denenecek · ${UYGULA ? "YAZILIYOR" : "KURU (yazılmaz; --uygula)"}`);
 
@@ -91,7 +151,6 @@ const kaynaklar = KAYNAK_ADLARI.map((ad) => {
 const yazici = new Yazici(a, UYGULA, (e) => { console.error(`${ts()} YAZMA HATASI: ${(e as Error).message}`); process.exit(1); });
 
 let kapanan = 0, kapanmayan = 0;
-const sebepler = new Map<string, number>();
 
 for (const no of hedefler) {
   // Kaynaklar SIRAYLA denenir. Bir boşluk çoğu zaman tek bir kaynağın o an cevap verememesinden
@@ -110,7 +169,7 @@ for (const no of hedefler) {
       sebepler.set(m, (sebepler.get(m) ?? 0) + 1);
     }
   }
-  yazildi ? kapanan++ : kapanmayan++;
+  if (yazildi) kapanan++; else { kapanmayan++; kapanmayanlar.push(no); }
   if ((kapanan + kapanmayan) % 50 === 0) console.log(`${ts()} ${kapanan + kapanmayan}/${hedefler.length} · kapanan ${kapanan} · kalan boşluk ${kapanmayan}`);
 }
 
@@ -119,6 +178,8 @@ console.log(`${ts()} bitti: ${kapanan} blok kapatıldı, ${kapanmayan} kapanmad�
 for (const [m, n] of [...sebepler.entries()].sort((x, y) => y[1] - x[1]).slice(0, 8)) console.log(`   ${n}× ${m}`);
 
 if (UYGULA) {
+  await eksikListesiniGuncelle({ bas: Math.min(...hedefler), son: Math.max(...hedefler) });
+
   const [[bas, son]] = (await tsv(`
     SELECT (SELECT max(blok) FROM (
       SELECT blok, lagInFrame(blok) OVER (ORDER BY blok ROWS BETWEEN 1 PRECEDING AND CURRENT ROW) AS onceki
@@ -126,3 +187,7 @@ if (UYGULA) {
   console.log(`${ts()} pencere şimdi ${bas}–${son} (${Number(son) - Number(bas) + 1} blok)`);
 }
 }
+
+// `process.exit()` yok (yukarıdaki gerekçe); ama Prisma'nın açık bağlantısı süreci kapanmaktan
+// alıkoyar, o yüzden elle bırakılır.
+await prisma.$disconnect();
