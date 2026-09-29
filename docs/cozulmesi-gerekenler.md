@@ -84,61 +84,44 @@ BSCTrace) — bir karar, bugün yok.
 
 ---
 
-## 2. EVM adaptörü BOŞ — Ethereum/Polygon yoklanıyor ama taranamıyor
+## 2. ~~EVM adaptörü BOŞ~~ — YAZILDI (2026-09-29)
 
-**Ne bozuk:** `packages/chain/src/adapters/evm.ts` üç yöntemde de
-`throw new Error("EVM adaptörü Faz 1b'de doldurulacak")` diyor. Yoklama
-katmanı Etherscan'i doğrudan çağırdığı için **bir EVM adresinin var olduğunu
-söyleyebiliyoruz ama içine bakamıyoruz.**
+`packages/chain/src/adapters/evm.ts` üç yöntemde de `throw` ediyordu: bir EVM adresinin var
+olduğunu söyleyebiliyor ama içine bakamıyorduk. Adaptör yazıldı, `registry.hazirMi` EVM
+zincirlerini (BSC hariç, anahtar şartıyla) hazır sayıyor ve arayüz zaten `hazirMi`ye soruyordu —
+yani indeksleme düğmesi kendiliğinden açıldı.
 
-**Nasıl görülür:** ETH adresi yapıştır → yoklama "ethereum'da aktif" der →
-adres sayfasında indeksleme başlatılamaz.
+**Ölçüldü (2026-09-29, gerçek Etherscan + canlı Postgres):**
 
-**Ölçüm:** `grep -n "doldurulacak" packages/chain/src/adapters/evm.ts` → 3 satır.
+| soru | sonuç |
+|---|---|
+| özet | `exists=true` · ilk **2015-09-28** · son 2026-09-28 · bakiye ham metin |
+| üç uç da veriyor mu | 3 sayfada 145 hareket: **native 30 · internal 58 · token 57** |
+| sayfalama mükerrer üretiyor mu | 145 hareketin tekili 145, **mükerrer 0** |
+| değer taşımayan kayıt | 29 tanesi atlandı ve SAYILDI |
+| tek işlem okuması | 1 token hareketi, ham tutar + sözleşme (TRON'daki "0 hareket" tuzağı yok) |
+| olmayan işlem | `null` (patlamıyor) |
+| arşive yazma | `adresIndeksle("ethereum", …, { maxSayfa: 2 })` → **4.542 hareket** |
 
-**Engel ANAHTAR DEĞİL; üç uç da bugün çalışıyor (ölçüldü 2026-09-29).**
-`ETHERSCAN_API_KEY` dolu (34 karakter) ve Etherscan V2 üç hesap ucunun
-üçünü de veriyle döndürdü: `txlist`, `tokentx` ve **`txlistinternal`** — hepsi
-`status: "1"`. Yani yazılacak şey bir erişim müzakeresi değil, TRON'daki
-aynı şeklin (sayfalama, imleç, onay süzgeci, ham tam sayı) EVM karşılığını
-yazmak. Ölçümün komutu (ağ erişimi ve anahtar konteynerde):
+Arşivdeki örneklere elle bakıldı: ETH 2.960 · VISH 993 · Endgame 42 · MKR 24 … ("N kayıt yazıldı"
+bir doğrulama değildir).
 
-```bash
-docker exec cry-worker node -e '
-const k = process.env.ETHERSCAN_API_KEY;
-const u = "https://api.etherscan.io/v2/api?chainid=1&module=account" +
-  "&address=0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045&page=1&offset=2&sort=desc&apikey=" + k;
-(async () => { for (const a of ["txlist","tokentx","txlistinternal"]) {
-  const r = await fetch(u + "&action=" + a); console.log(a, r.status, (await r.text()).slice(0,120));
-} })();'
-```
+**Yol boyunca çıkan üç kusur — üçü de kod okuyarak değil KOŞTURULUNCA çıktı:**
 
-**İki tuzak ölçülerek doğrulandı:**
+1. **Gerçek hız sınırı 3/sn, belgelerin dediği 5 değil.** Kaynak bunu HTTP 200 + `result` metni
+   olarak söylüyor, yani `http.ts`in 429 yolu hiç görmüyor. Geri çekilme adaptörün içine alındı
+   ve hata `rateLimited` ile yükseliyor (§12'nin notu doğru çıksın diye).
+2. **`eth_getCode` dolu diye adres sözleşme değil.** vitalik.eth için
+   `0xef01005a7f…` dönüyor: bu bir **EIP-7702 yetki devri**, yani sıradan bir cüzdan. İlk sürüm
+   onu sözleşme saydı; takip motorunda bu, izi olmayan bir duvarda `kontrat` sebebiyle durmak
+   demekti. Karşılaştırma ölçüldü: USDT 22.152 karakter kod, boş adres `0x`.
+3. **Kaynak bazı token'ların metadata'sını okuyamıyor.** `0xd654bdd3…` için `tokenName` ve
+   `tokenSymbol` BOŞ, `tokenDecimal` "1". O "1" ile çevrilen `340000000000000000000` ekrana
+   34 milyar kat yanlış bir büyüklük olarak düşerdi. Artık varlık `?` ve ondalık 0; tutar ham
+   taşınıyor. Arşivde bu hâlde yazılmış 21 kayıt da düzeltildi.
 
-- **Hata HTTP 200 ile gelir ve metni `result` alanında durur.** Anahtarsız aynı
-  çağrı `{"status":"0","message":"NOTOK","result":"Missing/Invalid API Key"}`
-  döndürdü — `!!result` diye bakan bir kontrol bunu "bulundu" sayar. Yoklama
-  katmanında kural zaten var (`etherscanHatasi`, `network-probe.ts`); adaptör
-  doldurulurken **aynı kural orada da uygulanmalı**, çünkü bu projede "bir kural
-  bir yerde uygulanıp kardeşinde unutulabiliyor".
-- **Anahtar depo kökündeki `.env`'de BOŞ** (uzunluk 0); dolu olanlar
-  `C:\srv\cry\.env` ve `apps/web/.env.local`. Yalnızca kök `.env` yükleyen bir
-  betik "Missing/Invalid API Key" alır ve **bunu hata olarak değil 200 olarak**
-  alır. Yerel betik iki dosyayı birden yükler (CLAUDE.md → çalışma ortamı).
-
-**Yeni kapı: `capabilities.internalTransfers: true` EVM'de de bugün İDDİA.**
-TRON'dan farkı var — orada kaynak zaten vermiyor (§4), EVM'de kaynak **veriyor**
-(`txlistinternal` ölçüldü) ama adaptör okumuyor. Adaptör doldurulurken bu uç
-okunmazsa bayrak `false` yapılır; okunursa iki liste birleştirilir ve
-`(chain, txHash, occurrence)` tekilliği ikisini de kapsar.
-
-**Sınır, ölçülmüş olan:** ücretsiz plan **BSC'yi kapsamıyor** (§1b) ve istek
-başına 1.000 kayıt / 5 çağrı sn sınırı var. Sayfalama blok numarasıyla
-olduğu için devam noktası TRON'un fingerprint'inin aksine KALICIDIR.
-
-**Nerede:** `packages/chain/src/adapters/evm.ts`.
-
----
+**Kalan:** `capabilities.internalTransfers: true` EVM'de artık KARŞILIKLI (uç okunuyor). BSC
+kapalı kalıyor ve sebebi §1b'de; onu açmak ücretli bir indeksleyici kararıdır.
 
 ## 3. Bitcoin ve Solana adaptörleri de boş — ama engelleri AYRI cinsten
 

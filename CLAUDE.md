@@ -356,6 +356,30 @@ yoldan** alıp karşılaştırmaktır.
   TRX (`call_value`) ve iç transferler görünmüyor. Ekran bunu yazar. (Aynı
   işlemde `from=0x0, to=0x0` bir Transfer olayı ölçüldü — zincirde gerçekten öyle.)
 
+## EVM adaptörü
+
+- **Ethereum · Polygon · Arbitrum · Optimism · Base · Avalanche AÇIK; BSC DEĞİL.** Ücretsiz plan
+  `chainid=56`yı kapsamıyor ve Blockscout BSC barındırmıyor (ikisi de ölçüldü). `hazirMi` ayrıca
+  ANAHTAR ŞART koşar: anahtarsız Etherscan HTTP 200 ile "Missing/Invalid API Key" döndürüyor ve
+  hazır sayılan bir zincir her adrese "bakıldı, bir şey yok" dedirtirdi.
+- **Etherscan'de üç şey de HTTP 200 ile gelir: hata, "kayıt yok" ve HIZ SINIRI.** Ayıran şey
+  `result`ın TİPİ — metinse hata, diziyse cevap. Hız sınırı metni `rateLimited` ile işaretlenir,
+  yoksa "bekle" denmesi gereken yerde "boşuna deneme" denirdi. Gerçek sınır belgelerin dediği 5
+  değil **3 çağrı/sn** (ölçüldü); geri çekilme adaptörün İÇİNDE, çünkü `http.ts`in 429 yolu
+  HTTP 200'ü hiç görmüyor.
+- **Sayfalama imleci son bloğu VE o blokta verilmiş kayıtları taşır.** `sonBlok + 1` sessiz kayıp,
+  `sonBlok` yerinde sayma olurdu. Ölçüldü: 3 sayfa, 145 hareket, **mükerrer 0**. Sayfanın tamamı
+  tek bloktaysa ilerleyemediğini SÖYLER.
+- **`eth_getCode` boş değil diye adres SÖZLEŞME DEĞİLDİR.** `0xef0100`+20 bayt bir **EIP-7702
+  yetki devri**dir ve o adres sıradan bir cüzdandır (vitalik.eth'te ölçüldü). Sözleşme saymak,
+  izi olmayan bir duvarda `kontrat` sebebiyle durdurup rapora yanlış sebep yazardı.
+- **Kaynağın okuyamadığı token metadata'sı UYDURULMAZ.** `tokenName` ve `tokenSymbol` birlikte
+  boşsa `tokenDecimal` bir ölçüm değil dolgudur (ölçüldü: boş ad/sembol + "1"); varlık `?` olur,
+  ondalık 0'a çekilir ve tutar HAM taşınır. O "1" ile çevrilen tutar 34 milyar kat yanlış bir
+  büyüklük gösterirdi.
+- **Değer taşımayan kayıt hareket DEĞİLDİR ama SAYILIR** (`atlananSifirSayisi`), onay kayıtlarında
+  olduğu gibi. Başarısız işlem kayda GİRER (`success: false`): para hareket etmedi ama niyet bilgidir.
+
 ## Etiket kaynağı
 
 - **TronScan anahtarsız cevap VERMİYOR** (401). "Ücretsiz gelir" bir varsayımdı

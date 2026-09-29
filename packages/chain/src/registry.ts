@@ -21,6 +21,17 @@ const EVM_ZINCIRLERI: ChainId[] = [
   "ethereum", "bsc", "polygon", "arbitrum", "optimism", "base", "avalanche",
 ];
 
+/**
+ * Etherscan'in ÜCRETSİZ planının KAPSAMADIĞI zincirler.
+ *
+ * BSC ölçüldü (2026-09-09): `chainid=56` → "Free API access is not supported for this chain".
+ * Yedek olarak seçilen Blockscout da BSC barındırmıyor (ölçüldü 2026-09-14: 404, zincir
+ * listesinde 56 yok). Yoklama katmanı herkese açık RPC'ye düşüyor ve o yol "var" diyebiliyor,
+ * "yok" DİYEMİYOR. Bu yüzden BSC HAZIR SAYILMAZ: yarım bir adaptör, bakılmamış bir yeri
+ * bakılmış gösterirdi.
+ */
+const UCRETSIZ_KAPSAM_DISI: ChainId[] = ["bsc"];
+
 export class AdapterRegistry {
   private readonly onbellek = new Map<ChainId, ChainAdapter>();
 
@@ -35,9 +46,19 @@ export class AdapterRegistry {
     return adaptor;
   }
 
-  /** Bu zincirde şu an gerçekten veri çekilebiliyor mu (iskelet değil mi). */
+  /**
+   * Bu zincirde şu an gerçekten veri çekilebiliyor mu (iskelet değil mi).
+   *
+   * EVM için ANAHTAR ŞART: anahtarsız Etherscan `{"status":"0","result":"Missing/Invalid API
+   * Key"}` döndürüyor ve bu HTTP 200'dür. Anahtarsız bir adaptörü "hazır" saymak, her adrese
+   * "bakıldı, bir şey yok" dedirtirdi.
+   */
   hazirMi(chain: ChainId): boolean {
-    return chain === "tron";
+    if (chain === "tron") return true;
+    if (EVM_ZINCIRLERI.includes(chain)) {
+      return !UCRETSIZ_KAPSAM_DISI.includes(chain) && Boolean(this.config.etherscanApiKey);
+    }
+    return false;
   }
 
   private uret(chain: ChainId): ChainAdapter {
