@@ -88,7 +88,7 @@ jobs:
             exit 1
           }
 
-      - name: Derle ve ayaga kaldir
+      - name: Derle
         run: |
           # B4 canli uc okuyucusu elle "cry-blok-okuyucu-deneme" adiyla denendi (2026-09-17); servis
           # gelince ikinci bir okuyucu kalmasin. Konteyner yoksa bir sey yapmaz (stderr'e yazan bir
@@ -97,16 +97,29 @@ jobs:
           if ($deneme) { docker rm -f $deneme | Out-Null }
           docker compose build
           if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Migration (yeni konteynerlerden ONCE)
+        run: |
+          # SIRA KURALDIR: migration "compose up"tan ONCE kosar. Tersi denendigi surece sutun
+          # ekleyen her deploy, yeni kodun ayakta olup sutunun HENUZ OLMADIGI bir pencere
+          # birakiyordu; o pencerede Prisma olmayan sutunu secip /api/adres'i dusururdu.
+          #
+          # Bunun bedeli sudur ve bilerek kabul edildi: migration kosarken ESKI konteynerler hala
+          # ayakta ve YENI semaya bakiyorlar. Yani her migration GERIYE UYUMLU olmak zorundadir --
+          # sutun eklemek serbest, sutun silmek/yeniden adlandirmak iki deploya bolunur (once kod
+          # o sutunu birakir, sonraki deploy sutunu dusurur).
+          #
+          # "run --rm worker" bagimliliklari (db, redis) kendisi ayaga kaldirir ve saglikli
+          # olmalarini bekler (compose depends_on). Migration WORKER imajindan kosar: web imaji
+          # standalone cikti tasiyor ve icinde prisma CLI yok.
+          docker compose run --rm worker npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Ayaga kaldir
+        run: |
           docker compose up -d
           if ($LASTEXITCODE -ne 0) { exit 1 }
           docker image prune -f
-
-      - name: Migration
-        run: |
-          # Migration WORKER imajindan kosar: web imaji standalone cikti
-          # tasiyor ve icinde prisma CLI yok.
-          docker compose run --rm worker npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
-          if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Seed
         run: |

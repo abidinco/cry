@@ -296,6 +296,13 @@ yoldan** alıp karşılaştırmaktır.
    reddedince süreç **çıktı üretmeden** exit 1 veriyor. Bypass iş düzeyinde verilir.
 4. **Compose proje adı sabit** (`name: cry`), yoksa ikinci bir proje aynı
    konteyner adlarını isterdi.
+5. **Migration `compose up`tan ÖNCE koşar.** Tersi, sütun ekleyen her deploy'da yeni kodun ayakta
+   olup sütunun HENÜZ OLMADIĞI bir pencere bırakıyordu; orada Prisma olmayan sütunu seçip
+   `/api/adres`i düşürürdü. Bedeli bilerek kabul edildi: migration koşarken **ESKİ konteynerler
+   yeni şemaya bakar**, yani her migration GERİYE UYUMLU olmalı — sütun eklemek serbest, sütun
+   silmek/yeniden adlandırmak İKİ deploy'a bölünür. `run --rm worker` bağımlılıkları kendisi
+   kaldırıp sağlıklı olmalarını bekler ve tek seferlik konteynere ayrı ad verir (`container_name`
+   çakışmaz; dry-run ile ölçüldü).
 
 ## Veri kuralları
 
