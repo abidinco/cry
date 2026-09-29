@@ -318,17 +318,37 @@ böyle bir disk MAKİNEDE TAKILI DEĞİL (bkz. §16).
 **Kapsam dışı:** bu yedek PC'nin Postgres'ini kapsar. Hetzner'daki yığının veritabanı ayrıdır ve
 onun yedeği YOKTUR.
 
-## 12. Hız sınırına takılma kullanıcıya söylenmiyor
+## 12. ~~Hız sınırına takılma kullanıcıya söylenmiyor~~ — YAPILDI (2026-09-29)
 
-**Ne bozuk:** tarama yarıda kalırsa (`index_state = 'kismi'`) sebebin hız
-sınırı mı kaynağın hatası mı olduğu yalnızca worker log'unda.
+`index_state = 'kismi'` sebebi söylemiyordu; sebep yalnızca worker günlüğündeydi ve adres sayfası
+yanına **"devam edecek"** yazıyordu — DOĞRULANMAMIŞ bir vaat, çünkü kimse kendiliğinden devam
+etmiyor.
 
-**Nasıl görülür:** adres sayfası "kısmi" der, kullanıcı ne yapacağını bilmez.
+**Yapılan:** `addresses.index_note` (migration `20260929140000_indeks_notu`) turun neden yarıda
+kaldığını tutuyor: `sayfa_butcesi` · `hiz_siniri` · `kaynak_hatasi` · `adaptor_yok` · `iptal`.
+Yazan `apps/worker/src/indeksle.ts` (hata yakalanır, sebep yazılır, hata YİNE yükselir); kodu
+cümleye çeviren saf katman `@cry/motor` → `indeks-notu.ts`, 15 testle. Biten tur notu SİLER, yoksa
+dün hız sınırına takılmış bir adres bugün tam taransa bile "takıldı" demeye devam ederdi. Adres
+sayfası sebebi yazıyor ve yalnızca işe yarayacağı yerde (`hiz_siniri`, `sayfa_butcesi`)
+"yeniden taranabilir" diyor.
 
-**Nerede:** `IndeksSonucu.atlanmaSebebi` zaten taşınıyor ama kayda
-yazılmıyor; `addresses` tablosuna bir sebep alanı + adres sayfasında satır.
+**Ölçüldü (2026-09-29, canlı Postgres + gerçek TronGrid):**
 
----
+| yol | nasıl zorlandı | kayda yazılan |
+|---|---|---|
+| sayfa bütçesi | `adresIndeksle(..., { maxSayfa: 1 })`, 305 yeni hareket | `kismi` / `sayfa_butcesi` |
+| hız sınırı | gerçek 429 (kota canlı yığınla paylaşılıyor) | `kismi` / `hiz_siniri` |
+
+**Yol boyunca çıkan asıl kusur:** ilk sürüm gerçek 429'a `kaynak_hatasi` yazdı. Sebep,
+`http.ts`in denemeler tükenince `"N denemede alınamadı: <url>"` diye SARMALAMASI ve o
+sarmalayıcının durum kodu TAŞIMAMASIYDI — 429 yalnızca `cause`'ta duruyordu. Yani kullanıcıya
+"bekle, yeniden dene" denmesi gereken yerde "yeniden denemek işe yaramayabilir" denecekti.
+`notaCevir` artık zinciri izliyor ve bunun iki testi var. **Bu kusur kod okuyarak değil,
+koşturulunca çıktı.**
+
+**Ölçülmeyen tek yol:** tur BİTİNCE notun silinmesi uçtan uca görülmedi — TronGrid kotası doygundu
+ve her ikinci tur 429 aldı. Karar saf katmana alındı (`kaydedilecekNot`) ve testli; yazan satır
+tek satır. Bir sonraki tam tarama bunu kendiliğinden gösterecek.
 
 ## 13. ~~Ucu olmayan kenarlar: düğüm sınırında kenar yazılıyor, hedef yazılmıyor~~ — YAPILDI (2026-09-29)
 

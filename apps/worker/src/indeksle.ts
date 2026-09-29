@@ -7,6 +7,7 @@
  */
 import { prisma } from "@cry/db";
 import { registryFromEnv, type ChainAdapter, type ChainId, type Transfer } from "@cry/chain";
+import { kaydedilecekNot, notaCevir, type IndeksNotu } from "@cry/motor";
 import { BlokIndeksliAdaptor } from "./blok-indeksli-adaptor.js";
 
 const registry = registryFromEnv();
@@ -43,6 +44,8 @@ export type IndeksSonucu = {
   /** Transfer sayılmayan onay kayıtları: sessizce atılan kayıt "yoktu" sanılır. */
   atlananOnay?: number;
   atlanmaSebebi?: string;
+  /** Tur yarıda kaldıysa NEDEN: `indeksNotlari.ts`deki kodlardan biri. Bitmiş turda null. */
+  indeksNotu?: IndeksNotu | null;
   /** Hareketler nereden geldi: kendi blok indeksimiz mi, kaynak mı — ve neden. */
   hareketKaynagi?: string;
 };
@@ -60,6 +63,7 @@ export async function adresIndeksle(
       okunanSayfa: 0,
       tamamlandi: false,
       atlanmaSebebi: `${chain} adaptörü henüz doldurulmadı`,
+      indeksNotu: "adaptor_yok",
     };
   }
 
@@ -113,6 +117,11 @@ export async function adresIndeksle(
   const maxSayfa = opts.maxSayfa ?? 50;
   const baslangicTs = kayit.indexedThroughTs?.toISOString() ?? null;
 
+  // Tur yarıda kalırsa SEBEBİ kayda yazılır ve hata yine yükselir. Eskiden sebep yalnızca worker
+  // günlüğündeydi: ekran "kısmi" deyip "devam edecek" diye ekliyordu, oysa kimse devam etmiyordu
+  // ve kullanıcı hız sınırı mı kaynağın hatası mı olduğunu bilemiyordu.
+  let not: IndeksNotu | null = null;
+  try {
   while (sayfa < maxSayfa) {
     const { items, nextCursor } = await adaptor.listTransfers(adres, {
       cursor: imlec,
@@ -136,19 +145,16 @@ export async function adresIndeksle(
     imlec = nextCursor;
     if (!nextCursor) break;
   }
+  // Sayfa bütçesi bitti ama imleç duruyor: adres büyük, devamı VAR ve kimse kendiliğinden gelmiyor.
+  if (imlec !== null) not = "sayfa_butcesi";
+  } catch (hata) {
+    not = notaCevir(hata);
+    await durumuYaz(kayit.id, enSonTs, false, not);
+    throw hata;
+  }
 
   const tamamlandi = imlec === null;
-  await prisma.address.update({
-    where: { id: kayit.id },
-    data: {
-      // İmleç SAKLANMAZ; sonraki tur tarihten devam eder.
-      indexCursor: null,
-      lastIndexedAt: new Date(),
-      // "Şu ana kadar indeksledim" değil, "şu tarihe kadar VERİ gördüm".
-      indexedThroughTs: enSonTs,
-      indexState: tamamlandi ? "tam" : "kismi",
-    },
-  });
+  await durumuYaz(kayit.id, enSonTs, tamamlandi, not);
 
   return {
     address: adres,
@@ -157,6 +163,7 @@ export async function adresIndeksle(
     okunanSayfa: sayfa,
     tamamlandi,
     sonTarih: enSonTs?.toISOString() ?? null,
+    indeksNotu: not,
     atlananOnay:
       "atlananOnaySayisi" in adaptor
         ? (adaptor as { atlananOnaySayisi: number }).atlananOnaySayisi
@@ -167,6 +174,23 @@ export async function adresIndeksle(
         ? `${adaptor.sonKullanim.kaynak} (${adaptor.sonKullanim.sebep})`
         : undefined,
   };
+}
+
+/** Adresin indeks durumunu tek yerden yazar: bitmiş tur da, yarıda kalan tur da buradan geçer. */
+async function durumuYaz(id: bigint, enSonTs: Date | null, tamamlandi: boolean, not: IndeksNotu | null) {
+  await prisma.address.update({
+    where: { id },
+    data: {
+      // İmleç SAKLANMAZ; sonraki tur tarihten devam eder.
+      indexCursor: null,
+      lastIndexedAt: new Date(),
+      // "Şu ana kadar indeksledim" değil, "şu tarihe kadar VERİ gördüm".
+      indexedThroughTs: enSonTs,
+      indexState: tamamlandi ? "tam" : "kismi",
+      // Biten turda not SİLİNİR; kararı saf katman veriyor (testli).
+      indexNote: kaydedilecekNot(tamamlandi, not),
+    },
+  });
 }
 
 /**

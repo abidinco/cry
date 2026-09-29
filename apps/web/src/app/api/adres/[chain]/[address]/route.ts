@@ -68,6 +68,9 @@ export async function GET(_istek: Request, ctx: { params: Promise<{ chain: strin
     biliniyor: Boolean(kayit),
     indexState: kayit?.indexState ?? "bilinmiyor",
     lastIndexedAt: kayit?.lastIndexedAt ?? null,
+    // Tur yarıda kaldıysa SEBEBİ: "kısmi" tek başına "bekleyeyim mi, yeniden mi deneyeyim"
+    // sorusunu cevaplamıyordu ve sebep yalnızca worker günlüğünde kalıyordu.
+    indexNote: kayit?.indexNote ?? null,
     firstSeen: ilk,
     lastSeen: son,
     tarihKaynagi: ilk === null ? null : kaynaktanTarih ? "kaynak" : "indeks",

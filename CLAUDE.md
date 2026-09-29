@@ -305,6 +305,16 @@ yoldan** alıp karşılaştırmaktır.
 - **"Yok" ile "bakılamadı" AYRI cevaplardır.** İkisini aynı kovaya koymak,
   bakılmamış bir yeri temiz gösterir. Bu dosyanın en çok tekrarlanan kuralı.
 - **Her etiket kaynağını, güven skorunu ve doğrulama tarihini taşır.**
+- **Yarıda kalan tarama SEBEBİNİ kayda yazar** (`addresses.index_note`): `sayfa_butcesi` ·
+  `hiz_siniri` · `kaynak_hatasi` · `adaptor_yok` · `iptal`. "kısmi" tek başına "bekleyeyim mi,
+  yeniden mi deneyeyim" sorusunu cevaplamıyordu ve sebep yalnızca worker günlüğündeydi. Biten tur
+  notu SİLER. Ekran artık "devam edecek" DEMEZ — o doğrulanmamış bir vaatti, kimse kendiliğinden
+  devam etmiyor. Sebebi kayıtlı olmayan kısmi tarama da bunu söyler.
+- **Hata sebebi ZİNCİRİN içinde olabilir.** `http.ts` denemeler tükenince
+  `"N denemede alınamadı: <url>"` diye SARMALAR ve o sarmalayıcı durum kodunu TAŞIMAZ; 429
+  yalnızca `cause`'tadır. Ölçüldü (gerçek 429): yalnızca en dıştaki hataya bakan sınıflandırıcı
+  kayda `kaynak_hatasi` yazdı — "bekle" denmesi gereken yerde "boşuna deneme" demiş olurdu.
+  `notaCevir` zinciri izler ve testlidir.
 - **Kaynağın HATASI veri gibi görünebilir.** Etherscan hatayı HTTP 200 ile
   döndürüp mesajı `result` alanına METİN olarak koyuyor (`"Missing/Invalid API
   Key"`, `"Free API access is not supported for this chain"`); `!!result`

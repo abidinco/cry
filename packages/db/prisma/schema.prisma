@@ -113,6 +113,10 @@ model Address {
   lastIndexedAt       DateTime? @map("last_indexed_at")
   /// "boş" ile "bakılmadı" ayrı sorulardır.
   indexState          String    @default("bilinmiyor") @map("index_state") // bilinmiyor|kismi|tam
+  /// Tur NEDEN yarıda kaldı: sayfa_butcesi | hiz_siniri | kaynak_hatasi | adaptor_yok | iptal.
+  /// "kısmi" tek başına sebebi söylemiyordu ve sebep yalnızca worker günlüğünde kalıyordu;
+  /// kullanıcı "bekleyeyim mi, bir daha mı deneyeyim" sorusunu cevaplayamıyordu.
+  indexNote           String?   @map("index_note")
 
   /// TRON: bu hesabı kim aktive etti (aynı kişi kümelemesinin dayanağı).
   activatedByAddress String?   @map("activated_by_address")

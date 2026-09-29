@@ -7,6 +7,7 @@ import { Adres, Bos, Kayit, Rozet, Satir, Tarih, Tutar, type Koken } from "@/com
 import { hareketsizGun, kisaAdres, sayi, tarih } from "@/lib/bicim";
 import BlokIndeksi from "./BlokIndeksi";
 import { butceNotu, esikleriDogrula, SINIRLAR } from "@/lib/kosu-baslatma";
+import { indeksNotuMetni, yenidenDenemeyeDeger } from "@cry/motor";
 
 type Etiket = {
   id: number;
@@ -23,6 +24,8 @@ type Ozet = {
   address: string;
   biliniyor: boolean;
   indexState: string;
+  /** Tur yarıda kaldıysa sebebi; null ise ya bitti ya da sebep kayıtlı değil. */
+  indexNote?: string | null;
   lastIndexedAt: string | null;
   firstSeen: string | null;
   lastSeen: string | null;
@@ -181,6 +184,7 @@ export default function AdresGorunumu({ chain, address }: { chain: string; addre
   const calisiyor = ozet.isDurumu === "bekliyor" || ozet.isDurumu === "calisiyor";
   const bekleme = hareketsizGun(ozet.lastSeen);
   const tk = tarihKokeni(ozet);
+  const notMetni = indeksNotuMetni(ozet.indexState, ozet.indexNote);
 
   return (
     <>
@@ -281,9 +285,16 @@ export default function AdresGorunumu({ chain, address }: { chain: string; addre
         <div className="panel satirlar">
           <Satir ad="indeks">
             <span className="veri">{indeksMetni(ozet)}</span>
-            {ozet.indexState === "kismi" && (
+            {/*
+              Eskiden burada "devam edecek" yazıyordu ve bu DOĞRULANMAMIŞ bir vaatti: kimse
+              kendiliğinden devam etmiyor. Yerine turun neden yarıda kaldığı yazılır; sebep
+              kayıtlı değilse bu da SÖYLENİR — sebepsiz bir "kısmi", eksikliğin sebebini
+              yokmuş gibi gösterirdi.
+            */}
+            {notMetni && (
               <span className="koken-notu" data-koken="supheli">
-                devam edecek
+                {notMetni}
+                {yenidenDenemeyeDeger(ozet.indexNote) && " · yeniden taranabilir"}
               </span>
             )}
           </Satir>
