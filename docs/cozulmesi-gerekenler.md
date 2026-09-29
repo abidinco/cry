@@ -148,14 +148,38 @@ uygulanamaz) ve bu, `listTransfers` doldurmakla bitmez — ikinci bir motor
 ister. CLAUDE.md'deki "atıf kuralı bir SEÇİMDİR ve rapora YAZILIR" kuralı
 burada iki kat önemli: para üstü tahmini de rapora yazılmalı.
 
-**Solana — engel SAHİPLİK çözümlemesi.** SPL token'ları cüzdanda değil
-türetilmiş token hesaplarında (ATA) durur; `jsonParsed` bir transferde
-karşı taraf olarak **token hesabını** verir, cüzdanı değil. Sahibi
-çözülmeden çizilen bir graf, aynı cüzdanı her token'da ayrı bir düğüm
-gösterir. İkinci mesele arşiv derinliği: genel RPC `getFirstAvailableBlock`
-için **0** diyor, ama bu düğümün İDDİASI — eski bir slot'la sınanmadı ve
-genel RPC'lerin eski işlemi reddetmesi bilinen bir durum. Karar verilmeden
-önce ölçülecek: yıllar öncesine ait bir imza `getTransaction` ile geliyor mu.
+**Solana — engel SAHİPLİK çözümlemesi; arşiv derinliği ÖLÇÜLDÜ ve sorun DEĞİL.**
+SPL token'ları cüzdanda değil türetilmiş token hesaplarında (ATA) durur; `jsonParsed` bir
+transferde karşı taraf olarak **token hesabını** verir, cüzdanı değil. Sahibi çözülmeden çizilen
+bir graf, aynı cüzdanı her token'da ayrı bir düğüm gösterir. Engel budur ve bir ÇÖZÜMLEME
+katmanı ister.
+
+Arşiv derinliği şüphesi kapandı (ölçüldü 2026-09-29, `api.mainnet-beta.solana.com`).
+`getFirstAvailableBlock` "0" diyordu ve bu düğümün İDDİASIYDI; eski slot'larla sınandı:
+
+| slot | `getBlockTime` |
+|---|---|
+| 446.668.728 | 2026-09-13 |
+| 300.000.000 | 2024-11-07 |
+| 200.000.000 | 2023-06-17 |
+| 100.000.000 | 2021-10-06 |
+| 50.000.000 | **2020-11-19** |
+| 1.000.000 | yok (boş hata) |
+
+Yani genel RPC 2020 sonuna kadar cevap veriyor; "eski işlemi reddeder" endişesi bu aralıkta
+gerçekleşmedi.
+
+**Ama iki YENİ engel ölçüldü ve ikisi de yazılmadan geçilemez:**
+
+1. **Yoğun adreste geçmiş SAYFALANAMIYOR.** USDC mint'inde `getSignaturesForAddress` ile 3.000
+   imza çekildi ve hepsi **~70 slot** (yaklaşık yarım dakika) içindeydi. Bir borsa ya da mint
+   adresinin geçmişine bu uçla inmek pratikte imkânsız; sıradan cüzdanlarda sorun yok. Kapsamı
+   olan bir çözüm ayrı bir indeksleyici ister.
+2. **`getTransaction` işlem SÜRÜMÜNÜ sormadan cevap vermiyor.** `maxSupportedTransactionVersion`
+   yeterli değilse `Transaction version (1) is not supported by the requesting client` diye HATA
+   veriyor (ölçüldü). İyi haber: sessiz değil. Kötü haber: hatayı yutan bir adaptör o işlemi
+   "hareket yok" diye okur — bu projenin en pahalı kusur sınıfı. Parametre AÇIKÇA verilmeli ve
+   yetmediğinde hata YUKARI taşınmalı.
 
 **Sıra ve gerekçesi:** EVM → Solana → Bitcoin. EVM'de şekil hazır ve kaynak
 ölçülü; Solana bir çözümleme katmanı ekler; Bitcoin bir motor ekler.
