@@ -24,7 +24,29 @@ export type FetchOptions = {
 const VARSAYILAN_TIMEOUT = 20_000;
 const VARSAYILAN_DENEME = 4;
 
-const uyu = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/**
+ * Uyku İPTAL EDİLEBİLİR olmak zorunda. Hız sınırı geri çekilmesi 30 sn'ye, kaynağın `Retry-After`
+ * beyanıyla 60 sn'ye çıkabiliyor; iptal edilemeyen bir uyku, kullanıcının "durdur"unu o kadar
+ * bekletirdi. İptalde beklemeden çözülür; çağıran bayrağa BAKIP hatayı kendisi atar.
+ */
+const uyu = (ms: number, signal?: AbortSignal) =>
+  new Promise<void>((cozumle) => {
+    if (signal?.aborted) return cozumle();
+    const bitir = () => {
+      clearTimeout(zamanlayici);
+      signal?.removeEventListener("abort", bitir);
+      cozumle();
+    };
+    const zamanlayici = setTimeout(bitir, ms);
+    signal?.addEventListener("abort", bitir, { once: true });
+  });
+
+/** Dışarıdan iptal edildiyse atılacak hata: `notaCevir` bunu "iptal" diye okur, hata saymaz. */
+function iptalHatasi(): Error {
+  const e = new Error("iptal edildi");
+  e.name = "AbortError";
+  return e;
+}
 
 /**
  * Beklenecek süre: kaynak `Retry-After` diyorsa ONA uyulur (kaynağın kendi
@@ -64,7 +86,8 @@ export async function getJson<T>(url: string, opts: FetchOptions): Promise<T> {
           status: yanit.status,
           rateLimited: true,
         });
-        await uyu(bekleme(deneme, yanit.headers.get("retry-after")));
+        await uyu(bekleme(deneme, yanit.headers.get("retry-after")), opts.signal);
+        if (opts.signal?.aborted) throw iptalHatasi();
         continue;
       }
 
@@ -82,7 +105,8 @@ export async function getJson<T>(url: string, opts: FetchOptions): Promise<T> {
       if (hata instanceof ChainSourceError && !hata.opts.rateLimited) throw hata;
       if (opts.signal?.aborted) throw hata;
       sonHata = hata;
-      if (deneme < denemeSayisi - 1) await uyu(bekleme(deneme, null));
+      if (deneme < denemeSayisi - 1) await uyu(bekleme(deneme, null), opts.signal);
+      if (opts.signal?.aborted) throw iptalHatasi();
     } finally {
       clearTimeout(zamanlayici);
       opts.signal?.removeEventListener("abort", disaridanIptal);

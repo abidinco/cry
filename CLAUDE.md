@@ -535,6 +535,10 @@ Tasarım dili: [docs/arayuz.md](docs/arayuz.md). İmza öğesi **köken oluğu**
     Where-Object { $_.CommandLine -like '*worker*' } |
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
   ```
+- **İptal tarama SIRASINDA yoklanır, adresler arasında değil** (`iptaleDuyarli`): gelen iptal
+  hem HTTP isteğini hem GERİ ÇEKİLME UYKUSUNU keser. `http.ts`in uykusu iptal edilemezdi ve
+  `Retry-After` 60 sn'ye çıkabiliyor — "durdur" o kadar bekliyordu. Ölçüldü (sahte 429,
+  `Retry-After: 30`): **30.000 ms → 81 ms**; test düzeltmesiz koşturulunca DÜŞÜYOR.
 - **Takip koşusu yeniden DENENMEZ** (`attempts: 1`): yarım koşunun düğümleri
   yazılmış oluyor, ikinci deneme üstüne farklı bir grafla gelir.
 

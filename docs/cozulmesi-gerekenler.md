@@ -393,15 +393,26 @@ sınıfıyla DOM düzeyinde yakmak. Önce ölçülmeli (React Profiler).
 
 ---
 
-## 15. Tek bir büyük adres taranırken "durdur" beklemek zorunda
+## 15. ~~Tek bir büyük adres taranırken "durdur" beklemek zorunda~~ — YAPILDI (2026-09-29)
 
-**Ne bozuk:** iptal bayrağı ADRESLER ARASINDA yoklanıyor; bir adresin
-indekslenmesi (en çok 10 sayfa) sürerken iptal o tarama bitene kadar bekler.
+İptal bayrağı yalnızca ADRESLER ARASINDA yoklanıyordu; bir adresin indekslenmesi (en çok 10 sayfa)
+sürerken iptal o tarama bitene kadar bekliyordu. Daha kötüsü: hız sınırına takılmış bir turda
+`http.ts` geri çekilme uykusuna giriyor ve o uyku İPTAL EDİLEMİYORDU — `Retry-After` 60 sn'ye
+kadar çıkabilir.
 
-**Nerede:** `apps/worker/src/indeksle.ts` sayfa döngüsüne iptal kontrolü
-(koşu kimliği parametre olarak) — ya da kabul: en kötü durum birkaç dakika.
+**Yapılan:** `apps/worker/src/takip.ts` → `iptaleDuyarli()` taramayı bir `AbortSignal` ile
+koşturuyor ve bayrağı saniyede bir yokluyor; `packages/chain/src/http.ts` → `uyu()` artık iptal
+edilebilir, uykudan çıkınca bayrağa bakılıp `AbortError` atılıyor. Bu hata `notaCevir`de zaten
+`iptal` notuna karşılık geliyor (§12), yani durdurulan tarama "kaynak bozuk" diye kaydedilmiyor.
 
----
+**Ölçüldü — belirleyici test (`tests/http-iptal.test.ts`):** sahte kaynak 429 + `Retry-After: 30`
+diyor, iptal 50 ms sonra geliyor. Düzeltmeli: **81 ms**. Düzeltmesiz: test 5 sn'de zaman aşımına
+DÜŞÜYOR (gerçekte 30.000 ms beklerdi). Ölçüt ateşleniyor.
+
+**Canlı koşuda fark ÖLÇÜLEMEDİ ve bunu söylemek gerekiyor:** gerçek bir koşuda iptalden kapanışa
+geçen süre düzeltmesiz 4,5 sn, düzeltmeli 4,0 sn çıktı — yani iptal o turda yavaş bir sayfaya denk
+gelmedi ve aradaki fark ölçüm gürültüsü. Kazanç, iptalin uzun bir istek ya da geri çekilme uykusu
+sırasında geldiği durumda ortaya çıkıyor; belirleyici test tam olarak onu kuruyor.
 
 ## 16. Dış yedek diski TAKILI DEĞİL — yedek 4 gün SESSİZCE alınamadı
 

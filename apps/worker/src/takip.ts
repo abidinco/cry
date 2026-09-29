@@ -68,6 +68,37 @@ async function iptalIstendiMi(traceRunId: bigint): Promise<boolean> {
   return satir[0]?.iptal === true;
 }
 
+/**
+ * Bir taramayı İPTALE DUYARLI koşturur: bayrak tarama SÜRERKEN yoklanır ve gelen iptal, aradaki
+ * HTTP isteğini de geri çekilme uykusunu da keser (`chain/http.ts` → `uyu` iptal edilebilir).
+ *
+ * Eskiden bayrak yalnızca ADRESLER ARASINDA sorulurdu: tek bir büyük adresin 10 sayfası bitene
+ * kadar "durdur" bekliyordu ve hız sınırına takılmış bir turda bu, geri çekilme süresi kadar daha
+ * uzuyordu (`Retry-After` 60 sn'ye kadar). Kullanıcı düğmeye bastıktan sonra geçen süre, düğmenin
+ * ne kadar doğru söylediğinin ölçüsüdür.
+ */
+async function iptaleDuyarli<T>(
+  traceRunId: bigint,
+  is: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  const kontrol = new AbortController();
+  let soruluyor = false;
+  const yoklama = setInterval(() => {
+    // Üst üste binmesin: yavaş bir sorgu ikinci bir sorgu doğurmamalı.
+    if (soruluyor || kontrol.signal.aborted) return;
+    soruluyor = true;
+    iptalIstendiMi(traceRunId)
+      .then((iptal) => { if (iptal) kontrol.abort(); })
+      .catch(() => {}) // Yoklama hatası taramayı DÜŞÜRMEZ; iptal bir sonraki turda yakalanır.
+      .finally(() => { soruluyor = false; });
+  }, ILERLEME_ARALIGI_MS);
+  try {
+    return await is(kontrol.signal);
+  } finally {
+    clearInterval(yoklama);
+  }
+}
+
 /** Başlarken eski bir iptal bayrağı ya da ilerleme kalmışsa silinir. */
 async function durumuTemizle(traceRunId: bigint): Promise<void> {
   await prisma.$executeRaw`
@@ -91,7 +122,8 @@ async function kokuHazirla(traceRunId: bigint, zincir: string, kok: string): Pro
   if (kayit && kayit.indexState !== "bilinmiyor") return;
 
   try {
-    const s = await adresIndeksle(zincir as ChainId, kok, { maxSayfa: 10 });
+    const s = await iptaleDuyarli(traceRunId, (signal) =>
+      adresIndeksle(zincir as ChainId, kok, { maxSayfa: 10, signal }));
     await durumYaz(traceRunId, "kokTaramasi", {
       yeniHareket: s.yeniHareket,
       tamamlandi: s.tamamlandi,
@@ -342,7 +374,8 @@ async function yuru(y: Yuruyus): Promise<{ iptal: boolean; kalan: number }> {
       // devamı değil. Taranmamış düğüm KENDİLİĞİNDEN taranır: atlanırsa graf kısa kalır ve
       // "iz burada bitti" sanılır.
       if (!bilgi.indekslendiMi && !yakmaAdresiMi(dugum.adres) && gorulen.size <= esikler.maxDugum) {
-        await adresIndeksle(zincir as ChainId, dugum.adres, { maxSayfa: 10 }).catch(() => {});
+        await iptaleDuyarli(traceRunId, (signal) =>
+          adresIndeksle(zincir as ChainId, dugum.adres, { maxSayfa: 10, signal })).catch(() => {});
       }
 
       const guncel = await dugumBilgisi(zincir, dugum.adres);
