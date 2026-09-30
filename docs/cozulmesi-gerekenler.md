@@ -306,10 +306,13 @@ ikinci kez bakılmasın diye yazıldı.
 **Kur tarafı TAM. Fiyat tarafı yapısal olarak eksik ve bu bir KARAR değil, bir
 KAYNAK sınırı.**
 
-| | kapsam | sebep |
+| | soruldu | sonuç |
 |---|---|---|
-| USD/TRY (TCMB) | arşivin **2.842 gününün tamamı** soruldu | ücretsiz, anahtarsız, 2005'e kadar geçmişli |
-| token→USD (CoinGecko) | 12.987 çiftin **988'i** | ücretsiz katman 365 günden eskisini VERMİYOR |
+| USD/TRY (TCMB) | arşivin **2.842 gününün tamamı** | **1.963 kur** · 879 "yayınlanmadı" · **0 hata** |
+| token→USD (CoinGecko) | 12.987 çiftin **988'i** | **684 fiyat** · 301 kaynakta yok · 12.000 aralık dışı |
+
+Yani kur tarafı **%100**, fiyat tarafı **%5,3** (684/12.987). Aradaki fark
+CoinGecko'nun ücretsiz katmanının 365 günlük penceresi.
 
 **Ölçüm (2026-09-30):**
 ```bash
@@ -340,6 +343,19 @@ docker exec cry-db psql -U cry -d cry -c \
    kalırdı. Kuru koşu bunu göstermedi — sayı doğruydu, EKSİK olan şey listenin
    kendisiydi.
 
+**Beşinci tuzak, ilk gerçek turda çıktı:** 978 çiftin 2'si tek bir geçici
+**Cloudflare 504**'ü yüzünden fiyatsız kaldı — `cgCek` yalnızca 429'da yeniden
+deniyordu. Ölçüt `tekrarDenenir`e çevrildi; geçici bir ağ hatasının bedeli o
+günün fiyatının bir sonraki tura kalması olmamalı.
+
+**Altıncı tuzak, ekran yolu ölçülünce çıktı:** Prisma'nın Decimal'i
+`toString()`te 1e-6 altını ÜSTEL yazıyor (`3.72575e-7`, 400 fiyatın 3'ünde).
+Üstel bir metin ondalık aritmetiğine girmiyor ve 85,5 Mn BTT'lik hareket
+"tutar fiyata çarpılamadı" diyordu — dürüst bir mesaj, ama fiyat gerçekten
+vardı. Aynı tuzağı YAZMA ucunda kapatmıştım, okuma ucunda unutmuştum:
+**bir kural bir yerde uygulanıp kardeşinde unutulabiliyor.** Düzeltmeden
+sonra aynı hareket 1.454,30 ₺ (işlem günü) / 1.560,09 ₺ (bugün) veriyor.
+
 **Kalan — ve hiçbiri kod işi değil:**
 
 - **2015–2025 arası fiyatsız** ve ücretsiz bir yolu yok. Kapatmanın bedeli
@@ -347,8 +363,10 @@ docker exec cry-db psql -U cry -d cry -c \
   (CryptoCompare, Kaiko). **Bir karar, bugün yok.** Rapor bu aralıkta "TL
   karşılığı yok — kaynak 365 günden eskisini vermiyor" diyor; yanlış değil,
   eksik.
-- **Pencere içindeki uzun kuyruk zayıf:** 87 varlığın çoğu CoinGecko'da
-  listelenmemiş. Onlar `kaynakta_yok` alıyor — "fiyatı 0" değil.
+- **Pencere içindeki uzun kuyruk zayıf ve ÖLÇÜLDÜ:** 988 çiftin **301'i**
+  `kaynakta_yok` — TRC10'lar ve CoinGecko'da listelenmemiş token'lar. Bu
+  "fiyatı 0" değil, "kaynak bu varlığı tanımıyor" demek. Hacmin tamamına yakını
+  USDT ve TRX'te ve ikisi de tam fiyatlı.
 - **Kur ile fiyat AYRI şeylerdir ve biri ötekini kurtarmaz.** Kur 2015'e kadar
   tam; ama tokenin o günkü USD fiyatı yoksa TL karşılığı yine çıkmaz.
 

@@ -12,6 +12,7 @@
 
 import { cgDurumu, cgGecmisUrl } from "./coingecko";
 import { tcmbDurumu, tcmbUrl } from "./tcmb";
+import { tekrarDenenir } from "./tipler";
 import type { FiyatYoklamasi, TcmbYoklama } from "./tipler";
 
 const uyu = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -53,8 +54,17 @@ export async function tcmbCek(isoGun: string, kapi: Kapi): Promise<TcmbYoklama> 
 /**
  * CoinGecko: bir coin'in bir günkü fiyatı.
  *
- * 429'da geri çekilir. Geri çekilme burada, `http.ts`te değil: o katman
- * `ChainSourceError` ve `ChainId` istiyor, bu kaynağın ikisi de yok.
+ * **Yeniden deneme ölçütü `tekrarDenenir`dir, "429 mı" DEĞİL.** İlk sürüm
+ * yalnızca hız sınırını tekrarlıyordu ve 978 çiftlik turda 2 tanesi tek bir
+ * geçici **Cloudflare 504**'ü yüzünden fiyatsız kaldı (TRX 2025-12-29 ve
+ * 2026-05-08, ölçüldü). Geçici bir ağ hatasının bedeli, o günün fiyatının
+ * sonraki tura kalması olmamalı.
+ *
+ * İki bekleme ayrı: hız sınırı İSRAR ediyor (6 ardışık çağrının 6'sı 429),
+ * 5xx genellikle bir sonraki denemede geçiyor.
+ *
+ * Geri çekilme burada, `http.ts`te değil: o katman `ChainSourceError` ve
+ * `ChainId` istiyor, bu kaynağın ikisi de yok.
  */
 export async function cgCek(
   coinId: string,
@@ -71,9 +81,9 @@ export async function cgCek(
     } catch (e) {
       son = { sonuc: "kaynak_hatasi", detay: e instanceof Error ? e.message : String(e) };
     }
-    if (son.sonuc !== "hiz_siniri") return son;
-    // Sınır israr ediyor (ölçüldü): üstel ve uzun bekle.
-    await uyu(Math.min(15_000 * 2 ** d, 120_000) + Math.random() * 500);
+    if (!tekrarDenenir(son.sonuc)) return son;
+    const taban = son.sonuc === "hiz_siniri" ? 15_000 : 3_000;
+    await uyu(Math.min(taban * 2 ** d, 120_000) + Math.random() * 500);
   }
   return son;
 }

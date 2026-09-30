@@ -18,6 +18,28 @@ describe("ondalık aritmetiği", () => {
     expect(ayristir("abc")).toBeNull();
   });
 
+  /**
+   * Prisma'nın Decimal'i `toString()`te 1e-6 ALTINI ÜSTEL yazıyor — 400
+   * fiyatın 3'ünde ölçüldü (`3.72575e-7`). Reddedilince o hareketin TL
+   * karşılığı "tutar fiyata çarpılamadı" diye düşüyordu: doğru davranıştı
+   * ama fiyat GERÇEKTEN vardı. Okuyan taraf `toFixed()` kullanıyor, burası
+   * ikinci kapı.
+   */
+  it("üstel yazımı da ayrıştırır", () => {
+    expect(ayristir("3.72575e-7")).toEqual(ayristir("0.000000372575"));
+    expect(ayristir("6e-7")).toEqual({ deger: 6n, olcek: 7 });
+    expect(ayristir("1.5e3")).toEqual({ deger: 1500n, olcek: 0 });
+    expect(ayristir("1E-2")).toEqual({ deger: 1n, olcek: 2 });
+    expect(ayristir("1e999")).toBeNull();
+  });
+
+  it("üstel bir fiyatla çarpım doğru büyüklüğü verir", () => {
+    // 85.563.825,672474 BTT (18 ondalık) × 3,72575e-7 USD
+    const ham = "85563825672474000000000000";
+    expect(carp(ham, 18, "3.72575e-7", 6)).toBe(carp(ham, 18, "0.000000372575", 6));
+    expect(carp(ham, 18, "3.72575e-7", 6)).toBe("31.878942");
+  });
+
   it("ölçek küçültürken yarıyı YUKARI yuvarlar", () => {
     expect(metne(olcekle(1235n, 3, 2), 2)).toBe("1.24");
     expect(metne(olcekle(1234n, 3, 2), 2)).toBe("1.23");

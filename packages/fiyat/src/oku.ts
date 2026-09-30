@@ -48,7 +48,9 @@ export async function kurAl(isoGun: string): Promise<KurCevabi> {
     where: { date: { lte: gun(isoGun), gte: alt } },
     orderBy: { date: "desc" },
   });
-  if (satir) return { kur: satir.usdTry.toString(), kurTarihi: iso(satir.date) };
+  // `toFixed()`, `toString()` DEĞİL: Decimal 1e-6 altını ÜSTEL yazıyor
+  // (ölçüldü: "3.72575e-7") ve üstel bir metin ondalık aritmetiğine girmez.
+  if (satir) return { kur: satir.usdTry.toFixed(), kurTarihi: iso(satir.date) };
 
   const yoklandi = await prisma.fxLookup.count({
     where: { date: { lte: gun(isoGun), gte: alt } },
@@ -74,7 +76,7 @@ export async function fiyatAl(assetId: number, isoGun: string): Promise<FiyatCev
   const satir = await prisma.priceDaily.findUnique({
     where: { assetId_date: { assetId, date: gun(isoGun) } },
   });
-  if (satir) return { usd: satir.usd.toString() };
+  if (satir) return { usd: satir.usd.toFixed() };
 
   const yoklama = await prisma.priceLookup.findUnique({
     where: { assetId_date: { assetId, date: gun(isoGun) } },

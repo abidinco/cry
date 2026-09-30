@@ -6,9 +6,29 @@
  * çarpmak tam da o uğrama anıdır; o yüzden çarpma da bölme de BigInt üstünde.
  */
 
-/** Ondalıklı bir metni (ör. "48.9131") tam sayı + ölçek çiftine ayır. */
+/**
+ * Ondalıklı bir metni (ör. "48.9131") tam sayı + ölçek çiftine ayır.
+ *
+ * ÜSTEL yazımı da kabul eder ve bu bir savunma değil bir ÖLÇÜM: Prisma'nın
+ * Decimal'i `toString()`te 1e-6 altını üstel veriyor (`3.72575e-7`, 400
+ * fiyatın 3'ünde ölçüldü) ve reddedilince o hareketin TL karşılığı "tutar
+ * fiyata çarpılamadı" diye düşüyordu. Okuyan taraf artık `toFixed()`
+ * kullanıyor; burası ikinci kapı, çünkü bu kural bir yerde uygulanıp
+ * kardeşinde unutulabiliyor.
+ */
 export function ayristir(metin: string): { deger: bigint; olcek: number } | null {
   const t = metin.trim();
+  const ustel = t.match(/^(-?\d+(?:\.\d+)?)[eE]([+-]?\d+)$/);
+  if (ustel?.[1] && ustel[2]) {
+    const taban = ayristir(ustel[1]);
+    if (!taban) return null;
+    const us = Number(ustel[2]);
+    if (!Number.isSafeInteger(us) || Math.abs(us) > 100) return null;
+    // Ölçek = tabanın ölçeği - üs. Negatif üs ölçeği BÜYÜTÜR.
+    const olcek = taban.olcek - us;
+    if (olcek >= 0) return { deger: taban.deger, olcek };
+    return { deger: taban.deger * 10n ** BigInt(-olcek), olcek: 0 };
+  }
   if (!/^-?\d+(\.\d+)?$/.test(t)) return null;
   const eksi = t.startsWith("-");
   const [tam, kesir = ""] = (eksi ? t.slice(1) : t).split(".");

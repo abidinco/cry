@@ -290,16 +290,25 @@ Doldurucu `packages/fiyat` (`--kaynak=tcmb|coingecko`, varsayılan KURU koşu).
   token'ın fiyatı yok" diye okumaktı. Arşivin 12.900 (varlık, gün) çiftinin
   **11.999'u** bu yüzden `aralik_disi` — ağa hiç gidilmeden, sebebiyle.
 - **CoinGecko'nun hız sınırı dar ve İSRARCI:** 6 ardışık çağrının 6'sı da 429
-  döndü. Kapı 13 sn (~4,6/dk), 429'da geri çekilme 15→120 sn. Her sonuç KALICI
-  yazılır; aynı günü ikinci kez sormanın bedeli yüksek.
+  döndü. Kapı 13 sn (~4,6/dk); 978 çiftlik tur 2s 37dk sürdü ve hız sınırına
+  HİÇ takılmadı. Her sonuç KALICI yazılır; aynı günü ikinci kez sormanın
+  bedeli yüksek.
+- **Yeniden deneme ölçütü "429 mu" DEĞİL, `tekrarDenenir`dir.** İlk sürüm
+  yalnızca hız sınırını tekrarlıyordu ve 978 çiftin 2'si tek bir geçici
+  Cloudflare **504**'ü yüzünden fiyatsız kaldı. Geçici bir ağ hatasının bedeli
+  o günün fiyatının bir sonraki tura kalması olmamalı.
 - **CoinGecko tarih biçimi GG-AA-YYYY, ISO DEĞİL.** `10-01-2025` kaynağa göre
   10 Ocak, ISO okuyan göze göre 1 Ekim; ayın 12'sinden küçük her günde iki
   okuma da "geçerli" görünür ve yanlış günün fiyatı HATASIZ yazılırdı.
 - **1 USDT ≈ 1 USD VARSAYILMAZ, ölçülür** (2026-09-07 için 0,999957). Depeg
   günleri gerçek ve raporda fark eden büyüklükler üretir.
-- **Fiyat üstel yazımla gelebilir** (`3.2e-9`) ve Decimal(38,12) onu kabul
-  etmez. Küçük ondalıklı token fiyatları GERÇEK; üstel yazım ya patlar ya
-  yanlış büyüklük yazar (`fiyatMetni`).
+- **Üstel yazım İKİ uçta da çıkar ve ikisi de ölçüldü.** Yazarken: CoinGecko
+  `3.2e-9` verebiliyor ve Decimal(38,12) onu kabul etmez (`fiyatMetni`).
+  **Okurken: Prisma'nın Decimal'i `toString()`te 1e-6 ALTINI üstel yazıyor**
+  (400 fiyatın 3'ünde, `3.72575e-7`) — okuyan taraf `toFixed()` kullanır.
+  İlk sürüm yalnızca yazma ucunu kapatmıştı ve 85,5 Mn BTT'nin TL karşılığı
+  "tutar fiyata çarpılamadı" diye düşüyordu: dürüst bir mesaj, ama fiyat
+  GERÇEKTEN vardı. `ayristir` ikinci kapı olarak üsteli de kabul eder.
 - **Tutar × fiyat × kur `Number`'a UĞRAMAZ** (`packages/fiyat/src/ondalik.ts`,
   BigInt); ölçek küçültme yarıyı yukarı yuvarlar. 2^256-1 testli.
 - **Bir satırın YOKLUĞU iki şey anlatır**, o yüzden olumsuz yoklamalar ayrı
