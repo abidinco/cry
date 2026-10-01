@@ -38,7 +38,7 @@ export async function GET(_istek: Request, ctx: { params: Promise<{ id: string }
   const kosu = await prisma.traceRun.findUnique({
     where: { id: kosuId },
     include: {
-      case: { select: { slug: true, title: true } },
+      case: { select: { slug: true, title: true, isDraft: true } },
       nodes: { orderBy: [{ hop: "asc" }, { id: "asc" }] },
       edges: { orderBy: [{ hop: "asc" }, { ts: "asc" }] },
     },
@@ -58,6 +58,8 @@ export async function GET(_istek: Request, ctx: { params: Promise<{ id: string }
     gorulemeyenler: korluk(kosu.chain),
     startedAt: kosu.startedAt,
     finishedAt: kosu.finishedAt,
+    // `isDraft`: vaka koşu açılırken otomatik açıldı ve kimse adlandırmadı.
+    // Ekran bunu rapor düğmesinde soruyor — karalamadan rapor alınmaz.
     vaka: kosu.case,
     dugumler: kosu.nodes.map((d) => ({
       address: d.address,

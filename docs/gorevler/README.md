@@ -14,7 +14,7 @@ Her dosya **tek oturumda bitecek** büyüklükte, kendi bitiş ölçütünü ta�
 | E | Etiket tohumlaması (OFAC + aday borsa adresleri) | ✅ bitti (2026-09-09) — 324 etiket; arşivle kesişim 0, bkz. bekleyen §1 |
 | 07 | Takip görünümü: akış (sankey) + tek ekran | ✅ bitti (2026-09-15) — canlıda koşu 9 ile gözle doğrulandı; devam, gizleme, yakıldı, şerit yolu, kaydır/yakınlaştır, ilerleme/durdur |
 | 08 | Deposit sezgiseli + aktivasyon kümelemesi | ⏳ |
-| 09 | Fiyat/kur (TCMB) + rapor + PDF + SHA-256 | ⏳ |
+| 09 | Fiyat/kur (TCMB) + rapor + PDF + SHA-256 | ⏳ fiyat/kur dolduruldu (2026-09-30), rapor MÜHÜRLENDİ (2026-10-01: kanonik JSON + SHA-256, `/rapor/[id]`); **PDF yazılmadı** — bkz. [çözülmesi gerekenler §20](../cozulmesi-gerekenler.md) |
 | 10 | İzleme: takip listesi arayüzü + self-hosted runner kurulumu | ⏳ |
 | 11 | [Yerel blok indeksi (TRON)](../yol-haritasi-blok-indeks.md) — B0 ölçüm → B7 EVM | ⏳ B0+B1+B2 bitti (2026-09-16) — motor ClickHouse; B3 geçmiş geriye doğru doluyor; B4 canlı uç yazıldı ve doğrulandı (2026-09-17), 24 saat ölçütü sürüyor; B5: ince ayna + blok keşfi + adres sayfası bölümü yazıldı (2026-09-17), keşif etiketleri yazılmadı — onay bekliyor |
 

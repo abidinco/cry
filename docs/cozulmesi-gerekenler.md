@@ -582,3 +582,45 @@ yazan kazanır). Bedeli bir turluk bilgi kaybı ve bu alan **hiçbir karar için
 pencere kapsam tablosundan hesaplanıyor. Bir gün bir ekran ya da rapor bu alanı okursa önce
 burası kilitlenmeli. `lastError` ve `lastRunAt` bu betikten EZİLMİYOR: hata yalnızca bu tur bir
 boşluğu kapatamadıysa yazılır, `lastRunAt` kursörün kendi yazımıdır (`canli.ts`).
+
+---
+
+## 20. Rapor MÜHÜRLENDİ, PDF yazılmadı (2026-10-01)
+
+**Ne yapıldı:** koşu artık kanıt paketine çevrilip mühürleniyor. Saf katman
+`packages/rapor` (kanonik JSON + SHA-256 + paket kurulumu, 19 test), toplayıcı
+`apps/web/src/lib/rapor-kaynagi.ts`, uçlar `POST /api/rapor` ·
+`GET /api/rapor/[id]` · `GET /api/rapor/[id]/kanit`, ekran `/rapor/[id]`,
+düğme `/takip/[id]` → "rapor al". Kurallar CLAUDE.md → *Rapor ve mühür*.
+
+**Ölçüldü (2026-10-01, canlı Postgres + gerçek fiyat arşivi, koşu 9):**
+
+```bash
+node --env-file=.env --env-file=apps/web/.env.local --import tsx scripts/rapor-olcum.mts 9
+```
+
+| ne | ölçüm |
+|---|---|
+| paket | 86 düğüm · 1.342 kenar · 805.310 bayt · 197 ms |
+| determinizm | kenarlar ters sırada verilince hash AYNI |
+| `jsonb` turu | yaz-oku sonrası mühür birebir aynı |
+| fiyat | 1.342/1.342 kenar fiyatsız (2019–2022, CoinGecko 365 gün sınırı) → "—" + 2 sebep |
+| fiyatlı gün | 4,5 USDT → **220,04 ₺**, 2026-09-29 bülteni; rapor günü fiyatı yok, sebebi yazılı |
+| kapılar | karalama+adsız → 409 · karalama+adlı → mühür · `calisiyor` → 409 · `durduruldu` → alınabilir + "graf eksik" uyarısı |
+
+**Kalan 1 — PDF.** Kanonik olan kanıt paketi, PDF ondan üretilecek ve kendi
+hash'i `reports.pdf_sha256`'ya yazılacak; sütun ve ekran satırı HAZIR, üretici
+yok. Bedeli bir BAĞIMLILIK: depoda PDF kütüphanesi yok ve Türkçe karakterler
+için gömülü yazı tipi gerekiyor — yani yazı tipi seçimi bir karardır ve seçim
+hash'i değiştirmez (kanonik olan JSON). Bu yüzden ertelendi, gizlenmedi.
+
+**Kalan 2 — sayfayı AJAN GÖRMEDİ.** `/rapor/3` oturum istiyor ve ajan parola
+girmiyor (CLAUDE.md → yerel ortam). Ölçülen şey sayfanın BASTIĞI veri: paket
+yukarıdaki tabloyla, mühür denetimi `jsonb` turuyla. Sayfanın kendisi derleniyor
+(`next build` → `/rapor/[id]` listede) ve istek 500 değil `/giris`e 307 veriyor.
+Gözle bakılacak yer: `/takip/9` → "rapor al", ya da hazır duran `/rapor/3`.
+
+**Kalan 3 — rapora kolon seçimi yok.** `reports.columns` boş dizi olarak
+duruyor; defterin hangi kolonlarının basılacağı henüz seçilemiyor. Bugün bir
+ihtiyaç ÖLÇÜLMEDİ, o yüzden madde burada değil [önerilerde](oneriler.md)
+olmalıydı — buraya yazılması, sütunun varlığının bir vaat gibi okunmaması için.

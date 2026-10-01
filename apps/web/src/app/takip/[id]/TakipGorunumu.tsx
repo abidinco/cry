@@ -34,6 +34,7 @@ import {
   type SeritTuru,
 } from "@/lib/akis";
 import Akis, { dugumAdi, SERIT_ADI, SERIT_RENK } from "./Akis";
+import RaporAl from "./RaporAl";
 
 type Kosu = {
   id: string;
@@ -59,7 +60,7 @@ type Kosu = {
   params: Record<string, unknown> | null;
   startedAt: string;
   finishedAt: string | null;
-  vaka: { slug: string; title: string } | null;
+  vaka: { slug: string; title: string; isDraft?: boolean } | null;
   dugumler: (AkisDugumu & { amountRaw: string | null; isTerminal: boolean })[];
   kenarlar: AkisKenari[];
   error?: string;
@@ -245,6 +246,15 @@ export default function TakipGorunumu({ id }: { id: string }) {
           {durduruluyor ? "durduruluyor…" : "durdur"}
         </button>
       )}
+      {/* Mühür bitmiş ya da DURDURULMUŞ koşudan alınır: durdurulmuş graf eksiktir
+          ve paket bunu uyarı olarak yazar — eksik olduğunu söyleyen bir kanıt
+          alınabilir, eksik olduğunu söylemeyen alınamaz. */}
+      <RaporAl
+        kosuId={kosu.id}
+        karalamaMi={kosu.vaka?.isDraft ?? false}
+        vakaBasligi={kosu.vaka?.title ?? ""}
+        kapali={suruyor}
+      />
       <span
         className="rozet"
         data-ton={

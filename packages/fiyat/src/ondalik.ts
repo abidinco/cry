@@ -77,3 +77,24 @@ export function carpMetin(a: string, b: string, hedefOlcek: number): string | nu
   if (!x || !y) return null;
   return metne(olcekle(x.deger * y.deger, x.olcek + y.olcek, hedefOlcek), hedefOlcek);
 }
+
+/**
+ * Ondalıklı metinlerin toplamı — `Number`'a UĞRAMADAN.
+ *
+ * Rapor "bu koşuda şu kadar ₺ hareket etti" diyebilmek için kenar kenar
+ * hesaplanmış TL tutarlarını topluyor. `parseFloat` ile toplamak, tam da
+ * tutarı ham tam sayı tutma kuralının delindiği yer olurdu: 1.342 kenarın
+ * her birinde kuruş hatası birikir.
+ *
+ * Tek bir parça okunamazsa `null` döner — yarısı toplanmış bir toplam, eksik
+ * olduğunu söylemeyen bir sayıdır.
+ */
+export function toplaMetin(parcalar: string[], hedefOlcek: number): string | null {
+  let toplam = 0n;
+  for (const p of parcalar) {
+    const x = ayristir(p);
+    if (!x) return null;
+    toplam += olcekle(x.deger, x.olcek, hedefOlcek);
+  }
+  return metne(toplam, hedefOlcek);
+}

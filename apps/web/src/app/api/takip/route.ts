@@ -70,7 +70,9 @@ export async function POST(istek: Request) {
   }
 
   // Vaka zorunlu (şema kararı): koşu bir dosyaya ait olmalı ki denetim kaydı
-  // ve rapor bir yere bağlansın. Vaka verilmezse o adres için biri açılır.
+  // ve rapor bir yere bağlansın. Vaka verilmezse o adres için biri açılır ve
+  // bu vaka KARALAMAdır (`isDraft`): adını kimse koymadı. Bedeli rapor
+  // istenince ödenir — karalamadan rapor alınmaz, adlandırma o anda sorulur.
   const vaka = govde.caseId
     ? await prisma.case.findUnique({ where: { id: govde.caseId } })
     : await prisma.case.create({
@@ -78,6 +80,7 @@ export async function POST(istek: Request) {
           slug: `${chain}-${kok.slice(0, 8).toLowerCase()}-${Date.now().toString(36)}`,
           title: govde.vakaBasligi ?? `${kok.slice(0, 10)}… takibi`,
           ownerId: oturum.userId,
+          isDraft: !govde.vakaBasligi,
         },
       });
   if (!vaka) return NextResponse.json({ error: "vaka bulunamadı" }, { status: 404 });

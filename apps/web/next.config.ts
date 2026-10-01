@@ -12,6 +12,7 @@ const config: NextConfig = {
     "@cry/fiyat",
     "@cry/kuyruk",
     "@cry/motor",
+    "@cry/rapor",
   ],
   // Standalone çıktının kökü depo kökü olmalı, apps/web değil (Next 15'te
   // üst düzey seçenek, experimental değil).

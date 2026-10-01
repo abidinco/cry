@@ -325,6 +325,41 @@ Doldurucu `packages/fiyat` (`--kaynak=tcmb|coingecko`, varsayılan KURU koşu).
 - **Rapor tek sayı BASMAZ:** "işlem günü X ₺ (bugün Y ₺)" ve hangi tarihli
   bültenin kullanıldığı satırda durur. `/islem/[chain]/[hash]` bunu gösteriyor.
 
+## Rapor ve mühür
+
+Kanıt paketi: saf katman `packages/rapor`, toplayıcı `apps/web/src/lib/rapor-kaynagi.ts`,
+uçlar `POST /api/rapor` · `GET /api/rapor/[id]` · `/api/rapor/[id]/kanit`, ekran `/rapor/[id]`.
+
+- **Kanonik hash KANIT PAKETİNİN (JSON) hash'idir**, PDF'in değil (kullanıcı kararı).
+  `reports.sha256` kanıt paketinin, `pdf_sha256` PDF'in kendi özeti; tek sütuna iki hash
+  sığdırmak hangi şeyin mühürlendiğini gizlerdi.
+- **Hash ancak serileştirme DETERMİNİSTİKSE bir şey ispatlar.** `JSON.stringify` anahtar
+  sırasını ekleme sırasından alıyor; `kanonikJson` her düzeyde SIRALAR, diziyi SIRALAMAZ
+  (dizideki sıra veridir). Ölçüldü (koşu 9, 86 düğüm / 1.342 kenar, 805.310 bayt, 197 ms):
+  kenarlar ters sırada verilince hash AYNI.
+- **Postgres `jsonb` anahtar sırasını KORUMAZ** — bu yüzden paket her okumada yeniden
+  kanonikleştirilip hash'i kayıtlıyla karşılaştırılır (`muhur.tutuyorMu`) ve ekran bunu basar.
+  Ölçüldü: yaz-oku turundan sonra mühür birebir aynı.
+- **Hash'i basan taraf, hash'i ÜRETTİĞİ metni de verir:** `/api/rapor/[id]/kanit`
+  `NextResponse.json` KULLANMAZ (o nesneyi kendi biçimiyle yeniden yazar ve baytlar
+  ayrılırdı); mühürlenen baytlar olduğu gibi iner, `sha256sum` ile doğrulanabilir.
+  Doğrulanamayan bir mühür, mühür değildir.
+- **Üretim zamanı pakete GİRER**, yani aynı koşudan iki rapor farklı hash alır — rapor bir
+  ANIN tutanağıdır. Determinizm ölçümü o alanı eşitleyerek yapılır.
+- **Yarım koşu mühürlenmez** (kuyrukta/çalışıyor → 409), ama **durdurulmuş koşu ALINABİLİR**
+  ve paket "graf eksik" uyarısını taşır: eksik olduğunu SÖYLEYEN kanıt alınabilir,
+  söylemeyen alınamaz. Dördü de ölçüldü (koşu 12 üstünde, durum geri alındı).
+- **Karalama vakasından rapor alınamaz** (`cases.is_draft`): koşu adsız açtıysa ad rapor
+  istenirken sorulur, verilince bayrak DÜŞER. Ölçüldü: ad yok → 409, ad var → mühür.
+- **TL toplamı fiyatsız kenar varsa ALT SINIRdır** ve kaç kenarın fiyatsız olduğu yanında
+  durur. Ölçüldü (koşu 9): 1.342 kenarın **1.342'si** fiyatsız — kenarlar 2019–2022 ve
+  CoinGecko ücretsiz katmanı 365 günden eskisini vermiyor. Rapor "0 ₺" DEĞİL "—" ve iki
+  sebep yazıyor. Fiyatın olduğu günde yol ateşleniyor (ölçüldü: 4,5 USDT → **220,04 ₺**,
+  2026-09-29 bülteni; aynı kayıtta rapor günü fiyatı yok ve sebebi yazılı).
+- **Eksik sebepleri TARİHSİZ sayılır** (`sebepOzu`, `<gün>`): yoksa 1.342 kenar yüzlerce ayrı
+  satır olur ve "fiyat neden yok" sorusunun cevabı görünmezdi.
+- **Toplam `Number`'a UĞRAMAZ** (`toplaMetin`, BigInt): 1.342 kenarda kuruş hatası birikirdi.
+
 ## Yedek
 
 - **Yedeklenen: yalnızca Postgres** (vaka, koşu, etiket, rapor, denetim kaydı —

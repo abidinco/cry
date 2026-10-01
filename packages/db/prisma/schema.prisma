@@ -265,6 +265,13 @@ model Case {
   owner       User      @relation(fields: [ownerId], references: [id])
   /// Varsayılan private; public yapmak admin onayı ister.
   visibility  String    @default("private")
+  /// KARALAMA vakası: koşu başlatılırken otomatik açıldı, kimse adlandırmadı.
+  ///
+  /// Kullanıcı kararı (CLAUDE.md → Kalan kararlar): nihai amaç "adresi
+  /// yapıştır, diyagramı al" — araya form koymak onu bozuyordu. Bedeli:
+  /// **karalama vakasından RAPOR alınamaz**, çünkü rapor bir DOSYAYA aittir
+  /// ve adlandırma rapor istendiği anda sorulur.
+  isDraft     Boolean   @default(false) @map("is_draft")
   approvedAt  DateTime? @map("approved_at")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
@@ -393,8 +400,14 @@ model Report {
   /// Dondurulmuş graf + kullanılan fiyatlar + metodoloji. Yeniden üretilebilir.
   snapshot Json
   columns  Json   @default("[]")
-  /// PDF'e basılan SHA-256 özeti.
+  /// **Kanonik** özet: kanıt paketinin (JSON) SHA-256'sı.
+  ///
+  /// Kullanıcı kararı: PDF bu paketten ÜRETİLİR ve kendi hash'i ikinci satır
+  /// olarak yazılır. PDF yazı tipine ve kütüphane sürümüne göre bayt bayt
+  /// değişir; dondurulması gereken şey KANITtır, sayfa düzeni değil.
   sha256   String
+  /// Üretilmiş PDF'in kendi SHA-256'sı; PDF henüz üretilmediyse boş.
+  pdfSha256 String? @map("pdf_sha256")
 
   createdById Int?     @map("created_by_id")
   createdAt   DateTime @default(now()) @map("created_at")
