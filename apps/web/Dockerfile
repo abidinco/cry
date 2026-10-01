@@ -23,5 +23,8 @@ ENV PORT=3000
 COPY --from=build /app/apps/web/.next/standalone ./
 COPY --from=build /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=build /app/apps/web/public ./apps/web/public
+# PDF'in gomulu yazi tipleri: yol calisma aninda cozuluyor, Next'in dosya
+# izleyicisi onlari standalone cikti ile tasimiyor. Acikca kopyalanir.
+COPY --from=build /app/packages/rapor/yazi-tipi ./packages/rapor/yazi-tipi
 EXPOSE 3000
 CMD ["node", "apps/web/server.js"]

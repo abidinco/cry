@@ -44,9 +44,9 @@ sonra devam" demek, kullanıcıyı boşuna beklemekten kurtarır.
 Şema hazır (`CaseQuery`), arayüz yok. Analiz sırasında "az önce nereye
 bakmıştım" sorusu sürekli soruluyor.
 
-**7. Rapor PDF'i: sunucu tarafında üret.**
-Tarayıcı yazdırmasına bırakmak, aynı raporun iki farklı makinede farklı
-görünmesi demek. Kanıt dondurma iddiası olan bir çıktıda bu kabul edilemez.
+**7. ~~Rapor PDF'i: sunucu tarafında üret.~~ — YAPILDI (2026-10-01).**
+Gömülü yazı tipiyle sunucuda üretiliyor ve aynı rapor her zaman aynı baytları
+veriyor (ölçüm: [çözülmesi gerekenler, madde 20](cozulmesi-gerekenler.md)).
 
 **8. İdari yargı benzeri "kurum ağacı" yok ama BORSA ağacı gerekecek.**
 Bir borsanın hot wallet'ı, deposit adresleri ve zincir başına ayrı adresleri

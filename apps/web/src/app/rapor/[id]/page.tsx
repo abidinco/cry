@@ -73,10 +73,19 @@ export default async function RaporSayfasi({ params }: { params: Promise<{ id: s
             <code className="veri">{rapor.pdfSha256}</code>
           ) : (
             <span className="m2">
-              PDF henüz üretilmedi. Kanonik olan kanıt paketidir; PDF ondan üretilir ve kendi
-              hash'i bu satıra yazılır.
+              PDF henüz üretilmedi; ilk indirmede üretilir ve hash'i bu satıra YAZILIR. Kanonik
+              olan kanıt paketidir.
             </span>
           )}
+        </Satir>
+        <Satir ad="PDF">
+          <a className="veri" href={`/api/rapor/${rapor.id}/pdf`}>
+            indir (okunur hâli) ▾
+          </a>
+          <span className="m3">
+            {" "}
+            · aynı rapordan her zaman aynı baytlar; üretilen hash kayıttakiyle karşılaştırılır
+          </span>
         </Satir>
         <Satir ad="kanıt paketi">
           <a className="veri" href={`/api/rapor/${rapor.id}/kanit`}>

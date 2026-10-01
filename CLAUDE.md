@@ -360,6 +360,34 @@ uçlar `POST /api/rapor` · `GET /api/rapor/[id]` · `/api/rapor/[id]/kanit`, ek
   satır olur ve "fiyat neden yok" sorusunun cevabı görünmezdi.
 - **Toplam `Number`'a UĞRAMAZ** (`toplaMetin`, BigInt): 1.342 kenarda kuruş hatası birikirdi.
 
+PDF: saf yerleşim `packages/rapor/src/pdf-duzen.ts`, çizici `pdf.ts` (pdf-lib),
+uç `GET /api/rapor/[id]/pdf`.
+
+- **PDF'in de kendi hash'i vardır ve o hash bir TAAHHÜTTÜR** (`reports.pdf_sha256`,
+  ilk indirmede yazılır): aynı rapordan üretilen PDF her zaman aynı baytları vermeli.
+  Bu yüzden üretim zamanı ve dosya kimliği pdf-lib'in varsayılanından değil PAKETTEN
+  gelir (`uretildi`, mührün ilk 32 hanesi). Ölçüldü (rapor 3): iki üretim AYNI sha256;
+  49 sayfa, 421.562 bayt, 611 ms. Sonraki üretim kayıttakiyle karşılaştırılır ve
+  uyuşmazlık başlıkta söylenir (`x-cry-pdf-uyusuyor`).
+- **Yerleşik 14 yazı tipiyle Türkçe rapor BASILAMAZ** (WinAnsi'de `ğ ş İ ı` ve `₺`
+  yok): DejaVu 2.37.3 üç dosya hâlinde depoda (`packages/rapor/yazi-tipi`, serbest
+  lisans, `KAYNAK.md`). Yazı tipi seçimi mührü DEĞİŞTİRMEZ — kanonik olan JSON.
+  **Yazı tipinin kapsamadığı karakter sessizce boş basılmaz:** `?` olur, SAYILIR ve
+  sayı ilk sayfaya yazılır (ölçüldü: gerçek raporda 0 karakter).
+- **Yazı tipi yolu ÜÇ çalışma dizininden çözülür** (depo kökü · `apps/web` · konteynerde
+  `/app`) ve bulunamazsa hata DENENEN yolları sayar. Next'in dosya izleyicisi dinamik
+  yolu taşımıyor: `apps/web/Dockerfile` `yazi-tipi`yi açıkça kopyalar (imajda ölçüldü).
+- **Sayfalamada bölünen blok kuyruğa geri konur; ilerlemeyen bölme SONSUZ DÖNGÜdür.**
+  Sayfa dibine denk gelen tablo kalan 10 pt'ye bölünüyor, parçası da sığmıyor ve blok
+  kendini yeniden bölüyordu: 1.342 hareketli koşuda 20 dakikada bitmedi ve HATA DA
+  VERMEDİ. İki kural: sığmayan blok ÖNCE yeni sayfaya geçer, bölme ancak TAM SAYFAYA
+  sığmadığında yapılır; ve döngünün bir İLERLEME BÜTÇESİ var (aşılırsa hata — takılı
+  süreç, hata veren süreçten pahalıdır; testte 5 ms'de ateşliyor).
+- **PDF defterin TAMAMINI basar; "ve N hareket daha" demez.** Ölçüldü (rapor 3, metin
+  geri çıkarılarak): 1.342 kayıt, 1'den 1.342'ye boşluksuz, 1.342 tekil tx, 49/49
+  sayfada altlık, Türkçe ve `₺` sağlam. **PDF'in doğrulaması metin ÇIKARILARAK yapılır** —
+  "derlendi" bir ölçüm değil.
+
 ## Yedek
 
 - **Yedeklenen: yalnızca Postgres** (vaka, koşu, etiket, rapor, denetim kaydı —

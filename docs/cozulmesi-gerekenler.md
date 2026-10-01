@@ -585,7 +585,7 @@ boşluğu kapatamadıysa yazılır, `lastRunAt` kursörün kendi yazımıdır (`
 
 ---
 
-## 20. Rapor MÜHÜRLENDİ, PDF yazılmadı (2026-10-01)
+## 20. Rapor mühürlendi ve PDF YAZILDI (2026-10-01)
 
 **Ne yapıldı:** koşu artık kanıt paketine çevrilip mühürleniyor. Saf katman
 `packages/rapor` (kanonik JSON + SHA-256 + paket kurulumu, 19 test), toplayıcı
@@ -608,17 +608,36 @@ node --env-file=.env --env-file=apps/web/.env.local --import tsx scripts/rapor-o
 | fiyatlı gün | 4,5 USDT → **220,04 ₺**, 2026-09-29 bülteni; rapor günü fiyatı yok, sebebi yazılı |
 | kapılar | karalama+adsız → 409 · karalama+adlı → mühür · `calisiyor` → 409 · `durduruldu` → alınabilir + "graf eksik" uyarısı |
 
-**Kalan 1 — PDF.** Kanonik olan kanıt paketi, PDF ondan üretilecek ve kendi
-hash'i `reports.pdf_sha256`'ya yazılacak; sütun ve ekran satırı HAZIR, üretici
-yok. Bedeli bir BAĞIMLILIK: depoda PDF kütüphanesi yok ve Türkçe karakterler
-için gömülü yazı tipi gerekiyor — yani yazı tipi seçimi bir karardır ve seçim
-hash'i değiştirmez (kanonik olan JSON). Bu yüzden ertelendi, gizlenmedi.
+**Kalan 1 — PDF: YAPILDI (2026-10-01).** Saf yerleşim
+`packages/rapor/src/pdf-duzen.ts`, çizici `pdf.ts` (pdf-lib + gömülü DejaVu),
+uç `GET /api/rapor/[id]/pdf`, `/rapor/[id]`de indirme satırı. Kurallar
+CLAUDE.md → *Rapor ve mühür*.
 
-**Kalan 2 — sayfayı AJAN GÖRMEDİ.** `/rapor/3` oturum istiyor ve ajan parola
-girmiyor (CLAUDE.md → yerel ortam). Ölçülen şey sayfanın BASTIĞI veri: paket
-yukarıdaki tabloyla, mühür denetimi `jsonb` turuyla. Sayfanın kendisi derleniyor
-(`next build` → `/rapor/[id]` listede) ve istek 500 değil `/giris`e 307 veriyor.
-Gözle bakılacak yer: `/takip/9` → "rapor al", ya da hazır duran `/rapor/3`.
+```bash
+node --env-file=.env --env-file=apps/web/.env.local --import tsx scripts/rapor-pdf-olcum.mts 3
+```
+
+| ne | ölçüm (rapor 3, koşu 9) |
+|---|---|
+| boyut | 49 sayfa · 421.562 bayt · 611 ms (ikinci üretim 532 ms) |
+| determinizm | iki üretim AYNI sha256 (tarihler paketin `uretildi` anından, dosya kimliği mühürden) |
+| defter | 1.342 kayıt, 1→1.342 boşluksuz, 1.342 tekil tx, 49/49 sayfada altlık |
+| yazı tipi | basılamayan karakter **0**; Türkçe ve `₺` metin çıkarılarak doğrulandı |
+| konteyner | `yazi-tipi` imajda `/app/packages/rapor/yazi-tipi`; uç derlendi ve 500 değil `/giris`e 307 veriyor |
+
+Yolda bir SESSİZ TAKILMA bulundu ve kurala bağlandı: sayfa dibine denk gelen
+tablo kendini sonsuza bölüyordu — 1.342 hareketli koşuda 20 dakikada bitmedi,
+hata da vermedi. Artık bölme ancak tam sayfaya sığmayan blok için yapılıyor ve
+döngünün bir ilerleme bütçesi var (regresyon 5 ms'de HATA veriyor).
+
+**Kalan 2 — sayfayı ve ucu AJAN GÖRMEDİ.** `/rapor/3` ve `/api/rapor/3/pdf`
+oturum istiyor, ajan parola girmiyor (CLAUDE.md → yerel ortam). Ölçülen şey
+uçtan önce gelen her şey: paket yukarıdaki tabloyla, mühür denetimi `jsonb`
+turuyla, PDF gerçek rapordan üretilip metni geri çıkarılarak
+(`C:\srv\cry\pdf-olcum-3.pdf`). İkisi de derleniyor ve istek 500 değil `/giris`e
+307 veriyor. `reports.pdf_sha256` yalnızca uç çağrıldığında yazıldığı için
+kayıttaki hash hâlâ BOŞ — ilk indirmede yazılacak. Gözle bakılacak yer:
+`/takip/9` → "rapor al", ya da hazır duran `/rapor/3` → "PDF indir".
 
 **Kalan 3 — rapora kolon seçimi yok.** `reports.columns` boş dizi olarak
 duruyor; defterin hangi kolonlarının basılacağı henüz seçilemiyor. Bugün bir
