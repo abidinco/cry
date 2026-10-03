@@ -71,6 +71,21 @@ export default async function IzlemeSayfasi() {
   // söyler, "bütün hareketler" demez.
   const mesajSayisi = await prisma.alert.count({ where: { path: "mesaj" } });
 
+  // Servisin NABZI: en son bakış damgası. Damga yalnızca uyarı geldiğinde
+  // ilerlerse hareketsiz bir adres hiç bakılmamış gibi görünür ve sessiz bir
+  // kopma fark edilmez — canlı okuyucuda ölçüldü, 45,6 saat geride "healthy".
+  // Servis artık her turda baktığı adresleri bildiriyor; aşağıdaki satır o
+  // bildirimin EKRANDAKİ karşılığı. Yoksa "mesaj gelmedi" iki şeyi birden
+  // anlatır: hareket yok ya da servis bakmıyor.
+  const sonBakis = satirlar
+    .map((s) => s.lastCheckedAt)
+    .filter((t): t is string => Boolean(t))
+    .sort()
+    .at(-1);
+  const gerideDk = sonBakis
+    ? Math.round((Date.now() - new Date(sonBakis).getTime()) / 60000)
+    : null;
+
   return (
     <main className="sayfa">
       <UstBar username={oturum.username} admin={adminMi(oturum)} />
@@ -91,7 +106,17 @@ export default async function IzlemeSayfasi() {
         <p className="veri m3" style={{ fontSize: 12 }}>
           izlenen: {satirlar.filter((s) => s.active).length} aktif / {satirlar.length} kayıt
           {" — "}servisten itilen mesaj: {mesajSayisi}
+          {" — "}
+          {sonBakis
+            ? `servisin son bakışı: ${sonBakis.replace("T", " ").slice(0, 19)} UTC (${gerideDk} dk önce)`
+            : "servis HENÜZ bakmadı — kurulu mu, listeye ulaşabiliyor mu?"}
         </p>
+        {gerideDk !== null && gerideDk > 45 && (
+          <p className="veri" style={{ fontSize: 12, color: "var(--uyari, #b8860b)" }}>
+            Son bakış {gerideDk} dakika önce; periyot 15 dakika. Servis duruyor ya da PC&apos;ye
+            ulaşamıyor olabilir — &laquo;mesaj yok&raquo;u &laquo;hareket yok&raquo; diye okumayın.
+          </p>
+        )}
       </section>
       <IzlemeListesi satirlar={satirlar} />
     </main>

@@ -106,3 +106,25 @@ aksi hâlde arşiv, kendi kaydının kaynağını söyleyemez.
 `probe_cache` doluyor ama sonuç yalnızca arama anında görünüyor. "Bu adres
 başka hangi zincirlerde aktif" sorusu, adres sayfasının kalıcı bir satırı
 olmalı — aynı adres birden çok EVM zincirinde yaşıyor olabilir.
+
+## Sonradan eklenenler (2026-10-04)
+
+**18. Vakaları listeleyen bir ekran.**
+Karalama vakası artık koşu başlatılırken kendiliğinden açılıyor (karar:
+CLAUDE.md → Kalan kararlar) ve adlandırma rapor istenirken soruluyor. Eksik
+olan şey "hangi karalamalar birikti, hangisi adlandırıldı, hangi vakanın kaç
+koşusu var" sorusunu cevaplayan bir sayfa. Bugün bir iş bu yüzden tökezlemedi;
+ölçütü `/etiket` ile aynı — bedeli, bir iş o sayfada tökezlediğinde ödenir.
+
+**19. İzleme eşiği için öneri: adresin kendi geçmişinden bir sayı.**
+Eşik şu an elle yazılıyor ve ilk değer bir tahmin. Ölçüldü (Binance 2, 1 saat):
+`USDT=1000` eşiği 442 hareketin 117'sini mesaja çevirdi — yoğun bir borsa
+cüzdanında bu hâlâ saatte 117 bildirim demek. Adres eklenirken son 7 günün
+hareket dağılımından bir eşik ÖNERMEK (ör. 90. yüzdebirlik) ilk değeri ölçüme
+bağlar. Öneri bir KARAR değildir: yazılan sayı insanın olmalı.
+
+**20. ~~İzlemenin kendi sağlık ölçüsü~~ — aynı turda YAPILDI (2026-10-04).**
+Servis her turda baktığı adresleri bildiriyor, uyarı olmasa da; damga yalnızca
+gerçekten bakılan adrese yazılıyor ve `/izleme` 45 dakikayı geçen sessizlikte
+uyarıyor. Öneri olarak yazıldı, sonra kapatıldı: bir sürecin takılıp takılmadığı
+damgayla değil İLERLEMEYLE ölçülür ve bu projede aynı tuzağa iki denetim düştü.

@@ -219,18 +219,22 @@ indeksine yazmak yeni bir kaynak değil, yeni bir SÜTUN meselesi — ama şema 
 blokların yeniden okunması demek. Bugün yapılmadı; yapılırsa bayrak `blok-indeksli-adaptor` için
 yeniden açılır.
 
-## 5. Vaka açacak ekran yok
+## 5. ~~Vaka açacak ekran yok~~ — KARAR bunu kaldırdı (2026-10-01)
 
-**Ne bozuk:** `TraceRun.caseId` zorunlu, ama `cases` tablosuna satır yazacak
-tek bir arayüz yok. İlk takibi başlatmak için vakayı elle SQL'le açtım.
+Madde "vaka formu yazılacak" diyordu; kullanıcı kararı (CLAUDE.md → Kalan
+kararlar) tersini seçti: **koşu başlatılırken vaka yoksa KARALAMA vakası
+otomatik açılır** (`cases.is_draft`), çünkü nihai amaç "adresi yapıştır,
+diyagramı al" ve araya form koymak onu bozuyordu. Adlandırma, bedelinin
+ödendiği yerde isteniyor: **karalamadan rapor alınamaz** ve `/takip/[id]` →
+"rapor al" adı o anda soruyor (`RaporAl.tsx` → `vakaBasligi`).
 
-**Nasıl görülür:** `POST /api/takip` vakasız çağrıda hata verir; kullanıcı
-kendi başına takip başlatamaz.
+Ölçüldü (§20): karalama + adsız → 409 · karalama + adlı → mühür ve bayrak
+düşer. Yani eksik olan şey bir ekran değildi, bir karardı.
 
-**Ölçüm:** `select count(*) from cases;` → 0. `find apps/web/src/app -name "*vaka*"` → boş.
-
-**Nerede:** yeni `apps/web/src/app/vaka/…`. Görev 09'un (rapor) da girişidir:
-rapor bir vakaya ait olur.
+**Kalan:** vakaları LİSTELEYEN bir ekran hâlâ yok (hangi karalamalar birikti,
+hangisi adlandırıldı). Bugün bir iş bu yüzden tökezlemedi, o yüzden madde
+[önerilere](oneriler.md) ait — buraya yalnızca eski hâli yanlış okunmasın diye
+yazıldı.
 
 ---
 
@@ -293,6 +297,8 @@ node --env-file=.env --env-file=apps/web/.env.local --import tsx scripts/izleme-
 | bildirim ucu | 1 yazıldı · listede olmayan adres **atlandı ve sebebi döndü** · aynı uyarı ikinci kez mükerrer satır AÇMADI |
 | hız sınırı | ikinci tur `allowed_rps(1)`e çarptı → `hiz_siniri`, **kursör ilerletilmedi** |
 | hareketsiz adres | Binance-Hot 1 (son hareket 2026-09-17) → "yeni hareket yok" — bu bir ARIZA değil, doğru cevap |
+| 3 dakikalık pencere | 17 hareket → 6 mesaj / 11 özet (aynı eşikle) |
+| nabız | uyarısız tur **1 adresi** işaretledi, listede olmayanı SAYMADI, damga ilerledi |
 
 **Kalan 1 — deploy:** `deploy-watcher.yml` yalnızca `apps/watcher/**`
 değişince tetikleniyor; bu iş o yolu değiştirdiği için ilk push'ta kendiliğinden

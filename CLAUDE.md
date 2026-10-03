@@ -429,6 +429,13 @@ Servis `apps/watcher` (düz JS, Hetzner, SQLite), saf eşik katmanı
   jetonla): kurulu ama sorulmayan bir servis, `/etiket`ten önceki etiketlerin
   aynısıdır. Uç bir RAPOR kanalıdır — listede olmayan adres yazılmaz, atlanır ve
   sebebi döner; eşik/aktiflik oradan DEĞİŞTİRİLEMEZ.
+- **Tur, UYARI OLMASA DA bildirilir** ("baktım, hareket yok" bir bilgidir) ve
+  damga yalnızca GERÇEKTEN bakılan adrese yazılır — hız sınırına giren adres
+  listeye girmez. Yalnızca uyarıyla ilerleyen bir damga, hareketsiz adresi hiç
+  bakılmamış gösterirdi; canlı okuyucuda bunun tersi ölçüldü (45,6 saat geride
+  "healthy"). Ekran 45 dakikayı geçen sessizlikte UYARIR: "mesaj yok" ile
+  "hareket yok" aynı şey değil. Ölçüldü: uyarısız tur 1 adresi işaretledi,
+  listede olmayanı saymadı, damga ilerledi.
 - **Kapı listesine eklemek YETMEZ**, uç kendi jetonunu sormak zorundadır; ikisi
   ayrı dosyada olduğu için testi ikisini birlikte ateşler (`tests/kapilar.test.ts`).
 - **İzlemek TARAMAK değildir:** izleme için açılan adres `index_state =

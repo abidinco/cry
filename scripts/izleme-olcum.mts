@@ -135,6 +135,36 @@ async function main() {
   });
   satir("aynı uyarı ikinci kez", `HTTP ${tekrar.status} · ${JSON.stringify(await tekrar.json())}`);
 
+  /* --- 4b. Nabız: uyarı OLMASA da "baktım" bildirilebiliyor mu --- */
+  // Damga yalnızca uyarı geldiğinde ilerlerse, hareketsiz bir adres hiç
+  // bakılmamış gibi görünür. Canlı okuyucuda ölçüldü: yalnızca damgaya bakan
+  // denetim 45,6 saat geride "healthy" diyordu.
+  await prisma.watch.update({ where: { id: takip.id }, data: { lastCheckedAt: null } });
+  const nabiz = await fetch(`${TABAN}/api/izleme/bildirim`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-watcher-token": JETON },
+    body: JSON.stringify({
+      alerts: [],
+      tur: {
+        bitti: new Date().toISOString(),
+        bakilanlar: [
+          { chain: "tron", address: ADRES },
+          { chain: "tron", address: "TListedeOlmayanAdres" },
+        ],
+      },
+    }),
+  });
+  const nGovde = (await nabiz.json()) as { bakisIsaretlendi?: number };
+  const nabizdanSonra = await prisma.watch.findUnique({
+    where: { id: takip.id },
+    select: { lastCheckedAt: true },
+  });
+  satir(
+    "nabız (uyarısız tur)",
+    `HTTP ${nabiz.status} · işaretlenen ${nGovde.bakisIsaretlendi} (listede olmayan SAYILMAZ) · ` +
+      `damga ${nabizdanSonra?.lastCheckedAt ? "ilerledi" : "İLERLEMEDİ"}`,
+  );
+
   const kayitli = await prisma.alert.findMany({
     where: { watchId: takip.id },
     select: { txHash: true, movementKey: true, path: true, reason: true, assetSymbol: true },

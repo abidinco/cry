@@ -53,23 +53,36 @@ async function listeyiSenkronla() {
   }
 }
 
-/** Gönderilmiş uyarıları PC'ye geri it: kurulu ama SORULMAYAN servis, olmayan servistir. */
-async function uyarilariIt() {
+/**
+ * Gönderilmiş uyarıları ve TURUN KENDİSİNİ PC'ye geri it.
+ *
+ * İki sebep: (1) kurulu ama SORULMAYAN bir servis, olmayan servistir;
+ * (2) **bir sürecin takılıp takılmadığı damgayla değil İLERLEMEYLE ölçülür** —
+ * uyarı olmadan hiç konuşmayan bir servis, 45 saat sessiz kalsa da ekranda
+ * sağlıklı görünürdü (canlı okuyucuda tam bu yaşandı).
+ *
+ * Uyarı olmasa da itilir: "baktım, hareket yok" bir BİLGİdir. Bakılamayan adres
+ * listeye GİRMEZ — "yok" ile "bakılamadı" ayrı cevaplardır.
+ */
+async function uyarilariIt(tur) {
   const jeton = process.env.WATCHER_TOKEN;
   if (!jeton) return;
   const bekleyen = depo.itilmeyenUyarilar();
-  if (bekleyen.length === 0) return;
+  if (bekleyen.length === 0 && (tur?.bakilanlar?.length ?? 0) === 0) return;
   try {
     const yanit = await fetch(`${PC_TABANI}/api/izleme/bildirim`, {
       method: "POST",
       headers: { "content-type": "application/json", "x-watcher-token": jeton },
-      body: JSON.stringify({ alerts: bekleyen }),
+      body: JSON.stringify({ alerts: bekleyen, tur }),
       signal: AbortSignal.timeout(10000),
     });
     if (!yanit.ok) throw new Error(`durum ${yanit.status}`);
     const govde = await yanit.json();
     depo.itildiYaz(bekleyen);
-    console.log(`↑ ${bekleyen.length} uyarı PC'ye itildi (yazılan ${govde.yazildi ?? "?"})`);
+    console.log(
+      `↑ ${bekleyen.length} uyarı + ${tur?.bakilanlar?.length ?? 0} bakış PC'ye itildi ` +
+        `(yazılan ${govde.yazildi ?? "?"}, bakış ${govde.bakisIsaretlendi ?? "?"})`,
+    );
   } catch (hata) {
     // İtilemeyen uyarı KALIR; bir sonraki turda yeniden denenir.
     console.log(`· uyarılar itilemedi (${hata.message}) — kayıtta bekliyor`);
@@ -182,6 +195,9 @@ async function takibeBak(takip, sayac) {
     ileri,
     okuma.hareketler.at(-1)?.txHash ?? null,
   );
+  // Bu adrese GERÇEKTEN bakıldı: hata alan ya da hız sınırına giren adres
+  // buraya gelmiyor, çünkü onlara bakılamadı.
+  sayac.bakilanlar.push({ chain: takip.chain, address: takip.address });
 }
 
 async function turAt() {
@@ -196,19 +212,32 @@ async function turAt() {
     return;
   }
 
-  const sayac = { mesaj: 0, ozet: 0, gonderilemedi: 0, bakilamadi: 0, sayfa_butcesi: 0 };
+  const basladi = new Date().toISOString();
+  const sayac = {
+    mesaj: 0, ozet: 0, gonderilemedi: 0, bakilamadi: 0, sayfa_butcesi: 0,
+    bakilanlar: [],
+  };
   for (const takip of takipler) {
     if (takip.chain !== "tron") continue; // Faz 1: yalnızca TRON
     await takibeBak(takip, sayac);
   }
   console.log(
     `✓ tur bitti — ${Object.entries(sayac)
-      .filter(([, v]) => v > 0)
-      .map(([k, v]) => `${k}:${v}`)
+      .filter(([k, v]) => (k === "bakilanlar" ? v.length > 0 : v > 0))
+      .map(([k, v]) => `${k}:${k === "bakilanlar" ? v.length : v}`)
       .join(" · ") || "yeni hareket yok"}`,
   );
 
-  if (!KURU) await uyarilariIt();
+  if (!KURU) {
+    await uyarilariIt({
+      basladi,
+      bitti: new Date().toISOString(),
+      bakilanlar: sayac.bakilanlar,
+      mesaj: sayac.mesaj,
+      ozet: sayac.ozet,
+      bakilamadi: sayac.bakilamadi + (sayac.hiz_siniri ?? 0),
+    });
+  }
 }
 
 async function main() {

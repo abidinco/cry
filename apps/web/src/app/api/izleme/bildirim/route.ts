@@ -39,9 +39,17 @@ export async function POST(istek: Request) {
     return NextResponse.json({ error: "yetkisiz" }, { status: 401 });
   }
 
-  const govde = (await istek.json().catch(() => ({}))) as { alerts?: GelenUyari[] };
+  const govde = (await istek.json().catch(() => ({}))) as {
+    alerts?: GelenUyari[];
+    tur?: { bitti?: string; bakilanlar?: { chain?: string; address?: string }[] };
+  };
   const gelenler = Array.isArray(govde.alerts) ? govde.alerts.slice(0, 500) : [];
-  if (gelenler.length === 0) return NextResponse.json({ yazildi: 0, atlanan: 0 });
+  const bakilanlar = Array.isArray(govde.tur?.bakilanlar)
+    ? govde.tur.bakilanlar.slice(0, 1000)
+    : [];
+  if (gelenler.length === 0 && bakilanlar.length === 0) {
+    return NextResponse.json({ yazildi: 0, atlanan: 0, bakisIsaretlendi: 0 });
+  }
 
   // Takipler tek sorguda: uyarı başına gidiş dönüş, 500 kayıtta 500 sorgu olurdu.
   const takipler = await prisma.watch.findMany({
@@ -96,10 +104,32 @@ export async function POST(istek: Request) {
     });
   }
 
+  /* --- Turun kendisi: "baktım, hareket yok" bir BİLGİdir --- */
+  //
+  // Damga yalnızca uyarı geldiğinde ilerlerse, hareketsiz bir adres hiç
+  // bakılmamış gibi görünür ve SESSİZ bir kopma fark edilmez. Canlı okuyucuda
+  // ölçüldü: yalnızca damgaya bakan denetim, 45,6 saat geride "healthy" dedi.
+  //
+  // Bakılamayan adres listeye GİRMEZ (servis onu göndermiyor): "yok" ile
+  // "bakılamadı" ayrı cevaplardır.
+  const bakisId = bakilanlar
+    .map((b) => anahtar.get(`${b.chain}\u0000${b.address}`))
+    .filter((id): id is number => typeof id === "number");
+  const bakisIsaretlendi =
+    bakisId.length === 0
+      ? 0
+      : (
+          await prisma.watch.updateMany({
+            where: { id: { in: bakisId } },
+            data: { lastCheckedAt: ZAMAN(govde.tur?.bitti) ?? new Date() },
+          })
+        ).count;
+
   return NextResponse.json({
     yazildi,
     atlanan: atlananlar.length,
     // Atlananın SEBEBİ söylenir: "0 yazıldı" tek başına arızayı gizler.
     atlananOrnek: atlananlar.slice(0, 5),
+    bakisIsaretlendi,
   });
 }
