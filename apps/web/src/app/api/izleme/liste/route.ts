@@ -4,19 +4,15 @@
  * Oturum çerezi İSTEMEZ (servis bir tarayıcı değil), paylaşılan bir jeton
  * ister. Jeton yoksa uç nokta AÇILMAZ: tanımsız bir sır "kontrol yok"
  * demektir, ve bu liste soruşturma konusu adresleri taşıyor.
+ *
+ * Liste EŞİKLERİ de taşır (kullanıcı kararı: eşik üstü mesaj, küçükler günlük
+ * özete). Eşik servisin yanında DEĞİL burada durur; PC kapalıyken servis
+ * elindeki son kopyayla çalışır, ama eşiği değiştiren insan tek bir yerden
+ * değiştirir.
  */
 import { NextResponse } from "next/server";
-import { timingSafeEqual } from "node:crypto";
 import { prisma } from "@cry/db";
-
-function jetonGecerliMi(gelen: string | null): boolean {
-  const beklenen = process.env.WATCHER_TOKEN;
-  if (!beklenen || !gelen) return false;
-  const a = Buffer.from(gelen);
-  const b = Buffer.from(beklenen);
-  // Uzunluk farkı timingSafeEqual'ı patlatır; önce ayrı kontrol.
-  return a.length === b.length && timingSafeEqual(a, b);
-}
+import { jetonGecerliMi } from "@/lib/izleme";
 
 export async function GET(istek: Request) {
   if (!jetonGecerliMi(istek.headers.get("x-watcher-token"))) {
@@ -30,6 +26,7 @@ export async function GET(istek: Request) {
       label: true,
       lastSeenTxHash: true,
       address: { select: { address: true } },
+      thresholds: { select: { assetSymbol: true, minAmount: true } },
     },
   });
 
@@ -39,6 +36,7 @@ export async function GET(istek: Request) {
       address: t.address.address,
       label: t.label,
       lastSeenTxHash: t.lastSeenTxHash,
+      thresholds: t.thresholds,
     })),
     ts: new Date().toISOString(),
   });

@@ -269,19 +269,41 @@ kapsam dar.
 
 ---
 
-## 8. İzleme servisi hiç deploy edilmedi
+## 8. İzleme: eşik ve arayüz YAZILDI (2026-10-04); kalan tek şey DEPLOY
 
-**Ne bozuk:** `apps/watcher` yazılmış (Dockerfile + kaynak var), ama
-`deploy-watcher.yml` yalnızca `apps/watcher/**` değişince tetikleniyor ve
-**bir kez bile koşmadı**. Sunucuda ayrıca bir kerelik `/srv/cry/.env`
-gerekiyor.
+**Ne yapıldı:** karar (15 dakikada bir · eşik üstü mesaj · küçükler günlük
+özet · eşik varlık ve adres bazında) koda ve ekrana geçti. Saf katman
+`apps/watcher/src/esik.js` + `tron.js` (42 test), döngü `index.js`, ekran
+`/izleme`, uçlar `GET /api/izleme/liste` (eşikleri de taşır) ·
+`POST /api/izleme/bildirim` (servis mesajlarını PC'ye geri iter) ·
+`/api/izleme` + `/api/izleme/[id]`. Şema: `watch_thresholds` tablosu,
+`alerts`e `movement_key`/`path`/`reason`. Kurallar CLAUDE.md → *İzleme*.
 
-**Nasıl görülür:** Telegram kanalı doğrulandı (iki mesaj ulaştı) ama kimse
-bir şey izlemiyor: `watches` tablosu boş.
+**Ölçüldü (2026-10-04, gerçek TronGrid + canlı Postgres):**
 
-**Nerede:** GitHub → Actions → deploy-watcher → **Run workflow** (elle
-tetikleme) + sunucuda `.env`. Sıklık ve eşik karara bağlandı (CLAUDE.md → Kalan kararlar): 15 dakikada bir,
-eşik üstü harekette mesaj, küçükler günlük özete.
+```bash
+node --env-file=.env --env-file=apps/web/.env.local --import tsx scripts/izleme-olcum.mts TQrY8tryqsYVCYS3MFbtffiPp2ccyn4STm
+```
+
+| ne | ölçüm |
+|---|---|
+| eşik ayrımı | Binance 2, 1 saat: 442 hareketin **117 mesaj / 325 özet** (eşik `USDT=1000, *=1`) |
+| eşiksiz hâli | aynı saatte **442** bildirim olurdu |
+| liste ucu | HTTP 200, eşikler `USDT=1000 *=1` servise ulaşıyor; jetonsuz **401** |
+| bildirim ucu | 1 yazıldı · listede olmayan adres **atlandı ve sebebi döndü** · aynı uyarı ikinci kez mükerrer satır AÇMADI |
+| hız sınırı | ikinci tur `allowed_rps(1)`e çarptı → `hiz_siniri`, **kursör ilerletilmedi** |
+| hareketsiz adres | Binance-Hot 1 (son hareket 2026-09-17) → "yeni hareket yok" — bu bir ARIZA değil, doğru cevap |
+
+**Kalan 1 — deploy:** `deploy-watcher.yml` yalnızca `apps/watcher/**`
+değişince tetikleniyor; bu iş o yolu değiştirdiği için ilk push'ta kendiliğinden
+koşacak. Sunucuda bir kerelik `/srv/cry/.env` gerekiyor ve orada
+`WATCHER_POLL_SECONDS` **900** olmalı (PC kopyası güncellendi; eski değer 60'tı
+ve koddaki 900 varsayılanını ezerdi).
+
+**Kalan 2 — ekranı AJAN GÖRMEDİ.** `/izleme` oturum istiyor, ajan parola
+girmiyor (CLAUDE.md → yerel ortam). Ölçülen şey sayfadan önce gelen her şey:
+uçlar yukarıdaki tabloyla, eşik katmanı 42 testle. Gözle bakılacak yer:
+`/izleme` → adres ekle → "eşik".
 
 ---
 
@@ -292,7 +314,10 @@ container'lar ortamı **açılışta** okuyor. Bir sonraki deploy'a kadar
 uygulama içinden Telegram'a mesaj gitmez (elle test edilen yol gitti).
 
 **Nerede:** ilk deploy'da kendiliğinden düzelir; buraya "bozuk mu?" diye
-ikinci kez bakılmasın diye yazıldı.
+ikinci kez bakılmasın diye yazıldı. İlk gerçek mesaj §8'in deploy'undan sonra
+gelir; gelmezse bakılacak yer servisin günlüğündeki
+"⊘ Telegram yapılandırılmamış" satırıdır — o satır varsa sorun ortamda, yoksa
+kaynakta.
 
 ---
 

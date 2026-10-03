@@ -506,10 +506,35 @@ model Watch {
   createdById    Int?      @map("created_by_id")
   createdAt      DateTime  @default(now()) @map("created_at")
 
-  alerts Alert[]
+  alerts     Alert[]
+  thresholds WatchThreshold[]
 
   @@unique([chain, addressId])
   @@map("watches")
+}
+
+/// Bildirim eşiği — **varlık ve adres bazında** (kullanıcı kararı, CLAUDE.md →
+/// Kalan kararlar): eşiği AŞAN hareket anında mesaj olur, altındakiler GÜNLÜK
+/// ÖZETE girer. Eşiksiz bir izleme her tozu mesaja çevirir (ölçüldü: bir adrese
+/// gönderen 3.069 adresin 3.053'ü yalnızca tozdu).
+model WatchThreshold {
+  id      Int   @id @default(autoincrement())
+  watchId Int   @map("watch_id")
+  watch   Watch @relation(fields: [watchId], references: [id], onDelete: Cascade)
+
+  /// Varlık sembolü; `*` o adresin bütün varlıkları için VARSAYILAN eşiktir.
+  /// Null DEĞİL `*`: Postgres'te null'lar birbirine eşit sayılmadığı için
+  /// nullable bir sütun aynı adrese iki varsayılan eşik yazılmasına izin verirdi.
+  assetSymbol String @default("*") @map("asset_symbol")
+  /// Eşik, GÖSTERİM biriminde ondalıklı METİN ("1000", "0.5"). Ham tam sayı
+  /// değil: eşiği insan yazıyor ve ham değer ondalığı söylenmeden okunamaz.
+  /// Karşılaştırma ham uzayda BigInt ile yapılır (`Number`'a uğramaz).
+  minAmount String @map("min_amount")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([watchId, assetSymbol])
+  @@map("watch_thresholds")
 }
 
 model Alert {
@@ -518,15 +543,26 @@ model Alert {
   watch   Watch  @relation(fields: [watchId], references: [id], onDelete: Cascade)
 
   txHash      String    @map("tx_hash")
+  /// Hareketin işlem İÇİNDEKİ kimliği (`<varlık>|<yön>|<sıra>`). Tek işlem birden
+  /// çok hareket taşıyabiliyor — birebir aynı 20 Transfer olayı ölçüldü ve
+  /// yirmisi de gerçekti — ve biri eşiğin üstünde, öteki altında kalabilir.
+  /// Tekillik yalnızca tx'ten kurulsaydı ikinci hareket SESSİZCE düşerdi.
+  movementKey String    @default("") @map("movement_key")
   ts          DateTime
   amountRaw   String?   @map("amount_raw")
   assetSymbol String?   @map("asset_symbol")
   direction   String? // gelen|giden
+  /// Hangi YOLDAN bildirildi: `mesaj` (eşik üstü, anında) | `ozet` (eşik altı,
+  /// günlük özet). Yol olmadan "neden bu kadar az mesaj geldi" sorulamaz.
+  path        String?   @default("mesaj")
+  /// Yolun SEBEBİ: `esik_ustu` · `esik_alti` · `esik_yok` · `ondalik_bilinmiyor`.
+  /// Eşiği uygulayamadığımız hareket SUSTURULMAZ, sebebiyle mesaj olur.
+  reason      String?
   sentAt      DateTime? @map("sent_at")
   channel     String    @default("telegram")
   createdAt   DateTime  @default(now()) @map("created_at")
 
-  @@unique([watchId, txHash])
+  @@unique([watchId, txHash, movementKey])
   @@index([watchId, createdAt])
   @@map("alerts")
 }

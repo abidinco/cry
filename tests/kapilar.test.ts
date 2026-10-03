@@ -9,9 +9,43 @@ describe("oturum kapısı", () => {
     expect(ACIK_YOLLAR).toContain("/api/oturum/giris");
   });
 
-  it("izleme senkronu oturum değil JETON ister, o yüzden listede", () => {
+  it("izleme uçları oturum değil JETON ister, o yüzden listede", () => {
     // Servis bir tarayıcı değil; kendi koruması uç noktanın içinde.
     expect(ACIK_YOLLAR).toContain("/api/izleme/liste");
+    expect(ACIK_YOLLAR).toContain("/api/izleme/bildirim");
+  });
+
+  it("kapıyı açmak YETMEZ: açılan izleme uçları jetonsuz 401 verir", async () => {
+    // Kapı listesi ile ucun kendi kontrolü AYRI yerlerde; biri eklenip öteki
+    // unutulabilir ve o zaman soruşturma adresleri jetonsuz okunurdu.
+    // Ölçüm kod okumakla değil ucu ÇAĞIRMAKLA yapılır.
+    const { GET } = await import("../apps/web/src/app/api/izleme/liste/route.js");
+    const { POST } = await import("../apps/web/src/app/api/izleme/bildirim/route.js");
+    expect((await GET(new Request("http://x/api/izleme/liste"))).status).toBe(401);
+    expect(
+      (
+        await POST(
+          new Request("http://x/api/izleme/bildirim", { method: "POST", body: "{}" }),
+        )
+      ).status,
+    ).toBe(401);
+  });
+
+  it("yanlış jeton da 401 — eşitlik sabit zamanlı karşılaştırmayla", async () => {
+    const { jetonGecerliMi } = await import("../apps/web/src/lib/izleme.js");
+    const onceki = process.env.WATCHER_TOKEN;
+    process.env.WATCHER_TOKEN = "dogru-jeton";
+    try {
+      expect(jetonGecerliMi("dogru-jeton")).toBe(true);
+      expect(jetonGecerliMi("yanlis")).toBe(false);
+      expect(jetonGecerliMi(null)).toBe(false);
+      // Jeton TANIMSIZSA uç AÇILMAZ: tanımsız bir sır "kontrol yok" demektir.
+      delete process.env.WATCHER_TOKEN;
+      expect(jetonGecerliMi("herhangi")).toBe(false);
+    } finally {
+      if (onceki === undefined) delete process.env.WATCHER_TOKEN;
+      else process.env.WATCHER_TOKEN = onceki;
+    }
   });
 
   it("korumalı hiçbir yol yanlışlıkla açık değil", () => {

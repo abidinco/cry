@@ -388,6 +388,55 @@ uç `GET /api/rapor/[id]/pdf`.
   sayfada altlık, Türkçe ve `₺` sağlam. **PDF'in doğrulaması metin ÇIKARILARAK yapılır** —
   "derlendi" bir ölçüm değil.
 
+## İzleme (eşik · günlük özet)
+
+Servis `apps/watcher` (düz JS, Hetzner, SQLite), saf eşik katmanı
+`apps/watcher/src/esik.js` + `tron.js` (42 test), ekran `/izleme`, uçlar
+`GET /api/izleme/liste` · `POST /api/izleme/bildirim` (jeton) ·
+`/api/izleme` + `/api/izleme/[id]` (oturum).
+
+- **15 dakikada bir bakar; eşik ÜSTÜ hareket anında mesaj, altındakiler GÜNLÜK
+  ÖZET** (kullanıcı kararı). Ölçüldü (Binance 2, 1 saatlik pencere):
+  442 hareketin **117'si mesaj / 325'i özet**. Eşiksiz izleme aynı saatte 442
+  bildirim atardı.
+- **Eşik varlık ve adres bazında**; `*` o adresin varsayılanı ve varlığa özel
+  eşik onu EZER. Eşik GÖSTERİM biriminde METİN olarak durur, karşılaştırma ham
+  uzayda **çarpmayla** yapılır: eşiği varlığın ondalığına çekmek yuvarlamaydı ve
+  0,5 eşiği 0 ondalıklı varlıkta 1 olurdu.
+- **Eşiği UYGULAYAMADIĞIMIZ hareket SUSTURULMAZ**, sebebiyle mesaj olur:
+  `esik_yok` · `ondalik_bilinmiyor` · `esik_okunamadi` · `tutar_okunamadi`.
+  Ondalığı bilinmeyen tutarı "küçük" saymak, ölçülmemiş bir şeyi özete gömmekti.
+- **Kapının kabul ettiği eşik, servisin OKUYABİLDİĞİ eşik olmalı.** İki taraf
+  iki ayrı dilde yazılı (web TS, servis JS — sunucuda derleme yok) ve test
+  ikisini yan yana koyuyor; sapma "ekranda kabul, serviste `esik_okunamadi`"
+  olurdu. Üstel yazım iki tarafta da REDDEDİLİR (`1e3` bin kat yanlış sınır).
+- **Gün sınırı UTC** ve özetin başlığı bunu YAZAR: 03:00 TSİ'deki hareket bir
+  ÖNCEKİ günün özetine girer. Özet GİTMEDEN kayıt düşmez.
+- **TronGrid `allowed_rps(1)` diyor ve aşılınca sorgu sunucusunu 5 sn askıya
+  alıyor** (ölçüldü, gerçek yanıt). Çağrı arası 1,2 sn pencere + 429'da 5/10/15/20
+  sn geri çekilme; kota canlı yığınla PAYLAŞILIYOR, yani ölçümün ikinci turu
+  hız sınırına girip `hiz_siniri` ile durdu — kursör ilerletilmedi.
+- **Hız sınırı HTTP 429 ile DE, HTTP 200 + `Error` metniyle DE gelir.** Şekli
+  farklı, anlamı aynı; yalnızca 429'a bakan kod hareketi olan adresi sessizce
+  atlardı.
+- **Sayfa bütçesi (uç başına 5 sayfa) dolarsa kursör okunan EN BÜYÜK damgadan
+  ileri taşınmaz** ve bu kuru koşuda da yazılır: okunmamış aralık "hareket yok"
+  diye geçemez.
+- **Uyarı tekilliği işlemden DEĞİL hareketten kurulur** (`movement_key =
+  <varlık>|<yön>|<tekrar>`): bir işlemde birebir aynı 20 Transfer olayı ölçüldü
+  ve biri eşiğin üstünde öteki altında kalabilir.
+- **Servis gönderdiği mesajları PC'ye geri İTER** (`/api/izleme/bildirim`,
+  jetonla): kurulu ama sorulmayan bir servis, `/etiket`ten önceki etiketlerin
+  aynısıdır. Uç bir RAPOR kanalıdır — listede olmayan adres yazılmaz, atlanır ve
+  sebebi döner; eşik/aktiflik oradan DEĞİŞTİRİLEMEZ.
+- **Kapı listesine eklemek YETMEZ**, uç kendi jetonunu sormak zorundadır; ikisi
+  ayrı dosyada olduğu için testi ikisini birlikte ateşler (`tests/kapilar.test.ts`).
+- **İzlemek TARAMAK değildir:** izleme için açılan adres `index_state =
+  "bilinmiyor"` kalır.
+- **Kuru koşu:** `node apps/watcher/src/index.js --kuru` — tek tur, Telegram
+  kapalı, kursör/uyarı/özet yazılmaz, yalnızca yol sayılır. Ölçüm betiği
+  `scripts/izleme-olcum.mts`.
+
 ## Yedek
 
 - **Yedeklenen: yalnızca Postgres** (vaka, koşu, etiket, rapor, denetim kaydı —
@@ -715,7 +764,8 @@ Tasarım dili: [docs/arayuz.md](docs/arayuz.md). İmza öğesi **köken oluğu**
 ## Kalan kararlar (2026-09-29, ajan önerisiyle kapatıldı)
 
 Kullanıcı: "beklediğin kararlar için önerdiğin gibi devam et." Altısı da geri
-alınabilir; itiraz gelirse kural değişir.
+alınabilir; itiraz gelirse kural değişir. Beşi uygulandı; kalan madde bir karar
+değil bir TUTUM (arayüzün tembel elden geçirilmesi).
 
 - **Takip adresin TÜM GİRİŞLERİNDEN başlar; tek işlemden başlatmak `/islem`
   sayfasının işidir.** Tarih aralığıyla tohumlama YAZILMAYACAK — gerçek bir
@@ -733,9 +783,10 @@ alınabilir; itiraz gelirse kural değişir.
   bayt değişir; dondurulması gereken şey KANITTIR, sayfa düzeni değil. Bu karar
   ilk rapordan önce verilmek zorundaydı: verilmiş bir rapordaki hash geri alınamaz.
 - **İzleme 15 dakikada bir bakar, EŞİK ÜSTÜ harekette mesaj atar, küçükler günlük
-  özete girer.** Eşik varlık ve adres bazında ayarlanır. Servisin kurulumu
-  arayüzüyle birlikte (Görev 10) — kurulu ama sorulmayan bir servis, `/etiket`ten
-  önceki etiketlerin aynısı olurdu.
+  özete girer.** Eşik varlık ve adres bazında ayarlanır. **YAZILDI ve ölçüldü
+  (2026-10-04)** — kuralları *İzleme (eşik · günlük özet)* başlığında, kurulumu
+  `/izleme` ekranında. Kalan tek adım bu depoda değil: `deploy-watcher`
+  akışının sunucuda bir kez koşması.
 - **Arayüzün geri kalanı (adres sayfası, ana sayfa) şikâyet ya da ihtiyaç
   geldikçe elden geçirilir.** Peşinen tasarım turu yok; ölçütü etiket incelemeyle
   aynı: bedeli, bir iş o sayfada tökezlediğinde ödenir.

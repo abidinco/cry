@@ -19,6 +19,9 @@ export default function UstBar({ username, admin }: { username: string; admin: b
       <a href="/etiket" className="etiket" style={{ color: "var(--m2)" }}>
         etiket
       </a>
+      <a href="/izleme" className="etiket" style={{ color: "var(--m2)" }}>
+        izleme
+      </a>
       {admin && (
         <a href="/yonetim" className="etiket" style={{ color: "var(--m2)" }}>
           yönetim
