@@ -115,6 +115,27 @@ export function gunAnahtari(iso) {
 }
 
 /**
+ * Kapanmış bir günün özeti ŞİMDİ gönderilsin mi?
+ *
+ * Gün UTC'de 00:00'da kapanıyor ve o an TSİ 03:00 — özeti orada göndermek,
+ * kimsenin okumadığı bir saatte telefon çaldırmaktı. Varsayılan `saatUtc = 6`
+ * (09:00 TSİ) bir SEÇİMDİR ve geri alınabilir (`WATCHER_DIGEST_HOUR_UTC`).
+ *
+ * İki istisna, ikisi de "bilgi bekletilmez" diyor:
+ *  - DÜNDEN ESKİ bir gün hemen gider (servis kapalı kalmış olabilir; birikmiş
+ *    özet, saatini beklerse hiç gitmeyebilir),
+ *  - gün bugünse hiç gitmez — gün henüz kapanmadı.
+ */
+export function ozetZamaniMi(gun, simdiIso, saatUtc = 6) {
+  const bugun = gunAnahtari(simdiIso);
+  if (!bugun || !gun || gun >= bugun) return false;
+  const dun = gunAnahtari(new Date(new Date(simdiIso).getTime() - 86_400_000).toISOString());
+  if (dun && gun < dun) return true;
+  const saat = new Date(simdiIso).getUTCHours();
+  return Number.isInteger(saatUtc) ? saat >= saatUtc : true;
+}
+
+/**
  * Günlük özet metni. Eşik ALTI hareketler burada toplanır; satır başına
  * (adres, varlık) ve o çiftin kaç hareket / ne kadar tuttuğu yazılır.
  *

@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 // İzleme servisi derleme adımı OLMADAN koşuyor, kaynağı düz JS: tip bildirimi yok.
 // eslint-disable-next-line
 // @ts-expect-error -- düz JS modülü
-import { TUM_VARLIKLAR, ayristirOndalik, esikSec, gunAnahtari, mesajMetni, ozetMetni, tutarMetni, yolSec } from "../apps/watcher/src/esik.js";
+import { TUM_VARLIKLAR, ayristirOndalik, esikSec, gunAnahtari, mesajMetni, ozetMetni, ozetZamaniMi, tutarMetni, yolSec } from "../apps/watcher/src/esik.js";
 
 const USDT = { assetSymbol: "USDT", minAmount: "1000" };
 const HEPSI = { assetSymbol: TUM_VARLIKLAR, minAmount: "1" };
@@ -273,5 +273,29 @@ describe("eşik listesi doğrulaması", () => {
     const { esikleriDogrula } = await import("../apps/web/src/lib/izleme");
     const sonuc = esikleriDogrula([{ assetSymbol: "USDT", minAmount: "çok" }]);
     expect("hata" in sonuc).toBe(true);
+  });
+});
+
+describe("özetin gönderim saati", () => {
+  // Gün UTC 00:00'da kapanıyor ve o an TSİ 03:00. Özeti orada göndermek,
+  // kimsenin okumadığı bir saatte telefon çaldırmaktı; varsayılan 06:00 UTC
+  // (09:00 TSİ) bir SEÇİMDİR ve `WATCHER_DIGEST_HOUR_UTC` ile geri alınır.
+  it("gün henüz kapanmadıysa GÖNDERİLMEZ", () => {
+    expect(ozetZamaniMi("2026-10-04", "2026-10-04T23:00:00Z", 6)).toBe(false);
+  });
+
+  it("dünün özeti saatinden ÖNCE beklenir, sonra gider", () => {
+    expect(ozetZamaniMi("2026-10-03", "2026-10-04T00:10:00Z", 6)).toBe(false);
+    expect(ozetZamaniMi("2026-10-03", "2026-10-04T06:00:00Z", 6)).toBe(true);
+  });
+
+  it("DÜNDEN ESKİ birikmiş gün saat beklemez", () => {
+    // Servis kapalı kalmış olabilir; saatini bekleyen birikmiş özet, bir
+    // sonraki pencereyi de kaçırırsa hiç gitmez.
+    expect(ozetZamaniMi("2026-09-30", "2026-10-04T00:10:00Z", 6)).toBe(true);
+  });
+
+  it("saat 0 ise gün dönünce gider — seçim kullanıcının", () => {
+    expect(ozetZamaniMi("2026-10-03", "2026-10-04T00:10:00Z", 0)).toBe(true);
   });
 });

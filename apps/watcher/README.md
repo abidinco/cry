@@ -38,6 +38,7 @@ yüzden ikisi de ana yığınla YAN YANA test ediliyor (`tests/izleme-esik.test.
 | `WATCHER_TOKEN` | — | yoksa senkron ve geri itme ATLANIR |
 | `PC_BASE_URL` | `http://10.99.0.2:1337` | WireGuard üzerinden PC |
 | `WATCHER_CALL_GAP_MS` | `1200` | TronGrid `allowed_rps(1)` diyor (ölçüldü) |
+| `WATCHER_DIGEST_HOUR_UTC` | `6` | günlük özetin saati (09:00 TSİ); birikmiş gün beklemez |
 | `WATCHER_DRY_HOURS` | `24` | yalnızca kuru koşuda pencere |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | — | yoksa mesaj GİTMEZ ve bu söylenir |
 

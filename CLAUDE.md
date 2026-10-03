@@ -412,6 +412,11 @@ Servis `apps/watcher` (düz JS, Hetzner, SQLite), saf eşik katmanı
   olurdu. Üstel yazım iki tarafta da REDDEDİLİR (`1e3` bin kat yanlış sınır).
 - **Gün sınırı UTC** ve özetin başlığı bunu YAZAR: 03:00 TSİ'deki hareket bir
   ÖNCEKİ günün özetine girer. Özet GİTMEDEN kayıt düşmez.
+- **Özet gün dönünce DEĞİL 06:00 UTC'de (09:00 TSİ) gider** — gün 00:00 UTC'de
+  kapanıyor ve orası TSİ 03:00'tü. Saat bir SEÇİM, `WATCHER_DIGEST_HOUR_UTC` ile
+  geri alınır ve soru [bekleyen kararlarda](docs/bekleyen-kararlar.md). Dünden
+  ESKİ birikmiş gün saat BEKLEMEZ: beklerse bir sonraki pencereyi de kaçırıp hiç
+  gitmeyebilir.
 - **TronGrid `allowed_rps(1)` diyor ve aşılınca sorgu sunucusunu 5 sn askıya
   alıyor** (ölçüldü, gerçek yanıt). Çağrı arası 1,2 sn pencere + 429'da 5/10/15/20
   sn geri çekilme; kota canlı yığınla PAYLAŞILIYOR, yani ölçümün ikinci turu

@@ -21,7 +21,7 @@
 import { depoAc } from "./depo.js";
 import { telegramGonder } from "./telegram.js";
 import { hareketleriOku } from "./tron.js";
-import { esikSec, gunAnahtari, mesajMetni, ozetMetni, yolSec } from "./esik.js";
+import { esikSec, gunAnahtari, mesajMetni, ozetMetni, ozetZamaniMi, yolSec } from "./esik.js";
 
 const PC_TABANI = process.env.PC_BASE_URL ?? "http://10.99.0.2:1337";
 /** Varsayılan 900 sn = 15 dakika (kullanıcı kararı). */
@@ -99,7 +99,14 @@ async function uyarilariIt(tur) {
  */
 async function ozetleriGonder() {
   const bugun = gunAnahtari(ts());
+  const saat = Number(process.env.WATCHER_DIGEST_HOUR_UTC ?? 6);
   for (const { gun } of depo.bekleyenOzetGunleri(bugun)) {
+    // Gün UTC 00:00'da kapanıyor, yani TSİ 03:00; özet o saatte değil
+    // varsayılan olarak 06:00 UTC'de (09:00 TSİ) gider. Birikmiş günler bekler.
+    if (!ozetZamaniMi(gun, ts(), saat)) {
+      console.log(`· ${gun} özeti bekliyor (gönderim saati ${saat}:00 UTC)`);
+      continue;
+    }
     const kayitlar = depo.ozetKayitlari(gun);
     const metin = ozetMetni(gun, kayitlar);
     if (!metin) {
