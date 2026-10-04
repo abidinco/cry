@@ -34,6 +34,11 @@ Karara bağlanan madde bekleyenlerden **silinir**, kuralı buraya yazılır.
   kuralı CLAUDE.md'ye yazar, maddeyi masadan ve
   [bekleyen-kararlar.md](docs/bekleyen-kararlar.md)'den düşürür. Dosya masanın
   AYNASIDIR, tersi değil — masada olmayan bir karar sorulmamıştır.
+- **Masa ayrıca B3 doldurma DURUMUNU gösterir** (`durum/b3`): yazılan/kalan
+  blok, cephe, hız, günlüğün kendi kalan süre tahmini, boşluk, disk. Sayıyı
+  `cry-b3-doldurma-bitti-mi` rutini 3 saatte bir ölçüp yazar — masa 4 saatten
+  eskisini BAYAT diye işaretler, çünkü bayat bir ölçüm ölçüm değildir. **Kalan
+  süre günlüğün son satırından okunur**, masada yeniden hesaplanmaz.
 - **Dokümanlar KISA tutulur** (kullanıcı isteği 2026-09-29): CLAUDE.md her
   oturumda yükleniyor. Bir kural = bir madde + ölçümü; anlatı yok. Yeni kural
   eklerken eskisini uzatma, değiştir.
