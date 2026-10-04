@@ -26,6 +26,14 @@ Karara bağlanan madde bekleyenlerden **silinir**, kuralı buraya yazılır.
 - Commit mesajları Conventional Commits, **İngilizce**, gövdeli.
 - Ortam dosyası depoda DEĞİL: **`C:\srv\cry\.env`** (PC), `/srv/cry/.env`
   (sunucu). Depo public; sır commit'e girmez.
+- **Bekleyen kararlar KARAR MASASINDA sorulur** (kullanıcı kuralı 2026-10-04):
+  artifact **cry karar masası** — https://claude.ai/artifact/MKQ4Zj2X4grwjb2KiCYHwS
+  Yeni bir tercih çıkınca madde `kararlar` koleksiyonuna yazılır (altı başlık:
+  soru · ölçüm · seçenekler · verilmezse · geri alınır mı · nereye yazılır),
+  kullanıcı şıkkı masada seçer, ajan `cevaplar` koleksiyonunu OKUYUP uygular:
+  kuralı CLAUDE.md'ye yazar, maddeyi masadan ve
+  [bekleyen-kararlar.md](docs/bekleyen-kararlar.md)'den düşürür. Dosya masanın
+  AYNASIDIR, tersi değil — masada olmayan bir karar sorulmamıştır.
 - **Dokümanlar KISA tutulur** (kullanıcı isteği 2026-09-29): CLAUDE.md her
   oturumda yükleniyor. Bir kural = bir madde + ölçümü; anlatı yok. Yeni kural
   eklerken eskisini uzatma, değiştir.

@@ -11,6 +11,10 @@ Burası arşiv değil; tarihçe git geçmişinde.
 Kardeş dosyalar: [cozulmesi-gerekenler.md](cozulmesi-gerekenler.md) (karar
 beklemeyen eksikler), [oneriler.md](oneriler.md).
 
+**Karar MASADA verilir** (kullanıcı kuralı 2026-10-04): artifact
+[cry karar masası](https://claude.ai/artifact/MKQ4Zj2X4grwjb2KiCYHwS). Bu dosya
+masanın aynasıdır — madde oraya yazılır, şık orada seçilir, ajan okuyup uygular.
+
 ---
 
 **Günlük özet hangi saatte gelsin?** (2026-10-04)
