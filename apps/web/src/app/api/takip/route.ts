@@ -31,6 +31,7 @@ export async function POST(istek: Request) {
     minTutar?: string;
     pencereSaat?: number;
     tohumTx?: string;
+    yalnizYerel?: boolean;
   };
 
   const { chain, address } = govde;
@@ -99,6 +100,9 @@ export async function POST(istek: Request) {
         minTutar: govde.minTutar ?? VARSAYILAN_ESIKLER.minTutar.toString(),
         pencereSaat: govde.pencereSaat ?? 24,
         tohumTx: tohumTx || null,
+        // Kip de bir SINIRDIR ve kayda yazılır: "bu cevap yalnızca yerel indeksten
+        // verildi" bilgisi rapora girmeden, graf tam sanılır.
+        yalnizYerel: govde.yalnizYerel === true,
       },
     },
   });
@@ -119,7 +123,13 @@ export async function POST(istek: Request) {
       userId: oturum.userId,
       action: "takip.baslat",
       target: `${chain}:${kok}`,
-      meta: { traceRunId: kosu.id.toString(), kural, ...esikler, tohumTx: tohumTx || null },
+      meta: {
+        traceRunId: kosu.id.toString(),
+        kural,
+        ...esikler,
+        tohumTx: tohumTx || null,
+        yalnizYerel: govde.yalnizYerel === true,
+      },
     },
   });
 

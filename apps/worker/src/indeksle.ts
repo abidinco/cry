@@ -7,7 +7,7 @@
  */
 import { prisma } from "@cry/db";
 import { registryFromEnv, type ChainAdapter, type ChainId, type Transfer } from "@cry/chain";
-import { kaydedilecekNot, notaCevir, type IndeksNotu } from "@cry/motor";
+import { notaCevir, yerelKapsam, type IndeksNotu } from "@cry/motor";
 import { BlokIndeksliAdaptor } from "./blok-indeksli-adaptor.js";
 
 const registry = registryFromEnv();
@@ -17,14 +17,18 @@ const registry = registryFromEnv();
  * cevaplar, dışındakileri kaynağa bırakır (CLAUDE.md → M1). Sarmalayıcı adres başına DEĞİL süreç
  * başına tutuluyor; pencereyi 60 sn önbelleğe alıyor ve `occurrence` sayacını tur başında sıfırlıyor.
  */
-const sarmalayicilar = new Map<ChainId, ChainAdapter>();
-export function adaptorAl(chain: ChainId): ChainAdapter {
+const sarmalayicilar = new Map<string, ChainAdapter>();
+export function adaptorAl(chain: ChainId, yalnizYerel = false): ChainAdapter {
   const ham = registry.get(chain);
   if (chain !== "tron") return ham;
-  let s = sarmalayicilar.get(chain);
+  // Kip BAŞINA ayrı sarmalayıcı: iki kip aynı nesneyi paylaşsaydı eşzamanlı iki
+  // koşudan biri ötekinin kipini okur, "kaynağa gidilmedi" diyen bir koşu
+  // kaynağa giderdi. `occurrence` sayacı da kip başına ayrı kalır.
+  const anahtar = `${chain}|${yalnizYerel ? "yerel" : "melez"}`;
+  let s = sarmalayicilar.get(anahtar);
   if (!s) {
-    s = new BlokIndeksliAdaptor(ham);
-    sarmalayicilar.set(chain, s);
+    s = new BlokIndeksliAdaptor(ham, undefined, { yalnizYerel });
+    sarmalayicilar.set(anahtar, s);
   }
   return s;
 }
@@ -48,12 +52,20 @@ export type IndeksSonucu = {
   indeksNotu?: IndeksNotu | null;
   /** Hareketler nereden geldi: kendi blok indeksimiz mi, kaynak mı — ve neden. */
   hareketKaynagi?: string;
+  /**
+   * YALNIZCA YEREL kipte tarandı ve adresin geçmişi pencereden ÖNCE başlıyor:
+   * cevap bir ALT SINIRdır. "Hareket yok" ile "öncesine bakılmadı" ayrı
+   * cevaplardır; bu alan ikisini ayırıyor.
+   */
+  pencereDisiKaldi?: boolean;
+  /** Hangi aralığa bakıldı (ISO, yalnızca yerel kipte doldurulur). */
+  pencere?: { bas: string; son: string } | null;
 };
 
 export async function adresIndeksle(
   chain: ChainId,
   hamAdres: string,
-  opts: { maxSayfa?: number; signal?: AbortSignal } = {},
+  opts: { maxSayfa?: number; signal?: AbortSignal; yalnizYerel?: boolean } = {},
 ): Promise<IndeksSonucu> {
   if (!registry.hazirMi(chain)) {
     return {
@@ -67,7 +79,7 @@ export async function adresIndeksle(
     };
   }
 
-  const adaptor = adaptorAl(chain);
+  const adaptor = adaptorAl(chain, opts.yalnizYerel === true);
   const adres = adaptor.normalizeAddress(hamAdres);
   const ozet = await adaptor.getAddressSummary(adres, opts.signal);
 
@@ -154,7 +166,9 @@ export async function adresIndeksle(
   }
 
   const tamamlandi = imlec === null;
-  await durumuYaz(kayit.id, enSonTs, tamamlandi, not);
+  const pencereDisi =
+    opts.yalnizYerel === true && adaptor instanceof BlokIndeksliAdaptor && adaptor.sonPencereDisi;
+  await durumuYaz(kayit.id, enSonTs, tamamlandi, not, pencereDisi);
 
   return {
     address: adres,
@@ -173,11 +187,28 @@ export async function adresIndeksle(
       adaptor instanceof BlokIndeksliAdaptor
         ? `${adaptor.sonKullanim.kaynak} (${adaptor.sonKullanim.sebep})`
         : undefined,
+    pencereDisiKaldi: pencereDisi,
+    pencere:
+      adaptor instanceof BlokIndeksliAdaptor && adaptor.sonPencere
+        ? {
+            bas: new Date(adaptor.sonPencere.zamanBas * 1000).toISOString(),
+            son: new Date(adaptor.sonPencere.zamanSon * 1000).toISOString(),
+          }
+        : null,
   };
 }
 
 /** Adresin indeks durumunu tek yerden yazar: bitmiş tur da, yarıda kalan tur da buradan geçer. */
-async function durumuYaz(id: bigint, enSonTs: Date | null, tamamlandi: boolean, not: IndeksNotu | null) {
+async function durumuYaz(
+  id: bigint,
+  enSonTs: Date | null,
+  tamamlandi: boolean,
+  not: IndeksNotu | null,
+  pencereDisi = false,
+) {
+  // Kapsam kararı SAF katmanda (testli): sayfalar bittiyse "tam" demek, yalnızca yerel
+  // kipte pencere öncesine bakılmamış bir adresi taranmış göstermek olurdu.
+  const kapsam = yerelKapsam(tamamlandi, pencereDisi, not);
   await prisma.address.update({
     where: { id },
     data: {
@@ -186,9 +217,9 @@ async function durumuYaz(id: bigint, enSonTs: Date | null, tamamlandi: boolean, 
       lastIndexedAt: new Date(),
       // "Şu ana kadar indeksledim" değil, "şu tarihe kadar VERİ gördüm".
       indexedThroughTs: enSonTs,
-      indexState: tamamlandi ? "tam" : "kismi",
+      indexState: kapsam.indexState,
       // Biten turda not SİLİNİR; kararı saf katman veriyor (testli).
-      indexNote: kaydedilecekNot(tamamlandi, not),
+      indexNote: kapsam.not,
     },
   });
 }

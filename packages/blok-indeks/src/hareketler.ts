@@ -48,10 +48,22 @@ const imlecCoz = (m: string | null | "bitti"): { zaman: number; tx: string; idx:
   return { zaman: Number(z), tx: String(tx), idx: Number(i) };
 };
 
-/** `(zaman, tx, idx) > (…)` — ClickHouse demet karşılaştırması sıralamayı kullanabiliyor. */
-const sonraKosulu = (m: string | null | "bitti", txSutunu: string): string => {
+/**
+ * `(zaman, tx, idx) > (…)` — ClickHouse demet karşılaştırması sıralamayı kullanabiliyor.
+ *
+ * İki tablonun tx sütunu AYNI TİPTE DEĞİL: ana tabloda `tx` 32 baytlık FixedString, giden
+ * aynasında `txh` bir **UInt64** (`cityHash64`). İmleç her iki yön için de `unhex(...)`
+ * üretiyordu ve ikinci sayfada sorgu "Cannot convert string … to type UInt64" ile DÜŞÜYORDU —
+ * yani gideni `limit`ten çok olan adreslerde hareketler eksik kalıyor, hata `kaynak_hatasi`
+ * diye kaydediliyordu (ölçüldü 2026-10-06, TGnC7LMji…). Sayısal sütunda imleç ONDALIK yazılır;
+ * hex'i ClickHouse'ta geri çevirmeye çalışmak bayt sırası (big/little endian) tuzağı açardı.
+ */
+export const sonraKosulu = (m: string | null | "bitti", txSutunu: string, sayisalTx = false): string => {
   const k = imlecCoz(m);
-  return k ? ` AND (zaman, ${txSutunu}, idx) > (${k.zaman}, unhex('${k.tx}'), ${k.idx})` : "";
+  if (!k) return "";
+  if (!/^[0-9a-fA-F]{1,64}$/.test(k.tx)) throw new Error(`imleçte geçersiz tx: ${k.tx.slice(0, 20)}`);
+  const deger = sayisalTx ? BigInt(`0x${k.tx}`).toString() : `unhex('${k.tx}')`;
+  return ` AND (zaman, ${txSutunu}, idx) > (${k.zaman}, ${deger}, ${k.idx})`;
 };
 
 const imlecKur = (satirlar: IndeksHareketi[], limit: number, txAlani: (s: IndeksHareketi) => string): string | "bitti" => {
@@ -97,7 +109,7 @@ export async function adresHareketleri(
       ? []
       : await tsv(a, `SELECT toUnixTimestamp(zaman), lower(hex(txh)), idx, lower(hex(kime))
            FROM ${GIDEN_TABLO} FINAL
-           WHERE kimden = unhex('${h}') AND ${aralik}${sonraKosulu(imlec.giden, "txh")}
+           WHERE kimden = unhex('${h}') AND ${aralik}${sonraKosulu(imlec.giden, "txh", true)}
            ORDER BY zaman, txh, idx LIMIT ${limit}`);
 
   // 3) Gerçek tx — aynanın verdiği (kime, zaman) çiftleriyle ana tabloda NOKTA okuma.

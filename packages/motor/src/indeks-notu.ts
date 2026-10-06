@@ -11,7 +11,18 @@
  */
 import { ChainSourceError } from "@cry/chain";
 
-export type IndeksNotu = "sayfa_butcesi" | "hiz_siniri" | "kaynak_hatasi" | "adaptor_yok" | "iptal";
+export type IndeksNotu =
+  | "sayfa_butcesi"
+  | "hiz_siniri"
+  | "kaynak_hatasi"
+  | "adaptor_yok"
+  | "iptal"
+  /**
+   * YALNIZCA YEREL kipte tarandı: cevap blok indeksinin penceresiyle sınırlı ve
+   * adresin geçmişi pencereden ÖNCE başlıyor. Bir hata değil, bir KAPSAM
+   * bildirimidir — "bu adres temiz" değil "pencere öncesine bakılmadı".
+   */
+  | "pencere_oncesi";
 
 const CUMLE: Record<IndeksNotu, string> = {
   sayfa_butcesi: "sayfa bütçesi doldu — adres büyük, devamı var",
@@ -19,6 +30,8 @@ const CUMLE: Record<IndeksNotu, string> = {
   kaynak_hatasi: "kaynak hata verdi — yeniden denemek işe yaramayabilir",
   adaptor_yok: "bu zincirin adaptörü henüz yok — bakılamadı",
   iptal: "tarama durduruldu",
+  pencere_oncesi:
+    "yalnızca yerel indeksten tarandı — cevap pencereyle sınırlı, öncesine BAKILMADI",
 };
 
 /**
@@ -64,6 +77,42 @@ export function notaCevir(hata: unknown): IndeksNotu {
  */
 export function kaydedilecekNot(tamamlandi: boolean, not: IndeksNotu | null): IndeksNotu | null {
   return tamamlandi ? null : not;
+}
+
+/**
+ * YALNIZCA YEREL kipte bir taramanın kapsamı: sayfalar bitti diye adres "tam" DEĞİLDİR.
+ *
+ * Kipin sözü "kaynağa gitmeyeceğim"; bedeli, pencereden önceki geçmişe bakılmamış olması.
+ * O adresi `tam` yazmak, bakılmamış bir yeri taranmış göstermekti — bu dosyanın en çok
+ * tekrarlanan kuralının ("yok ≠ bakılamadı") tam karşılığı. Saf ve testli.
+ */
+export function yerelKapsam(
+  tamamlandi: boolean,
+  pencereDisi: boolean,
+  not: IndeksNotu | null,
+): { indexState: "tam" | "kismi"; not: IndeksNotu | null } {
+  // Yarıda kalan tarama kendi sebebini korur: sayfa bütçesi, pencereden daha acil bir eksiktir.
+  if (!tamamlandi) return { indexState: "kismi", not };
+  if (pencereDisi) return { indexState: "kismi", not: "pencere_oncesi" };
+  return { indexState: "tam", not: null };
+}
+
+/**
+ * YALNIZCA YEREL kipte bu adrese yeniden bakılmalı mı?
+ *
+ * Kaynaklı kipte kural "bilinmiyor değilse dokunma"ydı ve gerekçesi KOTAydı: her tarama
+ * TronGrid'e gidiyor, yarım kalmış bir adresi yeniden denemek koşuya dakikalar ekliyordu.
+ * Yerelde o gerekçe YOK — tarama bir ClickHouse sorgusu. Ölçüldü (2026-10-06): hız sınırında
+ * `kismi` kalmış bir kök yüzünden koşu 1 düğüm/0 kenar veriyordu, oysa aynı adresin yerel
+ * indekste 38.128 geleni vardı. Yani eski kural, kaynağın bıraktığı hasarı KALICI yapıyordu.
+ *
+ * Yeniden bakılmaz: tarama TAM bittiyse, ya da yerel kipte bitip yalnızca pencere öncesi
+ * eksik kaldıysa (`pencere_oncesi`) — ikinci tur aynı cevabı verir.
+ */
+export function yerelYenidenTara(indexState: string, indexNote?: string | null): boolean {
+  if (indexState === "tam") return false;
+  if (indexNote === "pencere_oncesi") return false;
+  return true;
 }
 
 /** Yeniden denemenin işe yarayabileceği durumlar — düğme ancak o zaman anlamlı. */

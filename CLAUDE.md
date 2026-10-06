@@ -463,6 +463,45 @@ Servis `apps/watcher` (düz JS, Hetzner, SQLite), saf eşik katmanı
   kapalı, kursör/uyarı/özet yazılmaz, yalnızca yol sayılır. Ölçüm betiği
   `scripts/izleme-olcum.mts`.
 
+## Yalnızca yerel koşu (API'siz takip)
+
+Kullanıcı kararı (2026-10-06): **koşular kaynağa HİÇ gitmeden, yerel blok
+indeksinden beslenebilir.** Kip `params.yalnizYerel`, ekranda varsayılan AÇIK,
+kapatmak bilerek kaynağa gitmektir. Saf katman testli (`tests/yalniz-yerel.test.ts`).
+
+- **Kipi doğuran ölçüm:** "bütün geçmiş" sorusunda aralık pencereden önce
+  başlıyor sayılıyor ve HER düğüm için TronGrid'e tur atılıyordu; koşu 28 kök
+  taramasında hız sınırına takılıp **1 düğüm / 0 kenar** verdi. Aynı kök yerel
+  kiple **29 düğüm / 67 kenar** (ölçüldü 2026-10-06, koşu 35, 10,3 sn).
+- **"Kaynağa gitmedi" İDDİA değil ÖLÇÜM:** ölçüm betiği `fetch`i sarmalayıp giden
+  isteği ana bilgisayara göre sayar — 33 istek, **hepsi 127.0.0.1:18123**,
+  trongrid 0 (`scripts/yalniz-yerel-olcum.mts`).
+- **Kipin bedeli SÖYLENİR:** pencere öncesine uzanan düğüm `pencere_oncesi`
+  notuyla `kismi` kalır (asla `tam`), sayısı `stats.yalnizYerel.pencereDisiDugum`
+  ve ekran grafın bir **ALT SINIR** olduğunu yazar. Ölçüldü: 29 düğümün 20'si.
+- **Sayı koşudan değil KAYITTAN okunur.** İlk sürüm yalnızca o turda taranan
+  düğümleri sayıyordu; ikinci koşuda hiçbir adres yeniden taranmadığı için
+  "0 düğüm pencere dışı" diyordu (ölçüldü: koşu 33). "Saymadım" ile "yok" aynı
+  şey değildir. Pencere de aynı sebeple ayrıca okunur.
+- **Bakiye, aktivasyon ve ilk/son görülme UYDURULMAZ:** kip açıkken kaynağa
+  sorulmaz, `null` döner; `getActivation` hiç TANIMLANMAZ. Sıfır bakiye yazmak
+  bakılmamış bir yeri "boş" göstermekti.
+- **Yerelde yarım kalmış adres YENİDEN taranır** (`yerelYenidenTara`): "bilinmiyor
+  değilse dokunma" kuralının gerekçesi kaynağın KOTASIYDI, yerelde tarama bir
+  ClickHouse sorgusu. O kural kaynağın bıraktığı hasarı kalıcı yapıyordu —
+  `kismi/hiz_siniri` kalmış kök yüzünden koşu boş dönüyordu, oysa aynı adresin
+  indekste 38.128 geleni vardı.
+- **Kökü borsa/servis etiketi DURDURMAZ** (`kokEtiketiDurdurmaz`): adresi insan
+  seçti, başlangıç noktasında durmak soruyu cevapsız bırakır. Etiket saklanmaz,
+  `stats.kokEtiketi`ne ve ekrana yazılır. Yakma · sözleşme · dallanma ·
+  indekssizlik kökte de DURDURUR: biri paranın yok edildiğini söyler, ötekiler
+  milyonlarca satırlık bir taramayı başlatırdı.
+- **Giden aynasının imleci ONDALIK yazılır.** Ana tabloda `tx` FixedString, aynada
+  `txh` **UInt64**; ikisine de `unhex` uygulayan imleç ikinci sayfada "Cannot
+  convert string … to type UInt64" ile düşüyordu. Gideni limitten çok olan adres
+  bu yüzden `kaynak_hatasi` alıyordu; düzeltmeden sonra aynı adres 3 sayfada
+  11.999 hareket verdi (ölçüldü 2026-10-06).
+
 ## Yedek
 
 - **Yedeklenen: yalnızca Postgres** (vaka, koşu, etiket, rapor, denetim kaydı —

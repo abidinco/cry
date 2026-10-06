@@ -86,6 +86,13 @@ export default function AdresGorunumu({ chain, address }: { chain: string; addre
   // dönmeli. Boş metin "verilmedi" demektir, sıfır DEĞİL.
   const [esik, setEsik] = useState({ maxHop: "", maxDugum: "", dallanmaEsigi: "" });
   const [sinirlarAcik, setSinirlarAcik] = useState(false);
+  /**
+   * YALNIZCA YEREL: koşu kaynağa hiç gitmez (kullanıcı kararı 2026-10-06). Varsayılan AÇIK,
+   * çünkü asıl hedef buydu: 10 aylık yerel geçmiş dururken her düğüm için TronGrid'e tur
+   * atmak koşuları hız sınırında durduruyordu. Kapatmak bir SEÇİMDİR: kaynağa gidilir,
+   * pencere öncesi de okunur, karşılığında kota ve süre ödenir.
+   */
+  const [yalnizYerel, setYalnizYerel] = useState(true);
 
   const esikOnizleme = esikleriDogrula(esik);
 
@@ -154,6 +161,7 @@ export default function AdresGorunumu({ chain, address }: { chain: string; addre
         address: ozet?.address ?? address,
         taintRule: kural,
         ...dogrulama.esikler,
+        yalnizYerel,
       }),
     });
     const govde = (await yanit.json().catch(() => ({}))) as {
@@ -270,6 +278,21 @@ export default function AdresGorunumu({ chain, address }: { chain: string; addre
                 max={SINIRLAR.dallanmaEsigi[1]}
                 onChange={(e) => setEsik((o) => ({ ...o, dallanmaEsigi: e.target.value }))}
               />
+            </Satir>
+            <Satir
+              ad="yalnızca yerel indeks"
+              not="kaynağa (TronGrid) hiç gidilmez"
+            >
+              <input
+                type="checkbox"
+                checked={yalnizYerel}
+                onChange={(e) => setYalnizYerel(e.target.checked)}
+              />
+              <span className="koken-notu">
+                {yalnizYerel
+                  ? "Cevap blok indeksinin penceresiyle SINIRLI: penceresinden önceye uzanan düğümler «bakılamadı» diye işaretlenir, koşu durmaz."
+                  : "Pencere öncesi geçmiş kaynaktan okunur — doğru ama YAVAŞ ve hız sınırına takılabilir."}
+              </span>
             </Satir>
             {/* Sayıyı büyütmek serbest, ama bedeli SESSİZ kalmamalı: her düğüm bir adres
                 taramasıdır ve pencere öncesi geçmiş kaynaktan okunuyor (M4: ~25 sn/adres). */}

@@ -90,3 +90,49 @@ export function tohumSorunu(t: TohumDurumu | null | undefined): string | null {
   if (t.bulunan === undefined || t.bulunan > 0) return null;
   return `Seçilen işlem (${t.tohumTx.slice(0, 12)}…) bu adrese para GETİRMİYOR: kökte 0 giriş bulundu. Takip köke giren paradan başlar — bu işlemde kök gönderen taraf olabilir. Boş graf "para hareket etmedi" demek DEĞİLDİR.`;
 }
+
+/** YALNIZCA YEREL kipin koşuya yazdığı kapsam defteri. */
+export type YalnizYerelDurumu = {
+  acik?: boolean;
+  pencere?: { bas: string; son: string } | null;
+  pencereDisiDugum?: number;
+};
+
+/** Kökün taşıdığı borsa/servis etiketi — durdurmadı ama söylenir. */
+export type KokEtiketi = { sebep?: string | null; etiketler?: string[]; not?: string };
+
+const gun = (iso: string): string => iso.slice(0, 10);
+
+/**
+ * Yalnızca yerel kipte koşan bir grafın EKRANDA söylemesi gereken cümle.
+ *
+ * Kipin sözü "kaynağa gitmem"; bedeli, pencere öncesine bakılmamış olması. Bu cümle
+ * yazılmazsa graf TAM sanılır — ve bu projenin en pahalı kusur sınıfı tam olarak budur:
+ * bakılmamış bir yeri temiz göstermek. Kip kapalıysa `null` döner (söylenecek bir şey yok).
+ */
+export function yalnizYerelNotu(y: YalnizYerelDurumu | null | undefined): string | null {
+  if (!y?.acik) return null;
+  if (!y.pencere) {
+    return "Yalnızca YEREL indeksten koşuldu ama pencere okunamadı: hangi aralığa bakıldığı BİLİNMİYOR.";
+  }
+  const kapsam = `${gun(y.pencere.bas)} → ${gun(y.pencere.son)}`;
+  const disi = y.pencereDisiDugum ?? 0;
+  const kuyruk =
+    disi > 0
+      ? ` ${disi} düğümün geçmişi bu aralıktan ÖNCE başlıyor ve öncesine BAKILMADI — bu graf bir ALT SINIRdır.`
+      : " Taranan düğümlerin hiçbiri bu aralığın dışına uzanmıyor.";
+  return `Kaynağa (TronGrid) hiç gidilmedi; cevap yerel blok indeksinin penceresiyle sınırlı: ${kapsam}.${kuyruk}`;
+}
+
+/**
+ * Kök bir borsa/servis etiketi taşıyorsa ekrana yazılacak uyarı.
+ *
+ * Koşu BAŞLAR (adresi insan seçti) ama etiket saklanmaz: "buradan çıkan para" ile "burası
+ * zaten bir havuz" ayrı cümlelerdir ve ikincisi raporu okuyanın bilmesi gereken şeydir.
+ */
+export function kokEtiketiNotu(k: KokEtiketi | null | undefined): string | null {
+  if (!k?.sebep) return null;
+  const adlar = (k.etiketler ?? []).filter(Boolean).join(", ");
+  const iddia = k.sebep === "terminal" ? "DOĞRULANMIŞ borsa" : "borsa ADAYI";
+  return `Kök bir ${iddia} etiketi taşıyor${adlar ? ` (${adlar})` : ""}; takip yine de buradan başlatıldı. Böyle bir adreste para ortak havuza karışmış olabilir.`;
+}

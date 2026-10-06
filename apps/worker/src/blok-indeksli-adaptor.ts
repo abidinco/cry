@@ -8,10 +8,14 @@
  * boşluksuz kapsadığı aralık. Ölçüldü (M1, 2026-09-21): orada TronGrid ile birebir aynı hareketleri
  * veriyor (13 adres, 560 hareket, eksik 0 / fazla 0) ve 17–67 kat hızlı.
  *
- * ÜÇ YOL:
+ * DÖRT YOL:
  *   - `indeks`  — sorulan aralık tamamen pencerede. Kaynağa hiç gidilmez.
  *   - `melez`   — aralık pencereden ÖNCE başlıyor: pencere öncesi KAYNAKTAN, pencere içi İNDEKSTEN.
  *   - `kaynak`  — pencere yok/okunamıyor ya da aralık tamamen pencere öncesi.
+ *   - `yalniz-yerel` — KULLANICI KARARI (2026-10-06): kaynağa HİÇ gidilmez. Pencere içi indeksten
+ *     okunur, pencere öncesi "bakılamadı" diye İŞARETLENİR (`pencereDisiKaldi`). Sebebi: koşu her
+ *     düğüm için kaynağa bir tur attığı sürece hız sınırına takılıyor ve 10 aylık yerel geçmiş
+ *     kullanılmadan duruyordu. Bu kipte cevap bir ALT SINIRdır ve bunu kendisi söyler.
  *
  * Melez neden GÜVENLİ (ve neden dün değildi): iki parça arasındaki dikiş, sınırda hareket kaybetme
  * ya da çiftleme riski taşıyordu. Şimdi parçalar bilerek ÖRTÜŞTÜRÜLÜYOR (`ORTAK_PAY`) — boşluk
@@ -75,7 +79,15 @@ const imlecOku = (m: string | null | undefined): Imlec | null => {
   }
 };
 
-export type IndeksKullanimi = { kaynak: "blok-indeksi" | "melez" | "trongrid"; sebep: string };
+export type IndeksKullanimi = {
+  kaynak: "blok-indeksi" | "melez" | "trongrid" | "yalniz-yerel";
+  sebep: string;
+};
+
+export type AdaptorKipi = {
+  /** true ise kaynağa HİÇ gidilmez; pencere dışı "bakılamadı" olur. */
+  yalnizYerel?: boolean;
+};
 
 /**
  * `listTransfers` dışındaki her şeyi sarılan adaptöre devreder — bakiye, aktivasyon, tek işlem ve
@@ -97,22 +109,42 @@ export class BlokIndeksliAdaptor implements ChainAdapter {
    * nereye gittiği ancak bu dağılımla söylenebilir: "hızlandı" demek yetmez, NEYİN hızlandığı
    * söylenir. Süreç boyunca birikir; `sayaciSifirla` ile bir ölçümün başında sıfırlanır.
    */
-  readonly sayac: Record<IndeksKullanimi["kaynak"], number> = { "blok-indeksi": 0, melez: 0, trongrid: 0 };
+  readonly sayac: Record<IndeksKullanimi["kaynak"], number> = {
+    "blok-indeksi": 0,
+    melez: 0,
+    trongrid: 0,
+    "yalniz-yerel": 0,
+  };
   sayaciSifirla(): void {
     this.sayac["blok-indeksi"] = 0;
     this.sayac.melez = 0;
     this.sayac.trongrid = 0;
+    this.sayac["yalniz-yerel"] = 0;
   }
+
+  /**
+   * Son turda pencere DIŞINDA kalan bir aralık var mıydı — yani cevap bir alt sınır mı?
+   * Yalnızca yerel kipte anlamlı; çağıran bunu `pencere_oncesi` notuna çeviriyor.
+   */
+  sonPencereDisi = false;
+  /** Son okunan pencere (çağıran raporda "hangi aralığa bakıldı" diyebilsin diye). */
+  sonPencere: Pencere | null = null;
 
   constructor(
     private readonly ic: ChainAdapter,
     private readonly a: Ayar = ayarOku(),
+    private readonly kip: AdaptorKipi = {},
   ) {
     this.chain = ic.chain;
     this.family = ic.family;
     this.nativeAsset = ic.nativeAsset;
     this.capabilities = ic.capabilities;
-    if (ic.getActivation) this.getActivation = (adres, sinyal) => ic.getActivation!(adres, sinyal);
+    // Yalnızca yerel kipte aktivasyon SORULMAZ: o soru kaynağa gider. Yeteneği
+    // taklit etmek yerine yöntem hiç tanımlanmıyor — `capabilities.activation`
+    // bir iddiadır ve karşılığı olmayan iddia bu projede en pahalı kusur.
+    if (ic.getActivation && !kip.yalnizYerel) {
+      this.getActivation = (adres, sinyal) => ic.getActivation!(adres, sinyal);
+    }
   }
 
   normalizeAddress(input: string): string {
@@ -121,8 +153,23 @@ export class BlokIndeksliAdaptor implements ChainAdapter {
   isValidAddress(input: string): boolean {
     return this.ic.isValidAddress(input);
   }
+  /**
+   * Yalnızca yerel kipte özet KAYNAĞA sorulmaz ve UYDURULMAZ: bakiye, ilk/son görülme ve
+   * sözleşme olup olmadığı `null` döner. Sıfır bakiye yazmak, bakılmamış bir yeri "boş"
+   * göstermekti; `exists: true` ise bir iddia değil, "bu adresi tarıyoruz" demek.
+   */
   getAddressSummary(address: string, signal?: AbortSignal) {
-    return this.ic.getAddressSummary(address, signal);
+    if (!this.kip.yalnizYerel) return this.ic.getAddressSummary(address, signal);
+    return Promise.resolve({
+      chain: this.chain,
+      address: this.normalizeAddress(address),
+      exists: true,
+      firstSeen: null,
+      lastSeen: null,
+      balanceRaw: null,
+      txCount: null,
+      isContract: undefined,
+    });
   }
   getTransaction(hash: string, signal?: AbortSignal) {
     return this.ic.getTransaction(hash, signal);
@@ -155,6 +202,18 @@ export class BlokIndeksliAdaptor implements ChainAdapter {
       this.sayac[this.sonKullanim.kaynak]++;
     }
 
+    // Yalnızca yerel kip: kaynak ucu hiç kullanılmaz. Pencere yoksa cevap "bakılamadı"dır ve
+    // BOŞ SAYFA değildir — çağıran `pencereDisiKaldi`ya bakıp notu yazıyor.
+    if (this.kip.yalnizYerel) {
+      if (!p) return { items: [], nextCursor: null };
+      return this.indekstenSayfa(
+        adres,
+        p,
+        opts,
+        onceki && "indeks" in onceki ? onceki.indeks : { gelen: null, giden: null },
+      );
+    }
+
     // Melezin BİRİNCİ parçası: pencere öncesi, kaynaktan, üst sınır pencerenin başı + ortak pay.
     if ((onceki && "oncesi" in onceki) || (!onceki && this.sonKullanim.kaynak === "melez")) {
       const imlec = onceki && "oncesi" in onceki ? onceki.oncesi : null;
@@ -183,12 +242,32 @@ export class BlokIndeksliAdaptor implements ChainAdapter {
 
   /** Aralığın pencereyle ilişkisine göre yolu seçer; sebebi günlüğe ve `IndeksSonucu`'na düşer. */
   private yolSec(p: Pencere | null, opts: ListOptions): IndeksKullanimi {
+    this.sonPencere = p;
+    this.sonPencereDisi = false;
+
+    // `fromTs` yoksa soru "bütün geçmiş"tir: başlangıç bilinmiyor, pencereden ÖNCE varsayılır.
+    // (`firstSeen` bir ALT SINIR DEĞİLDİR — M2'de ölçüldü, yukarıdaki nota bak.)
+    const bas = opts.fromTs ? Math.floor(Date.parse(opts.fromTs) / 1000) : Number.NEGATIVE_INFINITY;
+    const son = opts.toTs ? Math.floor(Date.parse(opts.toTs) / 1000) : p?.zamanSon ?? 0;
+
+    if (this.kip.yalnizYerel) {
+      // Kaynağa gitmek YASAK; tek soru "ne kadarını kapatabildik".
+      if (this.chain !== "tron" || !p) {
+        this.sonPencereDisi = true;
+        return {
+          kaynak: "yalniz-yerel",
+          sebep: this.chain !== "tron" ? "blok indeksi yalnızca TRON — BAKILAMADI" : "pencere okunamadı — BAKILAMADI",
+        };
+      }
+      const gun = ((p.zamanSon - p.zamanBas) / 86400).toFixed(1);
+      if (bas >= p.zamanBas) return { kaynak: "yalniz-yerel", sebep: `pencere içi (${gun} gün), kaynağa gidilmedi` };
+      this.sonPencereDisi = true;
+      return { kaynak: "yalniz-yerel", sebep: `pencere içi (${gun} gün) okundu; ÖNCESİNE bakılmadı` };
+    }
+
     if (this.chain !== "tron") return { kaynak: "trongrid", sebep: "blok indeksi yalnızca TRON" };
     if (!p) return { kaynak: "trongrid", sebep: "pencere okunamadı" };
     const gun = ((p.zamanSon - p.zamanBas) / 86400).toFixed(1);
-    // `fromTs` yoksa soru "bütün geçmiş"tir: başlangıç bilinmiyor, pencereden ÖNCE varsayılır.
-    const bas = opts.fromTs ? Math.floor(Date.parse(opts.fromTs) / 1000) : Number.NEGATIVE_INFINITY;
-    const son = opts.toTs ? Math.floor(Date.parse(opts.toTs) / 1000) : p.zamanSon;
     if (son <= p.zamanBas) return { kaynak: "trongrid", sebep: "aralık tamamen pencere öncesi" };
     if (bas >= p.zamanBas && son <= p.zamanSon) return { kaynak: "blok-indeksi", sebep: `pencere içi (${gun} gün)` };
     return { kaynak: "melez", sebep: `pencere öncesi kaynaktan, pencere içi (${gun} gün) indeksten` };

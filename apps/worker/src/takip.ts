@@ -14,6 +14,7 @@ import {
   durmaSebebi,
   devamEdilebilir,
   devamEsikleri,
+  kokEtiketiDurdurmaz,
   kosuDurmaSebebi,
   VARSAYILAN_ESIKLER,
   type AtifKurali,
@@ -21,9 +22,11 @@ import {
   type Esikler,
   type Hareket,
   type IzliGiris,
+  yerelYenidenTara,
 } from "@cry/motor";
 import { adresIndeksle } from "./indeksle";
 import { yakmaAdresiMi, type ChainId } from "@cry/chain";
+import { ayarOku, pencereOku } from "@cry/blok-indeks";
 
 type Parametreler = {
   maxHop?: number;
@@ -33,6 +36,13 @@ type Parametreler = {
   pencereSaat?: number;
   /** Tohum bir işlemse yalnızca o işlem takip edilir. */
   tohumTx?: string;
+  /**
+   * YALNIZCA YEREL: koşu kaynağa (TronGrid) HİÇ gitmez, yalnızca blok indeksinin
+   * penceresinden okur (kullanıcı kararı 2026-10-06). Cevap pencereyle sınırlıdır ve
+   * bunu kendisi söyler: pencere öncesine uzanan her düğüm `pencere_oncesi` notuyla
+   * işaretlenir, sayısı `stats.yalnizYerel`de durur.
+   */
+  yalnizYerel?: boolean;
 };
 
 /** Bir düğümün işlenmek üzere bekleyen hâli. */
@@ -114,21 +124,36 @@ async function durumuTemizle(traceRunId: bigint): Promise<void> {
  * Tarama başarısız olursa koşu DURMAZ ama sessiz de kalmaz: sebep `stats.kokTaramasi`na yazılır.
  * Boş bir graf "iz yok" diye okunur; oysa cevap "köke bakılamadı" olabilir ("yok" ≠ "bakılamadı").
  */
-async function kokuHazirla(traceRunId: bigint, zincir: string, kok: string): Promise<void> {
+async function kokuHazirla(
+  traceRunId: bigint,
+  zincir: string,
+  kok: string,
+  yalnizYerel: boolean,
+): Promise<void> {
   const kayit = await prisma.address.findUnique({
     where: { chain_address: { chain: zincir, address: kok } },
-    select: { indexState: true },
+    select: { indexState: true, indexNote: true },
   });
-  if (kayit && kayit.indexState !== "bilinmiyor") return;
+  // Kaynaklı kipte "bilinmiyor değilse dokunma" kuralı kotayı korur. Yerelde tarama bir
+  // ClickHouse sorgusu, ve o kural kaynağın bıraktığı hasarı kalıcı yapıyordu (ölçüldü).
+  const atla = yalnizYerel
+    ? kayit && !yerelYenidenTara(kayit.indexState, kayit.indexNote)
+    : kayit && kayit.indexState !== "bilinmiyor";
+  if (atla) return;
 
   try {
     const s = await iptaleDuyarli(traceRunId, (signal) =>
-      adresIndeksle(zincir as ChainId, kok, { maxSayfa: 10, signal }));
+      adresIndeksle(zincir as ChainId, kok, { maxSayfa: 10, signal, yalnizYerel }));
     await durumYaz(traceRunId, "kokTaramasi", {
       yeniHareket: s.yeniHareket,
       tamamlandi: s.tamamlandi,
       kaynak: s.hareketKaynagi ?? null,
       atlanmaSebebi: s.atlanmaSebebi ?? null,
+      // KÖK pencere öncesine uzanıyorsa koşu BAŞLAR ama uyarır (kullanıcı kararı):
+      // kökün geçmişi kesilmişse grafın tamamı o kesikten etkilenir, ve bunu
+      // söylemeyen bir graf "para buradan başladı" diye okunur.
+      pencereDisi: s.pencereDisiKaldi ?? false,
+      pencere: s.pencere ?? null,
     });
   } catch (e) {
     await durumYaz(traceRunId, "kokTaramasi", { hata: (e as Error).message.slice(0, 200) });
@@ -149,7 +174,8 @@ export async function takipKos(traceRunId: bigint): Promise<Ozet> {
   // tohum boş çıkar, yürüyüş ilk düğümde biter ve koşu "bitti" görünür. Ölçüldü (M4, 2026-09-22):
   // taze bir adreste koşu 10,9 sn sürdü ve 0 kenar verdi — hata vermeden, boş bir graf olarak.
   // Yürüyüş kökü zaten indeksliyor ama tohum ONDAN ÖNCE hesaplanıyor; sıra bu yüzden burada.
-  await kokuHazirla(traceRunId, kosu.chain, kosu.rootAddress);
+  const yalnizYerel = p.yalnizYerel === true;
+  await kokuHazirla(traceRunId, kosu.chain, kosu.rootAddress, yalnizYerel);
   const tohum = await tohumGirisleri(kosu.chain, kosu.rootAddress, p.tohumTx);
   // Tek bir İŞLEMDEN başlatılan koşuda tohumun boş çıkması sessiz kalmamalı: graf "1 düğüm · bitti"
   // görünür ve "para hareket etmemiş" diye okunur. En sık sebebi YÖNdür — tohum köke GİREN paradır,
@@ -165,7 +191,45 @@ export async function takipKos(traceRunId: bigint): Promise<Ozet> {
     esikler: esikleriOku(p),
     gorulen: new Set<string>([kosu.rootAddress]),
     sira: [{ adres: kosu.rootAddress, hop: 0, girisler: tohum }],
+    yalnizYerel,
+    kok: kosu.rootAddress,
   });
+
+  // Kipin bedeli KOŞUNUN KENDİSİNDE yazılı olmalı: rapor "bu cevap şu aralığa bakarak verildi"
+  // diyebilsin. Kip kapalıyken alan hiç yazılmaz — boş bir nesne "yerel koştu" diye okunurdu.
+  if (yalnizYerel) {
+    // Sayı BU koşuda taranan düğümlerden değil, grafın BÜTÜN düğümlerinin kayıtlı
+    // kapsamından okunur. Ölçüldü (koşu 33): ikinci kez koşulduğunda düğümler zaten
+    // taranmış olduğu için sayaç 0 diyordu — "saymadım"ı "yok" diye raporlamak, bu
+    // projenin kaçındığı kusurun ta kendisi.
+    const [{ sayi } = { sayi: 0n }] = await prisma.$queryRaw<{ sayi: bigint }[]>`
+      select count(*)::bigint as sayi
+        from trace_nodes n
+        join addresses a on a.chain = n.chain and a.address = n.address
+       where n.trace_run_id = ${traceRunId}
+         and a.index_note = 'pencere_oncesi'`;
+    // Pencere, taranan düğüm olmasa da yazılır: ikinci kez koşulan bir grafta hiçbir adres
+    // yeniden taranmıyor ve "hangi aralığa bakıldı" sorusu cevapsız kalıyordu (ölçüldü: koşu 34).
+    let pencere = sonuc.kapsam.pencere;
+    if (!pencere) {
+      try {
+        const p0 = await pencereOku(ayarOku());
+        if (p0) {
+          pencere = {
+            bas: new Date(p0.zamanBas * 1000).toISOString(),
+            son: new Date(p0.zamanSon * 1000).toISOString(),
+          };
+        }
+      } catch {
+        // Motora ulaşılamadı: pencere "bilinmiyor" kalır ve ekran bunu SÖYLER.
+      }
+    }
+    await durumYaz(traceRunId, "yalnizYerel", {
+      acik: true,
+      pencere,
+      pencereDisiDugum: Number(sayi),
+    });
+  }
 
   return kosuyuKapat(traceRunId, undefined, sonuc.iptal ? { kalan: sonuc.kalan } : undefined);
 }
@@ -259,6 +323,9 @@ export async function takipDevam(
     gorulen: new Set(mevcut.map((d) => d.address)),
     sira: [{ adres, hop: dugum.hop, girisler }],
     zorlaDevam: adres,
+    // Devam AYNI koşunun grafına ekleniyor; kipi de aynı olmalı. Yerel koşuya
+    // kaynaktan beslenen bir devam eklemek, tek grafta iki ayrı kapsam demekti.
+    yalnizYerel: p.yalnizYerel === true,
   });
 
   return kosuyuKapat(
@@ -339,12 +406,24 @@ type Yuruyus = {
   sira: Sira[];
   /** Kullanıcının devam ettirdiği düğüm: durma ölçütü ona SORULMAZ. */
   zorlaDevam?: string;
+  /** Kaynağa hiç gidilmez; cevap blok indeksinin penceresiyle sınırlıdır. */
+  yalnizYerel?: boolean;
+  /** Koşunun KÖKÜ: borsa etiketi onu durdurmaz, çünkü o adresi insan seçti. */
+  kok?: string;
 };
+
+/**
+ * Yürüyüşün KAPSAM defteri: kaç düğümde pencere öncesine bakılamadı ve hangi aralık okundu.
+ * Koşu bittiğinde `stats.yalnizYerel`e yazılır — sayılmayan eksik, yok sayılan eksiktir.
+ */
+type Kapsam = { pencereDisiDugum: number; pencere: { bas: string; son: string } | null };
 
 /** İlerleme ve iptal en çok bu sıklıkta yoklanır: her düğümde sorgu atmamak için. */
 const ILERLEME_ARALIGI_MS = 1000;
 
-async function yuru(y: Yuruyus): Promise<{ iptal: boolean; kalan: number }> {
+async function yuru(y: Yuruyus): Promise<{ iptal: boolean; kalan: number; kapsam: Kapsam }> {
+  const yalnizYerel = y.yalnizYerel === true;
+  const kapsam: Kapsam = { pencereDisiDugum: 0, pencere: null };
   const { traceRunId, zincir, kural, esikler, gorulen } = y;
   let sira = y.sira;
   let islenen = 0;
@@ -357,7 +436,7 @@ async function yuru(y: Yuruyus): Promise<{ iptal: boolean; kalan: number }> {
       if (Date.now() - sonYoklama >= ILERLEME_ARALIGI_MS) {
         sonYoklama = Date.now();
         const kalan = sira.length - sirasi + sonraki.length;
-        if (await iptalIstendiMi(traceRunId)) return { iptal: true, kalan };
+        if (await iptalIstendiMi(traceRunId)) return { iptal: true, kalan, kapsam };
         await durumYaz(traceRunId, "ilerleme", {
           islenen,
           hop: dugum.hop,
@@ -373,9 +452,19 @@ async function yuru(y: Yuruyus): Promise<{ iptal: boolean; kalan: number }> {
       // Yakma adresi TARANMAZ: milyonlarca hareketi var ve hiçbiri bu paranın
       // devamı değil. Taranmamış düğüm KENDİLİĞİNDEN taranır: atlanırsa graf kısa kalır ve
       // "iz burada bitti" sanılır.
-      if (!bilgi.indekslendiMi && !yakmaAdresiMi(dugum.adres) && gorulen.size <= esikler.maxDugum) {
+      const taransinMi = yalnizYerel
+        ? yerelYenidenTara(bilgi.indexState, bilgi.indexNote)
+        : !bilgi.indekslendiMi;
+      if (taransinMi && !yakmaAdresiMi(dugum.adres) && gorulen.size <= esikler.maxDugum) {
         await iptaleDuyarli(traceRunId, (signal) =>
-          adresIndeksle(zincir as ChainId, dugum.adres, { maxSayfa: 10, signal })).catch(() => {});
+          adresIndeksle(zincir as ChainId, dugum.adres, { maxSayfa: 10, signal, yalnizYerel }))
+          .then((s) => {
+            // Pencere dışı kalan düğüm SAYILIR: "kaç düğümde eksik baktık" sorusunun
+            // cevabı koşunun kendisinde durmalı, yoksa graf tam sanılır.
+            if (s.pencereDisiKaldi) kapsam.pencereDisiDugum += 1;
+            if (s.pencere) kapsam.pencere = s.pencere;
+          })
+          .catch(() => {});
       }
 
       const guncel = await dugumBilgisi(zincir, dugum.adres);
@@ -386,7 +475,7 @@ async function yuru(y: Yuruyus): Promise<{ iptal: boolean; kalan: number }> {
         0n,
       );
 
-      const sebep =
+      const hamSebep =
         dugum.adres === y.zorlaDevam
           ? null
           : durmaSebebi(
@@ -404,6 +493,18 @@ async function yuru(y: Yuruyus): Promise<{ iptal: boolean; kalan: number }> {
               esikler,
               gorulen.size,
             );
+
+      // Kökte borsa etiketi durdurmaz; ama SESSİZ de geçilmez — sebep koşuya yazılır,
+      // yoksa "bu adres bir servis cüzdanı adayı" bilgisi rapordan silinirdi.
+      const kokteEtiket = dugum.adres === y.kok && kokEtiketiDurdurmaz(hamSebep);
+      if (kokteEtiket) {
+        await durumYaz(traceRunId, "kokEtiketi", {
+          sebep: hamSebep,
+          etiketler: guncel.etiketler.map((e) => e.title),
+          not: "kök bir borsa/servis etiketi taşıyor; koşu yine de başlatıldı (adresi insan seçti)",
+        });
+      }
+      const sebep = kokteEtiket ? null : hamSebep;
 
       await dugumYaz(traceRunId, zincir, dugum, varlikToplami, sebep, guncel.etiketler);
       if (sebep) continue;
@@ -439,7 +540,7 @@ async function yuru(y: Yuruyus): Promise<{ iptal: boolean; kalan: number }> {
 
     sira = sonraki;
   }
-  return { iptal: false, kalan: 0 };
+  return { iptal: false, kalan: 0, kapsam };
 }
 
 /* ---------------- veri okuma ---------------- */
@@ -477,6 +578,9 @@ type DugumBilgisi = {
   borsaEtiketiDogrulanmisMi: boolean;
   sozlesmeMi: boolean;
   indekslendiMi: boolean;
+  /** Ham durum ve sebep: yerel kipte "yeniden bakılsın mı" kararı bunlara bakıyor. */
+  indexState: string;
+  indexNote: string | null;
   etiketler: {
     title: string;
     category: string;
@@ -493,6 +597,7 @@ async function dugumBilgisi(zincir: string, adres: string): Promise<DugumBilgisi
       id: true,
       isContract: true,
       indexState: true,
+      indexNote: true,
       labels: {
         select: { title: true, category: true, exchange: true, verifiedAt: true },
       },
@@ -505,6 +610,8 @@ async function dugumBilgisi(zincir: string, adres: string): Promise<DugumBilgisi
       borsaEtiketiDogrulanmisMi: false,
       sozlesmeMi: false,
       indekslendiMi: false,
+      indexState: "bilinmiyor",
+      indexNote: null,
       etiketler: [],
     };
   }
@@ -525,6 +632,8 @@ async function dugumBilgisi(zincir: string, adres: string): Promise<DugumBilgisi
     borsaEtiketiDogrulanmisMi: borsaEtiketleri.some((e) => e.verifiedAt !== null),
     sozlesmeMi: kayit.isContract === true,
     indekslendiMi: kayit.indexState !== "bilinmiyor",
+    indexState: kayit.indexState,
+    indexNote: kayit.indexNote,
     etiketler: kayit.labels.map((e) => ({
       title: e.title,
       category: e.category,

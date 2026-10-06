@@ -19,6 +19,23 @@ export type DurmaSebebi =
   | "kontrat" // akıllı sözleşme: iz burada kesiliyor
   | "indekssiz"; // düğüm taranmamış, veri yok
 
+/**
+ * KÖKTE etiket yüzünden durulur mu?
+ *
+ * Hayır: kökü insan SEÇTİ. "Bu adrese giren para nereye gitti" diye sorulurken başlangıç
+ * noktasında durmak, soruyu cevapsız bırakıp boş bir graf vermektir — ölçüldü (2026-10-06,
+ * koşu 28/31): kök doğrulanmamış bir "servis cüzdanı adayı" etiketi taşıyordu ve koşu
+ * 1 düğüm / 0 kenarla bitti. Devam kararı zaten insanın elinde (`zorlaDevam`); kök o
+ * kararın ilk hâlidir. Etiket SİLİNMEZ, rapora yazılır.
+ *
+ * Yalnızca BORSA etiketleri geçersizdir. Yakma adresi, sözleşme, dallanma ve indekssizlik
+ * kökte de durdurur: biri paranın yok edildiğini söyler, ötekiler milyonlarca satırlık bir
+ * taramayı başlatırdı.
+ */
+export function kokEtiketiDurdurmaz(sebep: DurmaSebebi | null): boolean {
+  return sebep === "terminal" || sebep === "terminal_aday";
+}
+
 export type Esikler = {
   /** Kökten kaç sıçrama. */
   maxHop: number;

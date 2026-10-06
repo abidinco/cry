@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { bloktanSatirlar, satirDizisi, TRANSFER_KONUSU, USDT_TRC20_HEX, type IndeksSatiri } from "@cry/blok-indeks";
 import { hexToBase58 } from "@cry/chain";
+// İmleç kurucusu paket dışına açılmıyor; testi doğrudan kaynağından alıyor.
+import { sonraKosulu } from "../packages/blok-indeks/src/hareketler.js";
 
 // GERÇEK TRON blokları (86.271.000 ve 86.271.003), yalnızca ilgili işlemler bırakılarak kırpıldı.
 // Beş vakanın beşi de gerçek veriden: TRX transferi, başarısız sözleşme çağrısı, USDT Transfer
@@ -95,5 +97,31 @@ describe("satirDizisi", () => {
 
   it("varlığı kodla yazar ve sütun sırası şemayla aynı", () => {
     expect(satirDizisi(s)).toEqual([1, 2, "ab".repeat(32), 3, 2, "cd".repeat(20), "ef".repeat(20), (2n ** 255n).toString()]);
+  });
+});
+
+describe("sayfalama imleci: iki tablonun tx sütunu AYNI TİPTE DEĞİL", () => {
+  it("ana tabloda tx ikilik: unhex ile karşılaştırılır", () => {
+    const k = sonraKosulu("1767220000|ab12cd|3", "tx");
+    expect(k).toContain("unhex('ab12cd')");
+    expect(k).toContain("(zaman, tx, idx) > (1767220000,");
+  });
+
+  it("giden aynasında txh UInt64: ONDALIK yazılır, unhex KULLANILMAZ", () => {
+    // Ölçüldü (2026-10-06): `unhex` ile kurulan imleç ikinci sayfada "Cannot convert string
+    // … to type UInt64" veriyordu; gideni limitten çok olan adresin hareketleri eksik kalıp
+    // hata `kaynak_hatasi` diye kaydediliyordu. Düzeltmeden sonra aynı adres 11.999 hareket verdi.
+    const k = sonraKosulu("1767220000|00000000000000ff|3", "txh", true);
+    expect(k).not.toContain("unhex");
+    expect(k).toContain("(zaman, txh, idx) > (1767220000, 255, 3)");
+  });
+
+  it("imleç boşsa koşul da boştur", () => {
+    expect(sonraKosulu(null, "tx")).toBe("");
+    expect(sonraKosulu("bitti", "txh", true)).toBe("");
+  });
+
+  it("imleçteki tx hex değilse HATA — sessizce sorguya girmez", () => {
+    expect(() => sonraKosulu("1|'; drop table x; --|2", "tx")).toThrow();
   });
 });

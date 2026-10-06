@@ -15,7 +15,16 @@ import { DEVAM_EK_HOP, devamEdilebilir } from "@cry/motor";
 import TakipIskeleti from "./TakipIskeleti";
 import TutarAraligi from "./TutarAraligi";
 import { islemGezgini, kisaHash } from "@/lib/gezgin";
-import { kokTaramasiSorunu, tohumSorunu, ilerlemeMetni, type Ilerleme } from "@/lib/kosu-durum";
+import {
+  kokEtiketiNotu,
+  kokTaramasiSorunu,
+  tohumSorunu,
+  ilerlemeMetni,
+  yalnizYerelNotu,
+  type Ilerleme,
+  type KokEtiketi,
+  type YalnizYerelDurumu,
+} from "@/lib/kosu-durum";
 import { Adres, Bos, Tarih, Tutar } from "@/components/ui";
 import { kisaTutar, sayi, tarih, tutarParcala } from "@/lib/bicim";
 import { cizilecekler } from "@/lib/graf-secim";
@@ -56,6 +65,10 @@ type Kosu = {
     /** Kök adres koşunun BAŞINDA tarandıysa sonucu; taranamadıysa sebebi. */
     kokTaramasi?: { yeniHareket?: number; tamamlandi?: boolean; kaynak?: string | null; atlanmaSebebi?: string | null; hata?: string };
     tohum?: { tohumTx?: string | null; bulunan?: number };
+    /** Yalnızca yerel kipte: hangi pencereye bakıldı ve kaç düğüm dışında kaldı. */
+    yalnizYerel?: YalnizYerelDurumu;
+    /** Kök bir borsa/servis etiketi taşıyorsa: durdurmadı ama söylenir. */
+    kokEtiketi?: KokEtiketi;
   } | null;
   params: Record<string, unknown> | null;
   startedAt: string;
@@ -280,6 +293,9 @@ export default function TakipGorunumu({ id }: { id: string }) {
   // Tek bir İŞLEMDEN başlatılan koşuda tohum boş çıktıysa ayrı bir cümle gerekir: sebep kökün
   // taranamaması değil, o işlemin köke para GETİRMEMESİDİR. İkisi aynı boş grafı üretir.
   const tohumMesaji = tohumSorunu(kosu.stats?.tohum);
+  // Kip ve kökün etiketi: ikisi de grafın KAPSAMINI anlatıyor, saf katmanda ve testli.
+  const yerelNot = yalnizYerelNotu(kosu.stats?.yalnizYerel);
+  const kokEtiketNotu = kokEtiketiNotu(kosu.stats?.kokEtiketi);
 
   if (!model || !gorunurModel || kosu.dugumler.length === 0) {
     return (
@@ -350,6 +366,17 @@ export default function TakipGorunumu({ id }: { id: string }) {
         // bir grafi tam gösterir ("yok" ile "bakılamadı" ayrı cevaplardır).
         <div className="veri m3" style={{ color: "var(--hata)", padding: "0 1rem 0.5rem" }}>
           Kök adresin taraması eksik — bu grafta görünmeyen giriş olabilir. {kokSorunu}
+        </div>
+      )}
+      {yerelNot && (
+        // Kipin bedeli: graf bir ALT SINIR. Söylenmezse tam sanılır.
+        <div className="veri m3" style={{ color: "var(--dikkat)", padding: "0 1rem 0.5rem" }}>
+          {yerelNot}
+        </div>
+      )}
+      {kokEtiketNotu && (
+        <div className="veri m3" style={{ color: "var(--dikkat)", padding: "0 1rem 0.5rem" }}>
+          {kokEtiketNotu}
         </div>
       )}
       <div className="takip-govde">
