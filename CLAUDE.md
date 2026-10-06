@@ -496,6 +496,13 @@ kapatmak bilerek kaynağa gitmektir. Saf katman testli (`tests/yalniz-yerel.test
   `stats.kokEtiketi`ne ve ekrana yazılır. Yakma · sözleşme · dallanma ·
   indekssizlik kökte de DURDURUR: biri paranın yok edildiğini söyler, ötekiler
   milyonlarca satırlık bir taramayı başlatırdı.
+- **Konteynerde `CLICKHOUSE_URL` SERVİS ADI olmalı.** `.env`deki değer makinenin
+  kendisini (`127.0.0.1:18123`) gösteriyor; `blok-okuyucu` ve `web` bunu eziyordu,
+  **worker EZMİYORDU**. Ölçüldü (2026-10-06, kuyruktan koşu 36): worker içinden
+  `clickhouse:8123` 200, `127.0.0.1:18123` ulaşılamıyor — yani canlı yolda pencere
+  hep "okunamadı" sayılıp HER soru kaynağa gidiyordu. **Betikten koşan ölçüm bunu
+  göremez**: orada 127.0.0.1 doğru adres. Yani indeksin kazancı aylardır yalnızca
+  ölçümlerde vardı, kullanıcının bastığı düğmede yoktu.
 - **Giden aynasının imleci ONDALIK yazılır.** Ana tabloda `tx` FixedString, aynada
   `txh` **UInt64**; ikisine de `unhex` uygulayan imleç ikinci sayfada "Cannot
   convert string … to type UInt64" ile düşüyordu. Gideni limitten çok olan adres

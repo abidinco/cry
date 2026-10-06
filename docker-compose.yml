@@ -79,10 +79,17 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
+      # .env'deki CLICKHOUSE_URL makinenin kendisini (127.0.0.1:18123) gösteriyor; konteynerden
+      # servis adı. EKSİKTİ ve sessizdi: worker indekse hiç ulaşamıyor, pencere "okunamadı"
+      # sayılıp her soru kaynağa gidiyordu (ölçüldü 2026-10-06, kuyruktan koşu 36). Yani blok
+      # indeksinin kazancı YALNIZCA betikten koşan ölçümlerde görünüyordu — canlı yolda değil.
+      CLICKHOUSE_URL: http://clickhouse:8123
     depends_on:
       db:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      clickhouse:
         condition: service_healthy
 
   # Blok indeksi (görev 11). Motor kararı ve ölçümü: docs/yol-haritasi-blok-indeks.md §1.
