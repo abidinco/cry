@@ -502,7 +502,10 @@ kapatmak bilerek kaynağa gitmektir. Saf katman testli (`tests/yalniz-yerel.test
   `clickhouse:8123` 200, `127.0.0.1:18123` ulaşılamıyor — yani canlı yolda pencere
   hep "okunamadı" sayılıp HER soru kaynağa gidiyordu. **Betikten koşan ölçüm bunu
   göremez**: orada 127.0.0.1 doğru adres. Yani indeksin kazancı aylardır yalnızca
-  ölçümlerde vardı, kullanıcının bastığı düğmede yoktu.
+  ölçümlerde vardı, kullanıcının bastığı düğmede yoktu. Düzeltmeden sonra canlı
+  yol ölçüldü (koşu 37, hiç taranmamış kök, kuyruktan): kök indeksten **20.189
+  hareket** okudu, 25 düğüm / 75 kenar, 82 sn, worker günlüğünde trongrid **0**
+  satır, ve koşu `terminal` ile bitti — yani doğrulanmış bir borsaya varıldı.
 - **Giden aynasının imleci ONDALIK yazılır.** Ana tabloda `tx` FixedString, aynada
   `txh` **UInt64**; ikisine de `unhex` uygulayan imleç ikinci sayfada "Cannot
   convert string … to type UInt64" ile düşüyordu. Gideni limitten çok olan adres
