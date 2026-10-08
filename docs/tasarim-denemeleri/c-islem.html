@@ -1,0 +1,230 @@
+<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>C — İşlem</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>/* c.css gömüldü — kaynak: c.css */
+/*
+ * C — "Kurul" tasarım dili. Bütün sayfalar bu dosyayı paylaşır.
+ *
+ * RENK KANALLARI ayrı kalır (arayuz.md): yön = yeşil/kehribar · uyarı = kırmızı
+ * köken = sol oluk · vurgu (cyan) = YALNIZCA bağlantı, odak, birincil eylem.
+ */
+:root{
+  --zemin:#0a0f1a; --yuzey:#101827; --yuzey2:#16202f; --yuzey3:#1b2637;
+  --cizgi:#1f2b3d; --cizgi2:#182230;
+  --m1:#e8eef6; --m2:#93a3b8; --m3:#64748b;
+  --vurgu:#38bdf8; --vurgu2:#4f7cf7;
+  --gelen:#34d399; --giden:#fbbf24; --aday:#fbbf24; --hata:#f87171; --geri:#f472b6;
+  --gelen-y:#6ee7b7; --aday-y:#fcd34d; --hata-y:#fca5a5;
+  /* köken işaretleri */
+  --kok-kaynak:#6c8ce0; --kok-indeks:#5a7187; --kok-supheli:#fbbf24; --kok-yok:#2a3850;
+  --r:10px; --r2:8px;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--zemin);color:var(--m1);font-family:Inter,system-ui,sans-serif;
+  font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased;
+  background-image:radial-gradient(900px 420px at 16% -12%, #14233a 0%, transparent 72%)}
+h1,h2,h3{margin:0;font-weight:600;letter-spacing:-.012em}
+h1{font-size:19px} h2{font-size:13px} h3{font-size:14px}
+a{color:var(--vurgu);text-decoration:none} a:hover{text-decoration:underline}
+.veri{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;font-size:12px}
+.etiket{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--m3);font-weight:600}
+.m2{color:var(--m2)} .m3{color:var(--m3)} .kusur{color:var(--m3)}
+:focus-visible{outline:2px solid var(--vurgu);outline-offset:2px}
+
+/* --- kabuk: sol ray + içerik --- */
+.kabuk{display:grid;grid-template-columns:60px minmax(0,1fr);min-height:100vh}
+.ray{background:#0b1220;border-right:1px solid var(--cizgi);display:flex;flex-direction:column;
+  align-items:center;gap:6px;padding:12px 0;position:sticky;top:0;height:100vh}
+.ray .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(145deg,var(--vurgu),#6366f1);
+  color:#061018;display:grid;place-items:center;font-weight:700;font-size:15px;margin-bottom:10px}
+.ray a{width:38px;height:38px;border-radius:9px;display:grid;place-items:center;color:var(--m3);font-size:16px}
+.ray a:hover{background:var(--yuzey2);color:var(--m1);text-decoration:none}
+.ray a.aktif{background:#16263d;color:var(--vurgu);box-shadow:inset 0 0 0 1px #24405e}
+.ray .alt{margin-top:auto;color:var(--m3);font-size:10px;display:grid;gap:6px;justify-items:center}
+.ana{padding:16px 22px 40px;min-width:0}
+.ana.dar{max-width:960px}
+
+/* --- sayfa başı --- */
+.tepe{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.tepe .sag{margin-left:auto;display:flex;gap:8px}
+.cip{font-family:"IBM Plex Mono",monospace;font-size:11px;padding:3px 9px;border-radius:999px;
+  background:var(--yuzey2);border:1px solid var(--cizgi);color:var(--m2);white-space:nowrap}
+.cip.ok{color:var(--gelen-y);border-color:#1d5745;background:#0e2a22}
+.cip.uy{color:var(--aday-y);border-color:#4a3a12;background:#211b08}
+.cip.hata{color:var(--hata-y);border-color:#5c2420;background:#241110}
+
+/* --- kartlar --- */
+.kartlar{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:14px}
+.kart{background:var(--yuzey);border:1px solid var(--cizgi);border-radius:var(--r);padding:12px 14px}
+.kart .d{font-family:"IBM Plex Mono",monospace;font-size:22px;font-weight:500;letter-spacing:-.02em;margin-top:5px}
+.kart .d small{font-size:13px;color:var(--m3)}
+.kart .d.y{color:var(--gelen-y)} .kart .d.k{color:var(--aday-y)} .kart .d.h{color:var(--hata-y)}
+.kart .alt{font-size:11px;color:var(--m3);margin-top:3px}
+
+/* --- panel: köken oluğu burada yaşar --- */
+.panel{background:var(--yuzey);border:1px solid var(--cizgi);border-radius:var(--r);overflow:hidden;position:relative}
+.panel[data-koken]::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--kok-yok)}
+.panel[data-koken="kaynak"]::before{background:var(--kok-kaynak)}
+.panel[data-koken="indeks"]::before{background:var(--kok-indeks)}
+.panel[data-koken="supheli"]::before{background:var(--kok-supheli)}
+.panel > h2{padding:11px 14px;border-bottom:1px solid var(--cizgi2);display:flex;align-items:center;gap:10px}
+.panel > h2 .etiket, .panel > h2 .sag{margin-left:auto}
+.ic{padding:12px 14px}
+.ic + .ic{border-top:1px solid var(--cizgi2)}
+.sutun{display:grid;gap:12px;align-content:start}
+.ikili{display:grid;grid-template-columns:minmax(0,1fr) 384px;gap:12px}
+.koken-notu{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--m3);margin-left:8px}
+.koken-notu[data-koken="supheli"]{color:var(--aday-y)}
+
+/* --- alan/değer --- */
+.satirlar{display:grid;gap:9px}
+.satir{display:grid;grid-template-columns:148px 1fr;gap:12px;align-items:baseline}
+@media(max-width:640px){.satir{grid-template-columns:1fr;gap:2px}}
+
+/* --- tablo --- */
+.tablo-sar{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--m3);font-weight:600;
+  padding:8px 10px;background:#0d1522;border-bottom:1px solid var(--cizgi2);position:sticky;top:0;white-space:nowrap}
+td{padding:6px 10px;border-bottom:1px solid #141d2b;vertical-align:baseline}
+tbody tr:hover{background:#131d2c}
+td.sag,th.sag{text-align:right}
+.kaydir{max-height:320px;overflow:auto}
+
+/* --- çubuk --- */
+.cubuk{display:grid;grid-template-columns:110px 1fr 78px;gap:9px;align-items:center;padding:3px 0}
+.yol{height:8px;border-radius:4px;background:#1a2433;overflow:hidden}
+.yol span{display:block;height:100%;border-radius:4px}
+.cubuk .veri{text-align:right}
+
+/* --- rozet --- */
+.rozet{display:inline-flex;gap:5px;align-items:center;font-size:11px;padding:2px 9px;border-radius:999px;
+  border:1px solid var(--cizgi);color:var(--m2);background:var(--yuzey2)}
+.rozet.y{color:var(--gelen-y);border-color:#15463a;background:#0c231d}
+.rozet.k{color:var(--aday-y);border-color:#4a3a12;background:#211b08}
+.rozet.h{color:var(--hata-y);border-color:#5c2420;background:#241110}
+
+/* --- denetimler --- */
+button,.dugme{font:inherit;font-size:12px;font-weight:500;border-radius:var(--r2);padding:7px 12px;cursor:pointer;
+  background:var(--yuzey2);border:1px solid var(--cizgi);color:var(--m1)}
+button:hover:not(:disabled){border-color:#2f425c}
+button:disabled{opacity:.45;cursor:default}
+button.b{background:linear-gradient(145deg,var(--vurgu),var(--vurgu2));border:0;color:#04121f;font-weight:600}
+button.kucuk{padding:3px 9px;font-size:11px;border-radius:6px}
+button.tehlike{color:var(--hata-y);border-color:#4a2420}
+input,select,textarea{font:inherit;font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--m1);
+  background:#0b1220;border:1px solid var(--cizgi);border-radius:var(--r2);padding:8px 10px}
+input::placeholder{color:var(--m3)}
+input:focus,select:focus{border-color:var(--vurgu);outline:none}
+label.satir-ic{display:inline-flex;align-items:center;gap:7px}
+
+/* --- uyarı / boş --- */
+.uyari{display:flex;gap:10px;align-items:flex-start;background:#1d1708;border:1px solid #4a3a12;
+  border-radius:var(--r);padding:10px 13px;color:#fde68a;font-size:12.5px}
+.uyari.hata{background:#241110;border-color:#5c2420;color:var(--hata-y)}
+.uyari.iyi{background:#0c231d;border-color:#15463a;color:var(--gelen-y)}
+.bos{border:1px dashed var(--cizgi);border-radius:var(--r);padding:18px;color:var(--m2)}
+
+/* --- akış (takip) --- */
+text{font-family:"IBM Plex Mono",monospace}
+.kol{font-size:9px;letter-spacing:.16em;fill:var(--m3)}
+.ad{font-family:Inter,sans-serif;font-size:11px;fill:var(--m1)}
+.tut{font-size:9.5px;fill:var(--m2)}
+.lejant{display:flex;gap:14px;flex-wrap:wrap;color:var(--m2);font-size:11.5px;align-items:center;margin-bottom:8px}
+.lejant i{display:inline-block;width:16px;height:4px;border-radius:2px;vertical-align:middle;margin-right:5px}
+</style>
+<style>
+.hash{font-family:"IBM Plex Mono",monospace;font-size:15px;word-break:break-all;font-weight:500}
+.hareket{display:grid;grid-template-columns:1fr auto;gap:12px;padding:12px 14px;border-bottom:1px solid var(--cizgi2)}
+.hareket:last-child{border:0}
+.ok{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.ok .veri{font-size:12.5px}
+.tl{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--m2);margin-top:5px}
+.tl b{color:var(--m1);font-weight:500}
+.buyuk-tutar{font-family:"IBM Plex Mono",monospace;font-size:18px;text-align:right;white-space:nowrap}
+</style></head><body>
+<div class="kabuk">
+  <nav class="ray">
+    <div class="logo">c</div>
+    <a href="c-ana.html" title="ara">⌕</a><a href="c-kurul.html" title="takip">◈</a>
+    <a href="c-adres.html" title="adres">⌖</a><a href="c-etiket.html" title="etiket">⛉</a>
+    <a href="c-izleme.html" title="izleme">◉</a><a href="c-rapor.html" title="rapor">▤</a>
+    <a href="c-yonetim.html" title="yönetim">⚙</a><span class="alt"><span class="rozet">ab</span></span>
+  </nav>
+  <main class="ana dar">
+    <div class="tepe">
+      <div>
+        <div class="etiket">işlem · tron</div>
+        <div class="hash">a93f7c0b41d2ee8891ab77cd0145f3e9b2d6a0c41f885e7b109ef2c21</div>
+      </div>
+      <span class="sag"><span class="cip ok">✓ başarılı</span><button>gezginde aç ↗</button></span>
+    </div>
+
+    <div class="ikili">
+      <div class="sutun">
+        <div class="panel" data-koken="kaynak">
+          <h2>İşlem <span class="etiket">köken · kaynağın beyanı</span></h2>
+          <div class="ic satirlar">
+            <div class="satir"><span class="etiket">blok</span><span class="veri">84.903.551</span></div>
+            <div class="satir"><span class="etiket">zaman</span><span><span class="veri">02.10.2026 14:22:09</span> <span class="koken-notu">UTC: 11:22:09 — gün sınırı UTC</span></span></div>
+            <div class="satir"><span class="etiket">sonuç</span><span><span class="rozet y">başarılı</span></span></div>
+            <div class="satir"><span class="etiket">hareket</span><span>2 <span class="koken-notu">log dizisinden okundu</span></span></div>
+          </div>
+        </div>
+
+        <div class="panel" data-koken="kaynak">
+          <h2>Hareketler <span class="etiket">işlem içindeki sıra</span></h2>
+          <div class="hareket">
+            <div>
+              <div class="ok">
+                <span class="veri">TLa2f1…9Qw</span><span class="m3">→</span><span class="veri">TR7NHq…dtM9</span>
+                <span class="rozet">USDT · TRC20</span>
+              </div>
+              <div class="tl">işlem günü <b>220,04 ₺</b> (rapor günü 231,70 ₺) · TCMB döviz alış <span class="m3">29.09.2026 bülteni</span> · 1 USDT = 0,999957 USD</div>
+            </div>
+            <div style="text-align:right">
+              <div class="buyuk-tutar">4,5<span class="kusur">0</span> <span class="m3" style="font-size:12px">USDT</span></div>
+              <button class="b kucuk" style="margin-top:7px">bu parayı takip et ▸</button>
+            </div>
+          </div>
+          <div class="hareket">
+            <div>
+              <div class="ok">
+                <span class="veri">TLa2f1…9Qw</span><span class="m3">→</span><span class="veri">TQ5rNn…bV1</span>
+                <span class="rozet k">? bilinmeyen token</span>
+              </div>
+              <div class="tl" style="color:var(--aday-y)">ondalık bilinmiyor — tutar HAM basılıyor, çevrilmedi. Fiyat yok: <span class="veri">kaynakta_yok</span>.</div>
+            </div>
+            <div style="text-align:right">
+              <div class="buyuk-tutar">85.500.000.000 <span class="m3" style="font-size:12px">ham</span></div>
+              <button class="b kucuk" style="margin-top:7px">bu parayı takip et ▸</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="uyari"><span>⚠</span><span><b>Bu liste bir eksiksizlik iddiası değildir.</b>
+          Sözleşme çağrısının taşıdığı TRX (<span class="veri">call_value</span>) ve iç transferler bu uçta görünmüyor;
+          TRON hesap ucu iç transferi vermiyor. Görülemeyen: <span class="veri">internalTransfers</span>.</span></div>
+      </div>
+
+      <div class="sutun">
+        <div class="panel"><h2>Bu işlemden takip</h2>
+          <div class="ic">
+            <p class="m2" style="margin:0 0 10px">Kök adresi <b>insan seçer</b>: tohum, köke GİREN paradır. Göndericiye düğme konmaz.</p>
+            <div class="satirlar">
+              <div class="satir"><span class="etiket">alıcı</span><span class="veri">TR7NHq…dtM9</span></div>
+              <div class="satir"><span class="etiket">alıcı</span><span class="veri">TQ5rNn…bV1</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="panel" data-koken="indeks"><h2>Fiyat ve kur</h2>
+          <div class="ic satirlar">
+            <div class="satir"><span class="etiket">fiyat</span><span class="veri">0,999957 USD <span class="koken-notu">coingecko · 02.10.2026</span></span></div>
+            <div class="satir"><span class="etiket">kur</span><span class="veri">48,8955 ₺ <span class="koken-notu">tcmb-doviz-alis</span></span></div>
+            <div class="satir"><span class="etiket">bülten</span><span class="veri">29.09.2026 <span class="koken-notu">hafta sonu · 3 gün geriye yürüdü</span></span></div>
+            <div class="satir"><span class="etiket">gün sınırı</span><span class="m2">UTC — 03:00 TSİ'deki hareket bir ÖNCEKİ günün kuruyla çevrilir</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div></body></html>

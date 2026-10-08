@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { adminMi, oturumOku } from "@/lib/yetki";
-import UstBar from "@/components/UstBar";
+import Kabuk from "@/components/Kabuk";
 import AdresGorunumu from "./AdresGorunumu";
 
 export default async function AdresSayfasi({
@@ -13,9 +13,8 @@ export default async function AdresSayfasi({
   const { chain, address } = await params;
 
   return (
-    <main className="sayfa">
-      <UstBar username={oturum.username} admin={adminMi(oturum)} />
+    <Kabuk username={oturum.username} admin={adminMi(oturum)}>
       <AdresGorunumu chain={chain} address={decodeURIComponent(address)} />
-    </main>
+    </Kabuk>
   );
 }

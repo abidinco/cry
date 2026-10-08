@@ -732,6 +732,15 @@ kapatmak bilerek kaynağa gitmektir. Saf katman testli (`tests/yalniz-yerel.test
 
 Tasarım dili: [docs/arayuz.md](docs/arayuz.md). İmza öğesi **köken oluğu**.
 
+- **Kabuk SOL RAY, üst şerit DEĞİL** (kullanıcı kararı 2026-10-08, dört varyasyondan
+  C): koyu lacivert yüzey, kart + panel, vurgu cyan. Ray dikey olduğu için takip
+  ekranına bir satır değil bir sütun ödenir ve tek ekran kuralı korunur. Görünüm
+  değişti, **kanallar değişmedi**: köken oluğu `.kayit` ve `.panel[data-koken]`de
+  yaşıyor, cyan yalnızca eylem/odak. Varyasyonlar `docs/tasarim-denemeleri/`.
+- **Kart bir ÖLÇÜ basar, altında SINIRINI yazar** (`.kart-alt`): kısmi taramadan
+  gelen sayının altında "ALT SINIR" durur. Büyük basılmış bir sayı, kaynağı
+  küçültülünce bakılmamış bir yeri hüküm gibi gösterir.
+
 - **Takip bir AKIŞ olarak çizilir, graf olarak değil** (kullanıcı kararı; üç
   örnekten A). Cytoscape grafında 40 Mn USDT ile 1 USDT aynı çizgiydi. Sütunlar
   sıçrama, ŞERİT KALINLIĞI tutar (tek varlığın ölçeğinde), sağda defter. Saf

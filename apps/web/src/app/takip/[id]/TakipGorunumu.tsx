@@ -231,24 +231,24 @@ export default function TakipGorunumu({ id }: { id: string }) {
   const params = (kosu.params ?? {}) as Record<string, unknown>;
 
   const baslik = (
-    <div className="takip-serit">
-      <div className="takip-kimlik">
-        <span className="etiket">
-          {kosu.vaka?.title ?? "vaka yok"} · koşu {kosu.id}
-        </span>
-        <Adres deger={kosu.rootAddress} zincir={kosu.chain} kisa={false} />
-      </div>
-      <span className="takip-bosluk" />
-      <span className="veri m2" title="rapora yazılır">
+    <div className="takip-serit tepe">
+      <h1>Koşu {kosu.id}</h1>
+      {/* Kök adres tam hâliyle durur: kısaltılmış bir kök, rapora giren bir kimliği gizler. */}
+      <span className="cip" title={kosu.rootAddress}>
+        <Adres deger={kosu.rootAddress} zincir={kosu.chain} />
+      </span>
+      <span className="cip">{kosu.vaka?.title ?? "vaka yok"}</span>
+      <span className="cip" title="rapora yazılır">
         {kosu.chain} · {KURAL_ADI[kosu.taintRule] ?? kosu.taintRule} · en çok {String(params.maxHop)} sıçrama ·{" "}
         {String(params.maxDugum)} düğüm
       </span>
-      <span className="veri m3">
+      <span className="cip">
         {sayi(kosu.dugumler.length)} adres · {sayi(kosu.kenarlar.length)} hareket
       </span>
-      <span className="veri m3">
+      <span className="cip">
         <Tarih deger={kosu.startedAt} metin={tarih(kosu.startedAt)} />
       </span>
+      <span className="takip-bosluk" />
       {suruyor && (
         <span className="takip-ilerleme" data-uyari={ilerlemeMetni(kosu.status, kosu.stats?.ilerleme, new Date()).uyari}>
           {ilerlemeMetni(kosu.status, kosu.stats?.ilerleme, new Date()).metin}

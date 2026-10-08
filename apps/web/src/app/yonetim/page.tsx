@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { adminMi, oturumOku } from "@/lib/yetki";
-import UstBar from "@/components/UstBar";
+import Kabuk from "@/components/Kabuk";
 import KullaniciYonetimi from "./KullaniciYonetimi";
 
 export default async function YonetimSayfasi() {
@@ -10,9 +10,8 @@ export default async function YonetimSayfasi() {
   if (!adminMi(oturum)) redirect("/");
 
   return (
-    <main className="sayfa">
-      <UstBar username={oturum.username} admin />
+    <Kabuk username={oturum.username} admin aktif="yonetim">
       <KullaniciYonetimi />
-    </main>
+    </Kabuk>
   );
 }

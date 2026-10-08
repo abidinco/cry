@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { adminMi, oturumOku } from "@/lib/yetki";
-import UstBar from "@/components/UstBar";
+import Kabuk from "@/components/Kabuk";
 import AramaKutusu from "./AramaKutusu";
 
 export default async function AnaSayfa() {
@@ -8,9 +8,8 @@ export default async function AnaSayfa() {
   if (!oturum) redirect("/giris");
 
   return (
-    <main className="sayfa">
-      <UstBar username={oturum.username} admin={adminMi(oturum)} />
+    <Kabuk username={oturum.username} admin={adminMi(oturum)} aktif="ara">
       <AramaKutusu />
-    </main>
+    </Kabuk>
   );
 }

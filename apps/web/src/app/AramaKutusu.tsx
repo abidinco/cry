@@ -103,16 +103,23 @@ export default function AramaKutusu() {
 
   return (
     <>
-      <form onSubmit={gonder} style={{ display: "flex", gap: 8, marginBottom: 22 }}>
+      {/* Giriş noktası tek bir kutudur: "adresi yapıştır, diyagramı al". Araya form koymak
+          onu bozuyordu (kullanıcı kararı 2026-09-29). */}
+      <h1 style={{ fontSize: 24, marginBottom: 6 }}>Adresi yapıştır, akışı al.</h1>
+      <p className="m2" style={{ margin: "0 0 16px", maxWidth: 680 }}>
+        Zincir, yapıştırılan metnin BİÇİMİNDEN çözülür — hiçbir ağ çağrısı yapılmadan. Biçim tek
+        bir zinciri göstermiyorsa adaylar yoklanır ve hangisine bakıldığı yazılır.
+      </p>
+      <form onSubmit={gonder} style={{ display: "flex", gap: 8, marginBottom: 22, maxWidth: 820 }}>
         <input
           value={girdi}
           onChange={(e) => setGirdi(e.target.value)}
           placeholder="cüzdan adresi, işlem hash'i ya da explorer bağlantısı"
-          style={{ flex: 1 }}
+          style={{ flex: 1, fontSize: 14, padding: "13px 15px", borderRadius: 12 }}
           spellCheck={false}
           autoFocus
         />
-        <button className="birincil" disabled={bekliyor || girdi.trim().length === 0}>
+        <button className="birincil" style={{ padding: "0 22px" }} disabled={bekliyor || girdi.trim().length === 0}>
           {bekliyor ? "…" : "çözümle"}
         </button>
       </form>

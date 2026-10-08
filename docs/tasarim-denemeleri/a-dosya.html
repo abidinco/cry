@@ -1,0 +1,162 @@
+<!doctype html><html lang="tr"><head><meta charset="utf-8">
+<title>A — Dosya</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@300;400;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --kagit:#f6f4ee; --kagit2:#fffdf8; --murekkep:#1b1a17; --m2:#5d5a52; --m3:#8c887e;
+  --tel:#d9d4c7; --tel2:#eae6dc;
+  --vurgu:#7a2e22;
+  --gelen:#2f6b4f; --giden:#9a6a1b; --hata:#9b2c22;
+  --kok-kaynak:#2f4a7a; --kok-indeks:#6b7a8c; --kok-supheli:#9a6a1b; --kok-yok:#c9c4b7;
+}
+*{box-sizing:border-box} body{margin:0;background:var(--kagit);color:var(--murekkep);
+  font-family:Spectral,Georgia,serif;font-size:14.5px;line-height:1.55}
+.veri{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-size:12.5px}
+.etiket{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--m3)}
+a{color:var(--vurgu);text-decoration:none;border-bottom:1px solid #e0cdc9}
+header.antet{border-bottom:2px solid var(--murekkep);padding:14px 32px 10px;display:flex;align-items:flex-end;gap:22px}
+.marka{font-weight:600;font-size:21px;letter-spacing:.01em}
+.marka small{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--m3);display:block;margin-top:2px}
+nav{display:flex;gap:18px;margin-left:auto;align-items:baseline}
+nav a{border:0;color:var(--m2);font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.06em}
+.sayfa{padding:0 32px 40px;max-width:1500px;margin:0 auto}
+.kunye{display:grid;grid-template-columns:repeat(5,auto) 1fr;gap:0 34px;padding:13px 0;border-bottom:1px solid var(--tel)}
+.kunye .d{font-family:"IBM Plex Mono",monospace;font-size:13px;margin-top:1px;display:block}
+.kunye .etiket{display:block}
+.muhur{margin-left:auto;align-self:center;border:1.5px solid var(--gelen);color:var(--gelen);
+  font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  padding:5px 11px;transform:rotate(-1.5deg)}
+.govde{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:0;border:1px solid var(--tel);border-top:0;background:var(--kagit2)}
+.sol{padding:14px 18px;min-width:0} .sag{border-left:1px solid var(--tel);background:#fbf9f3}
+.lejant{display:flex;gap:16px;flex-wrap:wrap;color:var(--m2);font-size:12.5px;align-items:center;padding-bottom:10px;border-bottom:1px dotted var(--tel)}
+.lejant i{display:inline-block;width:20px;height:5px;vertical-align:middle;margin-right:5px}
+text{font-family:"IBM Plex Mono",monospace}
+.kol{font-size:9px;letter-spacing:.14em;fill:#9a968b}
+.ad{font-family:Spectral,serif;font-size:11.5px;fill:#1b1a17}
+.tut{font-size:10px;fill:#6f6b61}
+.sag h2{font-family:Spectral,serif;font-size:14px;font-weight:600;margin:0 0 8px}
+.blok{padding:13px 16px;border-bottom:1px solid var(--tel)}
+.cubuklar{display:grid;gap:5px}
+.cubuk{display:grid;grid-template-columns:104px 1fr 82px;gap:9px;align-items:center}
+.yol{height:9px;background:var(--tel2);border:1px solid var(--tel)}
+.yol span{display:block;height:100%}
+.cubuk .veri{text-align:right}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--m3);font-weight:500;padding:6px 8px;border-bottom:1px solid var(--murekkep);background:#fbf9f3;position:sticky;top:0}
+td{padding:4px 8px;border-bottom:1px solid var(--tel2)}
+tbody tr:nth-child(odd){background:#f9f7f1}
+.defter{max-height:330px;overflow:auto}
+.sag-alt{padding:10px 16px}
+.kayit{position:relative;padding-left:20px;margin:26px 0}
+.kayit::before{content:"";position:absolute;left:0;top:2px;bottom:2px;width:3px;background:var(--kok-yok)}
+.kayit[data-k="kaynak"]::before{background:var(--kok-kaynak)} .kayit[data-k="indeks"]::before{background:var(--kok-indeks)}
+.kayit[data-k="supheli"]::before{background:var(--kok-supheli)}
+.kayit h2{font-size:15px;font-weight:600;margin:0 0 7px;display:flex;gap:10px;align-items:baseline}
+.kod{font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.12em;border:1px solid var(--tel);padding:1px 5px;color:var(--m2)}
+.satirlar{display:grid;gap:7px;max-width:760px}
+.satir{display:grid;grid-template-columns:150px 1fr;gap:14px;align-items:baseline;border-bottom:1px dotted var(--tel2);padding-bottom:5px}
+.not{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--m3);margin-left:9px}
+.not.s{color:var(--giden)}
+.uyari{border-left:3px solid var(--giden);background:#fbf3e3;padding:9px 13px;font-size:13px;margin:12px 0}
+button{font-family:"IBM Plex Mono",monospace;font-size:11.5px;padding:6px 13px;border:1px solid var(--murekkep);background:transparent;color:var(--murekkep);cursor:pointer}
+button.b{background:var(--vurgu);border-color:var(--vurgu);color:#fff}
+.kusur{color:var(--m3)}
+</style></head><body>
+<header class="antet">
+  <div class="marka">cry<small>akış analizi · kayıt defteri</small></div>
+  <nav><a href="#">etiket</a><a href="#">izleme</a><a href="#">yönetim</a><a href="#">şifre</a>
+  <span class="veri" style="color:var(--m3)">abidin</span><button>çıkış</button></nav>
+</header>
+<div class="sayfa">
+ <div class="kunye">
+   <div><span class="etiket">koşu</span><span class="d">37</span></div>
+   <div><span class="etiket">vaka</span><span class="d">karalama</span></div>
+   <div><span class="etiket">kök</span><span class="d">TR7NHq…dtM9</span></div>
+   <div><span class="etiket">kapsam</span><span class="d">25 düğüm · 75 kenar</span></div>
+   <div><span class="etiket">süre</span><span class="d">82 sn · yalnız yerel</span></div>
+   <span class="muhur">iz tamamlandı · terminal</span>
+ </div>
+ <div class="govde">
+  <div class="sol">
+    <div class="lejant">
+      <span><i style="background:#8c887e"></i>ileri</span>
+      <span><i style="background:#2f6b4f"></i>doğrulanmış borsa</span>
+      <span><i style="background:#9a6a1b"></i>aday</span>
+      <span><i style="background:#b2517f"></i>geri dönüş</span>
+      <span style="margin-left:auto" class="veri">varlık: USDT ▾</span>
+    </div>
+    <svg viewBox="0 0 860 420" style="width:100%;height:auto">
+      <text class="kol" x="28" y="18">KÖK</text><text class="kol" x="236" y="18">1. SIÇRAMA</text>
+      <text class="kol" x="470" y="18">2. SIÇRAMA</text><text class="kol" x="690" y="18">3. SIÇRAMA</text>
+      <path d="M118 120 C180 120 180 70 236 70 L236 110 C180 110 180 160 118 160 Z" fill="#8c887e" opacity=".5"/>
+      <path d="M118 165 C180 165 180 190 236 190 L236 250 C180 250 180 210 118 210 Z" fill="#8c887e" opacity=".5"/>
+      <path d="M118 215 C180 215 180 300 236 300 L236 340 C180 340 180 250 118 250 Z" fill="#8c887e" opacity=".5"/>
+      <path d="M326 75 C400 75 400 60 470 60 L470 100 C400 100 400 110 326 110 Z" fill="#8c887e" opacity=".45"/>
+      <path d="M326 195 C400 195 400 150 470 150 L470 215 C400 215 400 250 326 250 Z" fill="#8c887e" opacity=".45"/>
+      <path d="M326 305 C400 305 400 280 470 280 L470 330 C400 330 400 340 326 340 Z" fill="#8c887e" opacity=".45"/>
+      <path d="M560 65 C630 65 630 70 690 70 L690 130 C630 130 630 105 560 105 Z" fill="#2f6b4f" opacity=".6"/>
+      <path d="M560 160 C630 160 630 200 690 200 L690 250 C630 250 630 210 560 210 Z" fill="#9a6a1b" opacity=".55"/>
+      <path d="M560 290 C640 290 660 395 300 398 C180 400 150 300 118 290 L118 270 C170 285 200 380 300 378 C600 374 600 270 560 270 Z" fill="#b2517f" opacity=".45"/>
+      <rect x="96" y="112" width="22" height="146" fill="#2f4a7a"/>
+      <text class="ad" x="2" y="106">TR7NHq…dtM9</text><text class="tut" x="2" y="276">70,2 Mn</text>
+      <rect x="236" y="60" width="90" height="54" fill="#efece3" stroke="#1b1a17"/><text class="ad" x="244" y="82">TLa2f1…9Qw</text><text class="tut" x="244" y="97">28,4 Mn</text>
+      <rect x="236" y="186" width="90" height="66" fill="#efece3" stroke="#1b1a17"/><text class="ad" x="244" y="212">TJmK8c…4pR</text><text class="tut" x="244" y="227">24,0 Mn</text>
+      <rect x="236" y="296" width="90" height="46" fill="#efece3" stroke="#1b1a17" stroke-dasharray="3 3"/><text class="ad" x="244" y="318">TQ5rNn…bV1</text><text class="tut" x="244" y="333">17,8 Mn</text>
+      <rect x="470" y="58" width="90" height="48" fill="#efece3" stroke="#1b1a17"/><text class="ad" x="478" y="80">TWd3Lk…mA7</text>
+      <rect x="470" y="148" width="90" height="68" fill="#efece3" stroke="#1b1a17"/><text class="ad" x="478" y="172">TZz9Pq…kL2</text>
+      <rect x="470" y="276" width="90" height="56" fill="#efece3" stroke="#1b1a17" stroke-dasharray="3 3"/><text class="ad" x="478" y="298">TB1vXx…3nC</text>
+      <rect x="690" y="66" width="104" height="66" fill="#dceadf" stroke="#2f6b4f" stroke-width="1.5"/>
+      <text class="ad" x="698" y="90" fill="#1f4a37">✓ Binance 2</text><text class="tut" x="698" y="106" fill="#2f6b4f">11,1 Mn</text>
+      <rect x="690" y="196" width="104" height="56" fill="#f6ecd6" stroke="#9a6a1b" stroke-width="1.5"/>
+      <text class="ad" x="698" y="218" fill="#6b4a12">? MEXC adayı</text><text class="tut" x="698" y="234" fill="#9a6a1b">2,4 Mn</text>
+      <rect x="690" y="300" width="104" height="44" fill="#efece3" stroke="#1b1a17" stroke-dasharray="3 3"/>
+      <text class="ad" x="698" y="322">✕ yakıldı</text>
+    </svg>
+  </div>
+  <div class="sag">
+    <div class="blok"><h2>Para nereye ulaştı</h2>
+      <div class="cubuklar">
+        <div class="cubuk"><span>✓ Binance 2</span><span class="yol"><span style="width:72%;background:#2f6b4f"></span></span><span class="veri">11,1<span class="kusur">4</span> Mn</span></div>
+        <div class="cubuk"><span>? MEXC adayı</span><span class="yol"><span style="width:16%;background:#9a6a1b"></span></span><span class="veri">2,40 Mn</span></div>
+        <div class="cubuk"><span>bizim sınırımız</span><span class="yol"><span style="width:6%;background:#8c887e"></span></span><span class="veri">860,2 b</span></div>
+        <div class="cubuk"><span>✕ yakıldı</span><span class="yol"><span style="width:4%;background:#9b2c22"></span></span><span class="veri">70,2 b</span></div>
+      </div>
+    </div>
+    <div class="blok" style="display:flex;justify-content:space-between;align-items:center">
+      <span class="etiket">defter · 98 şerit / 1.342 hareket</span><button>süzgeci kaldır</button>
+    </div>
+    <div class="defter">
+      <table><thead><tr><th>zaman (TSİ)</th><th>hareket</th><th style="text-align:right">tutar</th></tr></thead><tbody>
+        <tr><td class="veri">02.10 14:22</td><td class="veri"><a href="#">a93f…c21</a></td><td class="veri" style="text-align:right">4,5<span class="kusur">0</span></td></tr>
+        <tr><td class="veri">02.10 14:19</td><td class="veri"><a href="#">7b10…9ef</a></td><td class="veri" style="text-align:right">1.200,00</td></tr>
+        <tr><td class="veri">02.10 13:58</td><td class="veri"><a href="#">cc41…02a</a></td><td class="veri" style="text-align:right">11.000,00</td></tr>
+        <tr><td class="veri">02.10 13:41</td><td class="veri"><a href="#">1f88…77d</a></td><td class="veri" style="text-align:right">250.000,00</td></tr>
+        <tr><td class="veri">02.10 12:07</td><td class="veri"><a href="#">6a0c…b43</a></td><td class="veri" style="text-align:right">3,2<span class="kusur">7</span></td></tr>
+        <tr><td class="veri">01.10 23:55</td><td class="veri"><a href="#">de72…118</a></td><td class="veri" style="text-align:right">8.400,00</td></tr>
+      </tbody></table>
+    </div>
+    <div class="sag-alt"><div class="etiket" style="margin-bottom:6px">seçili adres</div>
+      <div class="veri" style="word-break:break-all;margin-bottom:8px">TZz9Pq9rLm4kK8tVvN2sXeQ1bYhGkL2</div>
+      <button class="b">takibe devam et ▸ +2 sıçrama</button> <button>diyagramda gizle</button>
+    </div>
+  </div>
+ </div>
+ <div class="uyari"><b>Graf bir alt sınırdır.</b> Yalnız yerel kipte 29 düğümün 20'si pencere dışına uzanıyor (<span class="veri">pencere_oncesi</span>); daha eskisi olabilir.</div>
+ <section class="kayit" data-k="kaynak"><h2>Etiket <span class="kod">köken · kaynağın beyanı</span></h2>
+   <div class="satirlar">
+     <div class="satir"><span class="etiket">iddia</span><span>Binance 2 — <b>doğrulanmış borsa</b> <span class="not">sözlükte var</span></span></div>
+     <div class="satir"><span class="etiket">kaynak</span><span>TronScan <span class="veri">publicTag</span> <span class="not">ölçüm 02.10.2026</span></span></div>
+     <div class="satir"><span class="etiket">güven</span><span class="veri">0,90</span></div>
+     <div class="satir"><span class="etiket">motorda</span><span><span class="veri">terminal</span> — takip burada biter</span></div>
+   </div>
+ </section>
+ <section class="kayit" data-k="supheli"><h2>İndeks durumu <span class="kod">köken · doğrulanmamış</span></h2>
+   <div class="satirlar">
+     <div class="satir"><span class="etiket">tarama</span><span><b>kısmi</b> <span class="not s">sebep: sayfa_butcesi</span></span></div>
+     <div class="satir"><span class="etiket">pencere</span><span class="veri">2025-11-03 → 2026-10-08 <span class="not">boşluksuz</span></span></div>
+     <div class="satir"><span class="etiket">pencere öncesi</span><span>kaynağa sorulmadı — <span class="veri">null</span> <span class="not s">uydurulmadı</span></span></div>
+   </div>
+ </section>
+</div></body></html>

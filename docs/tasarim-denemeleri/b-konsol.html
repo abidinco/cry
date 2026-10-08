@@ -1,0 +1,142 @@
+<!doctype html><html lang="tr"><head><meta charset="utf-8">
+<title>B — Konsol</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --zemin:#07090b; --yuzey:#0c1014; --cizgi:#1b232b; --cizgi2:#131a21;
+  --m1:#d7e2e8; --m2:#7d8e9b; --m3:#4e5d68;
+  --vurgu:#ffb000;              /* fosfor kehribar: yalnizca eylem/odak */
+  --gelen:#3ecf8e; --hata:#ff5f56; --aday:#d4a017; --geri:#e06bb0;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--zemin);color:var(--m1);
+  font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px;line-height:1.45;font-variant-numeric:tabular-nums}
+a{color:var(--vurgu);text-decoration:none} a:hover{text-decoration:underline}
+.k{color:var(--m3)} .m2{color:var(--m2)}
+/* --- komut satiri: ust bar yerine --- */
+.komut{display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--cizgi);padding:7px 12px;background:var(--yuzey)}
+.komut .ps1{color:var(--vurgu);font-weight:700}
+.komut input{flex:1;background:transparent;border:0;color:var(--m1);font:inherit;outline:none}
+.komut .tus{border:1px solid var(--cizgi);color:var(--m3);padding:1px 5px;font-size:10px}
+/* --- durum satiri: 1 satir, her sey burada --- */
+.durum{display:flex;gap:0;border-bottom:1px solid var(--cizgi);font-size:11px;background:#0a0e12}
+.durum div{padding:4px 11px;border-right:1px solid var(--cizgi2);white-space:nowrap}
+.durum .ok{color:var(--gelen)} .durum .sag{margin-left:auto;border:0;color:var(--m3)}
+.govde{display:grid;grid-template-columns:minmax(0,1fr) 372px}
+.sol{padding:8px 10px;min-width:0;border-right:1px solid var(--cizgi)}
+.baslik{font-size:10px;letter-spacing:.18em;color:var(--m3);text-transform:uppercase;padding:5px 11px;
+  border-bottom:1px solid var(--cizgi);background:#0a0e12}
+.baslik b{color:var(--m2);font-weight:400}
+.lejant{display:flex;gap:14px;flex-wrap:wrap;color:var(--m2);font-size:11px;padding:2px 2px 8px}
+.lejant i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-right:5px}
+text{font-family:"JetBrains Mono",monospace}
+.kol{font-size:8.5px;letter-spacing:.2em;fill:#4e5d68}
+.ad{font-size:10.5px;fill:#d7e2e8} .tut{font-size:9.5px;fill:#7d8e9b}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{text-align:left;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--m3);font-weight:400;
+  padding:4px 7px;border-bottom:1px solid var(--cizgi);background:#0a0e12;position:sticky;top:0}
+td{padding:2px 7px;border-bottom:1px solid #0f151a;white-space:nowrap}
+tbody tr:hover{background:#101820}
+.defter{max-height:300px;overflow:auto}
+.cubuk{display:grid;grid-template-columns:94px 1fr 74px;gap:8px;align-items:center;padding:1px 0}
+.yol{height:7px;background:#121920} .yol span{display:block;height:100%}
+.cubuk .v{text-align:right}
+.alan{display:grid;grid-template-columns:118px 1fr;gap:10px;padding:1px 0}
+.alan .k{text-align:right}
+.kutu{padding:9px 11px;border-bottom:1px solid var(--cizgi)}
+/* --- koken: olugun yerine ONEK harf, konsol gelenegi --- */
+.satir-k::before{content:attr(data-on);color:var(--m3);margin-right:7px;font-weight:700}
+.satir-k[data-on="[K]"]::before{color:#6c9ce0} .satir-k[data-on="[I]"]::before{color:#7d8e9b}
+.satir-k[data-on="[?]"]::before{color:var(--aday)}
+.uyari{border-top:1px solid var(--cizgi);padding:7px 12px;color:var(--aday);font-size:11px;background:#15120a}
+.uyari b{color:#ffd27a}
+button{font:inherit;font-size:11px;background:#121920;border:1px solid var(--cizgi);color:var(--m1);padding:3px 9px;cursor:pointer}
+button:hover{border-color:var(--m3)}
+button.b{background:var(--vurgu);border-color:var(--vurgu);color:#120d00;font-weight:700}
+.kayitlar{padding:10px 12px;display:grid;gap:3px}
+.kusur{color:var(--m3)}
+</style></head><body>
+<div class="komut"><span class="ps1">cry&gt;</span>
+  <input value="takip 37  --kok TR7NHq…dtM9  --yalniz-yerel" spellcheck="false">
+  <span class="tus">⌘K komut</span><span class="tus">/ ara</span><span class="k">abidin</span><button>çıkış</button>
+</div>
+<div class="durum">
+  <div>koşu <b>37</b></div><div>vaka <span class="k">karalama</span></div>
+  <div>25 düğüm · 75 kenar</div><div>82 sn</div>
+  <div class="ok">bitti: terminal</div><div>kaynak çağrısı <span class="ok">0</span></div>
+  <div class="sag">etiket · izleme · yönetim · şifre</div>
+</div>
+<div class="govde">
+  <div class="sol">
+    <div class="lejant">
+      <span><i style="background:#56657a"></i>ileri</span><span><i style="background:#3ecf8e"></i>borsa ✓</span>
+      <span><i style="background:#d4a017"></i>aday ?</span><span><i style="background:#e06bb0"></i>geri ↩</span>
+      <span class="k">varlık USDT ▾ · yakınlık 100%</span>
+    </div>
+    <svg viewBox="0 0 860 400" style="width:100%;height:auto">
+      <text class="kol" x="24" y="14">KOK</text><text class="kol" x="236" y="14">H+1</text>
+      <text class="kol" x="470" y="14">H+2</text><text class="kol" x="690" y="14">H+3</text>
+      <path d="M118 112 C180 112 180 62 236 62 L236 102 C180 102 180 152 118 152 Z" fill="#56657a" opacity=".55"/>
+      <path d="M118 157 C180 157 180 182 236 182 L236 242 C180 242 180 202 118 202 Z" fill="#56657a" opacity=".55"/>
+      <path d="M118 207 C180 207 180 292 236 292 L236 332 C180 332 180 242 118 242 Z" fill="#56657a" opacity=".55"/>
+      <path d="M326 67 C400 67 400 52 470 52 L470 92 C400 92 400 102 326 102 Z" fill="#56657a" opacity=".5"/>
+      <path d="M326 187 C400 187 400 142 470 142 L470 207 C400 207 400 242 326 242 Z" fill="#56657a" opacity=".5"/>
+      <path d="M326 297 C400 297 400 272 470 272 L470 322 C400 322 400 332 326 332 Z" fill="#56657a" opacity=".5"/>
+      <path d="M560 57 C630 57 630 62 690 62 L690 122 C630 122 630 97 560 97 Z" fill="#3ecf8e" opacity=".55"/>
+      <path d="M560 152 C630 152 630 192 690 192 L690 242 C630 242 630 202 560 202 Z" fill="#d4a017" opacity=".5"/>
+      <path d="M560 282 C640 282 660 382 300 385 C180 387 150 292 118 282 L118 262 C170 277 200 367 300 365 C600 361 600 262 560 262 Z" fill="#e06bb0" opacity=".38"/>
+      <rect x="98" y="104" width="20" height="146" fill="#ffb000"/>
+      <text class="ad" x="0" y="98">TR7NHq…dtM9</text><text class="tut" x="0" y="268">70,2 Mn</text>
+      <rect x="236" y="52" width="90" height="52" fill="#121920" stroke="#2a3540"/><text class="ad" x="243" y="73">TLa2f1…9Qw</text><text class="tut" x="243" y="88">28,4 Mn</text>
+      <rect x="236" y="178" width="90" height="66" fill="#121920" stroke="#2a3540"/><text class="ad" x="243" y="202">TJmK8c…4pR</text><text class="tut" x="243" y="217">24,0 Mn</text>
+      <rect x="236" y="288" width="90" height="46" fill="#121920" stroke="#3a4753" stroke-dasharray="3 3"/><text class="ad" x="243" y="310">TQ5rNn…bV1</text>
+      <rect x="470" y="50" width="90" height="46" fill="#121920" stroke="#2a3540"/><text class="ad" x="477" y="70">TWd3Lk…mA7</text>
+      <rect x="470" y="140" width="90" height="68" fill="#121920" stroke="#2a3540"/><text class="ad" x="477" y="162">TZz9Pq…kL2</text>
+      <rect x="470" y="268" width="90" height="56" fill="#121920" stroke="#3a4753" stroke-dasharray="3 3"/><text class="ad" x="477" y="290">TB1vXx…3nC</text>
+      <rect x="690" y="58" width="106" height="64" fill="#0f1f18" stroke="#3ecf8e"/>
+      <text class="ad" x="697" y="80" fill="#3ecf8e">[✓] Binance 2</text><text class="tut" x="697" y="96" fill="#3ecf8e">11,1 Mn</text>
+      <rect x="690" y="188" width="106" height="54" fill="#1c1709" stroke="#d4a017"/>
+      <text class="ad" x="697" y="210" fill="#d4a017">[?] MEXC aday</text><text class="tut" x="697" y="226" fill="#d4a017">2,4 Mn</text>
+      <rect x="690" y="292" width="106" height="42" fill="#1c0e0d" stroke="#ff5f56"/>
+      <text class="ad" x="697" y="314" fill="#ff5f56">[✕] yakildi</text>
+    </svg>
+  </div>
+  <div>
+    <div class="baslik">para nereye ulaştı <b>· şerit toplamı</b></div>
+    <div class="kutu">
+      <div class="cubuk"><span style="color:#3ecf8e">[✓] Binance 2</span><span class="yol"><span style="width:72%;background:#3ecf8e"></span></span><span class="v">11,1<span class="kusur">4</span>Mn</span></div>
+      <div class="cubuk"><span style="color:#d4a017">[?] MEXC aday</span><span class="yol"><span style="width:16%;background:#d4a017"></span></span><span class="v">2,40Mn</span></div>
+      <div class="cubuk"><span class="m2">[~] sınırımız</span><span class="yol"><span style="width:6%;background:#56657a"></span></span><span class="v">860,2b</span></div>
+      <div class="cubuk"><span style="color:#ff5f56">[✕] yakıldı</span><span class="yol"><span style="width:4%;background:#ff5f56"></span></span><span class="v">70,2b</span></div>
+    </div>
+    <div class="baslik">defter <b>· 98 şerit / 1.342 hareket</b></div>
+    <div class="defter">
+      <table><thead><tr><th>zaman TSİ</th><th>tx</th><th style="text-align:right">tutar</th></tr></thead><tbody>
+        <tr><td>02.10 14:22</td><td><a href="#">a93f…c21</a></td><td style="text-align:right">4,5<span class="kusur">0</span></td></tr>
+        <tr><td>02.10 14:19</td><td><a href="#">7b10…9ef</a></td><td style="text-align:right">1.200,00</td></tr>
+        <tr><td>02.10 13:58</td><td><a href="#">cc41…02a</a></td><td style="text-align:right">11.000,00</td></tr>
+        <tr><td>02.10 13:41</td><td><a href="#">1f88…77d</a></td><td style="text-align:right">250.000,00</td></tr>
+        <tr><td>02.10 12:07</td><td><a href="#">6a0c…b43</a></td><td style="text-align:right">3,2<span class="kusur">7</span></td></tr>
+        <tr><td>01.10 23:55</td><td><a href="#">de72…118</a></td><td style="text-align:right">8.400,00</td></tr>
+        <tr><td>01.10 21:03</td><td><a href="#">90ab…55c</a></td><td style="text-align:right">640,00</td></tr>
+      </tbody></table>
+    </div>
+    <div class="baslik">seçili adres</div>
+    <div class="kutu" style="word-break:break-all">
+      <div style="margin-bottom:7px">TZz9Pq9rLm4kK8tVvN2sXeQ1bYhGkL2</div>
+      <div class="alan"><span class="k">etiket</span><span class="satir-k" data-on="[K]">MEXC adayı · güven 0,74</span></div>
+      <div class="alan"><span class="k">kaynak</span><span class="satir-k" data-on="[K]">tronscan publicTag · 02.10.2026</span></div>
+      <div class="alan"><span class="k">indeks</span><span class="satir-k" data-on="[?]">kısmi — sayfa_butcesi</span></div>
+      <div class="alan"><span class="k">gelen/giden</span><span class="satir-k" data-on="[I]">20.189 / 11.999 hareket</span></div>
+      <div style="margin-top:9px"><button class="b">devam ▸ +2 sıçrama</button> <button>gizle</button> <button>gezgin ↗</button></div>
+    </div>
+  </div>
+</div>
+<div class="uyari"><b>ALT SINIR</b> · yalnız yerel kip: 29 düğümün 20'si <span class="k">pencere_oncesi</span> notuyla kısmi. Pencere: 2025-11-03 → 2026-10-08 (boşluksuz). Daha eskisi olabilir, kaynağa SORULMADI.</div>
+<div class="kayitlar">
+  <div class="alan"><span class="k">[K] köken</span><span>kaynağın kendi beyanı</span></div>
+  <div class="alan"><span class="k">[I] köken</span><span>bizim kayıtlarımızdan türetildi</span></div>
+  <div class="alan"><span class="k">[?] köken</span><span>doğrulanmamış / eksik tarama</span></div>
+  <div class="alan"><span class="k">[-] köken</span><span>bilinmiyor</span></div>
+</div>
+</body></html>

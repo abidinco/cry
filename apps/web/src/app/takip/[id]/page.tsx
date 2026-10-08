@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { adminMi, oturumOku } from "@/lib/yetki";
-import UstBar from "@/components/UstBar";
+import Kabuk from "@/components/Kabuk";
 import TakipGorunumu from "./TakipGorunumu";
 
 export default async function TakipSayfasi({ params }: { params: Promise<{ id: string }> }) {
@@ -9,9 +9,8 @@ export default async function TakipSayfasi({ params }: { params: Promise<{ id: s
   const { id } = await params;
 
   return (
-    <main className="sayfa sayfa-genis">
-      <UstBar username={oturum.username} admin={adminMi(oturum)} />
+    <Kabuk username={oturum.username} admin={adminMi(oturum)} genis>
       <TakipGorunumu id={id} />
-    </main>
+    </Kabuk>
   );
 }

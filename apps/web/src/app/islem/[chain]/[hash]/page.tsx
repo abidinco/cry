@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { adminMi, oturumOku } from "@/lib/yetki";
-import UstBar from "@/components/UstBar";
+import Kabuk from "@/components/Kabuk";
 import IslemGorunumu from "./IslemGorunumu";
 
 export default async function IslemSayfasi({
@@ -13,9 +13,8 @@ export default async function IslemSayfasi({
   const { chain, hash } = await params;
 
   return (
-    <main className="sayfa">
-      <UstBar username={oturum.username} admin={adminMi(oturum)} />
+    <Kabuk username={oturum.username} admin={adminMi(oturum)}>
       <IslemGorunumu chain={chain} hash={decodeURIComponent(hash)} />
-    </main>
+    </Kabuk>
   );
 }

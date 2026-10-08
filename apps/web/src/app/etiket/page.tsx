@@ -14,7 +14,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@cry/db";
 import { adminMi, oturumOku } from "@/lib/yetki";
 import { incelemeSirasi, type IncelemeSatiri } from "@/lib/etiket-inceleme";
-import UstBar from "@/components/UstBar";
+import Kabuk from "@/components/Kabuk";
 import IncelemeListesi from "./IncelemeListesi";
 
 /** Bir turda insana sunulan en fazla satır — 764 satırlık bir sayfa kimsenin bakmadığı sayfadır. */
@@ -74,10 +74,15 @@ export default async function EtiketSayfasi({
   });
 
   return (
-    <main className="sayfa">
-      <UstBar username={oturum.username} admin={adminMi(oturum)} />
-      <section className="panel" style={{ marginTop: 12 }}>
-        <h1>Borsa iddiaları — doğrulama bekliyor</h1>
+    <Kabuk username={oturum.username} admin={adminMi(oturum)} aktif="etiket">
+      <div className="tepe">
+        <h1>Borsa iddiaları</h1>
+        <span className="cip" data-ton="dikkat">
+          {dagilim.reduce((t, d) => t + d._count, 0)} doğrulama bekliyor
+        </span>
+        <span className="cip" data-ton="iyi">{karara} karara bağlandı</span>
+      </div>
+      <section className="panel">
         <p className="m2" style={{ fontSize: 13, lineHeight: 1.6 }}>
           Bunların her biri motorda <b>terminal_aday</b> üretir: iz orada durur ama
           &laquo;borsaya girdi&raquo; denmez. Onaylanan iddia <b>terminal</b> olur ve rapora
@@ -108,6 +113,6 @@ export default async function EtiketSayfasi({
         </p>
       </section>
       <IncelemeListesi satirlar={incelemeSirasi(satirlar)} />
-    </main>
+    </Kabuk>
   );
 }

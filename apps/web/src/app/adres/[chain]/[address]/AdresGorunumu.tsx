@@ -196,11 +196,11 @@ export default function AdresGorunumu({ chain, address }: { chain: string; addre
 
   return (
     <>
-      <div style={{ marginBottom: 20 }}>
+      <div style={{ marginBottom: 16 }}>
         <h1 className="veri" style={{ fontSize: 15, wordBreak: "break-all" }}>
           {ozet.address}
         </h1>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 7 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 7, flexWrap: "wrap" }}>
           <span className="etiket">{ozet.chain}</span>
           {ozet.isContract && <Rozet>sözleşme</Rozet>}
           {ozet.etiketler.map((e) => (
@@ -213,6 +213,52 @@ export default function AdresGorunumu({ chain, address }: { chain: string; addre
               {!e.verifiedAt && " · doğrulanmamış"}
             </Rozet>
           ))}
+        </div>
+      </div>
+
+      {/*
+        Kartlar bir ÖLÇÜYÜ büyük basar, ama altında o sayının nereden geldiği ve neyle SINIRLI
+        olduğu yazar. Sayıyı büyütüp kaynağını küçültmek, kısmi bir taramayı hüküm gibi gösterir.
+      */}
+      <div className="kartlar">
+        <div className="kart">
+          <div className="etiket">bakiye</div>
+          <div className="kart-deger">
+            {ozet.balanceRaw ? <Tutar ham={ozet.balanceRaw} ondalik={6} sembol="TRX" /> : "—"}
+          </div>
+          <div className="kart-alt">
+            {ozet.balanceRaw ? "kaynağın beyanı" : "sorulmadı — yalnız yerel kipte bakiye okunmaz"}
+          </div>
+        </div>
+        <div className="kart">
+          <div className="etiket">gelen · giden</div>
+          <div className="kart-deger">
+            {sayi(ozet.hareketSayisi.gelen)}
+            <small> / {sayi(ozet.hareketSayisi.giden)}</small>
+          </div>
+          <div className="kart-alt">
+            {ozet.indexState === "tam"
+              ? "taranan aralıkta sayıldı"
+              : ozet.indexState === "kismi"
+                ? "ALT SINIR — tarama kısmi"
+                : "bakılmadı"}
+          </div>
+        </div>
+        <div className="kart">
+          <div className="etiket">ilk hareket</div>
+          <div className="kart-deger" style={{ fontSize: 17 }}>
+            <Tarih deger={ozet.firstSeen} metin={tarih(ozet.firstSeen)} />
+          </div>
+          <div className="kart-alt">{tk.not ?? (tk.koken === "kaynak" ? "kaynağın beyanı" : "köken bilinmiyor")}</div>
+        </div>
+        <div className="kart">
+          <div className="etiket">son hareket</div>
+          <div className="kart-deger" style={{ fontSize: 17 }}>
+            <Tarih deger={ozet.lastSeen} metin={tarih(ozet.lastSeen)} />
+          </div>
+          <div className="kart-alt">
+            {bekleme !== null ? `${sayi(bekleme)} gündür hareketsiz` : "—"}
+          </div>
         </div>
       </div>
 

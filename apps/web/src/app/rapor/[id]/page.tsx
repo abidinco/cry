@@ -15,7 +15,7 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@cry/db";
 import { kanonikJson, sha256, type KanitPaketi } from "@cry/rapor";
 import { adminMi, oturumOku } from "@/lib/yetki";
-import UstBar from "@/components/UstBar";
+import Kabuk from "@/components/Kabuk";
 import { Adres, Kayit, Rozet, Satir, Tarih } from "@/components/ui";
 import { sayi, tarih } from "@/lib/bicim";
 
@@ -42,8 +42,7 @@ export default async function RaporSayfasi({ params }: { params: Promise<{ id: s
   const tutuyor = yeniden === rapor.sha256;
 
   return (
-    <main className="sayfa sayfa-genis">
-      <UstBar username={oturum.username} admin={adminMi(oturum)} />
+    <Kabuk username={oturum.username} admin={adminMi(oturum)} genis>
 
       <Kayit
         koken="indeks"
@@ -203,6 +202,6 @@ export default async function RaporSayfasi({ params }: { params: Promise<{ id: s
           </table>
         </Kayit>
       )}
-    </main>
+    </Kabuk>
   );
 }

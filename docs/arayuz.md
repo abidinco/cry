@@ -3,6 +3,16 @@
 Yön (kullanıcı kararı, 2026-09-09): **yoğun adli araç**. Sakin, bilgi önce,
 süs yok. Ekranda yer kaplayan her şey bir olguyu anlatır.
 
+**Kabuk ve palet değişti (kullanıcı kararı 2026-10-08, dört varyasyondan C):**
+koyu lacivert yüzey (`#0a0f1a`), **solda sabit ray** (üst şerit kalktı), kart +
+panel, 10 px köşe, vurgu **cyan** (`#38bdf8`). Değişen görünüm; kanallar ve
+imza DEĞİŞMEDİ — köken oluğu duruyor, artık `.panel[data-koken]` olarak da.
+Varyasyonlar `docs/tasarim-denemeleri/` altında, seçilmeyenler dahil.
+
+**Kart bir ÖLÇÜ basar, altında sınırını yazar** (`.kart-alt`): kısmi taramadan
+gelen sayı "ALT SINIR" der. Sayıyı büyütüp kaynağını küçülten bir kart,
+bakılmamış bir yeri hüküm gibi gösterir.
+
 ## Konu
 
 Bu arayüzü kullanan kişi bir dosya üzerinde çalışıyor ve sonunda bir borsaya
@@ -17,10 +27,10 @@ bilginin **nereden geldiğini** söyler:
 
 | İşaret | Anlam |
 |---|---|
-| indigo | kaynağın kendi beyanı |
-| çelik mavisi | bizim kayıtlarımızdan türetildi |
-| kehribar | doğrulanmamış, ya da eksik bir taramadan geliyor |
-| gri | bilinmiyor |
+| mavi (`--kok-kaynak`) | kaynağın kendi beyanı |
+| çelik grisi (`--kok-indeks`) | bizim kayıtlarımızdan türetildi |
+| kehribar (`--kok-supheli`) | doğrulanmamış, ya da eksik bir taramadan geliyor |
+| gri (`--kok-yok`) | bilinmiyor |
 
 Bu bir süs değil. Projenin en derin kuralı "her etiket kaynağını ve güvenini
 taşır"; o kural veritabanında yaşıyordu ama ekranda bir karşılığı yoktu ve
@@ -37,7 +47,7 @@ Aynı renk iki farklı işi anlatmaz:
 - **yön** (para gelen/giden) → yeşil / kehribar
 - **uyarı** (bir şey yanlış) → kırmızı
 - **köken** → yalnızca sol oluk ve küçük notlar
-- **vurgu** (bağlantı, odak, birincil eylem) → indigo; hiçbir veri sınıfı bu
+- **vurgu** (bağlantı, odak, birincil eylem) → cyan; hiçbir veri sınıfı bu
   rengi kullanmaz
 
 ## Tipografi
@@ -80,7 +90,7 @@ Aynı çift arasındaki hareketler tek şeritte toplanır, hepsi defterde durur.
 
 **Düğümün durumu dokudur**, renk değil: doğrulanmış borsa düz yeşil ve ✓,
 aday taralı kehribar ve ?, bizim sınırımız (bütçe/dallanma) kesik çerçeve,
-kök indigo, **yakma adresi çapraz taralı ve ✕** (para yok edildi, iz biter,
+kök cyan, **yakma adresi çapraz taralı ve ✕** (para yok edildi, iz biter,
 devam yok). Renk tek başına hiçbir şey anlatmaz.
 
 Yerleşim **deterministiktir**: aynı koşu her açılışta aynı resmi verir,
@@ -115,7 +125,7 @@ Tam tutar ipucunda ve defterde, şerit etiketinde yalnızca kısa biçim
 **Takibe devam ve gizleme.** Bir adres seçilince sağ panelde eylemler
 çıkar:
 - **takibe devam et ▸ +2 sıçrama** — aday borsada ve bizim sınırımızda
-  (bütçe, dallanma…) kalan adreslerde; birincil düğme, indigo. Doğrulanmış
+  (bütçe, dallanma…) kalan adreslerde; birincil düğme, cyan. Doğrulanmış
   borsada düğme YOKTUR, yerine "iz burada tamamlandı" yazar.
 - **diyagramda gizle / göster** — adres ve şeritleriyle birlikte. Şerit
   seçilince "şeridi gizle"; defterde her satırın sonunda göz düğmesi.
@@ -129,7 +139,7 @@ o sıçramanın bütün şeritlerini akışta öne çıkarır; tersine, akışta
 
 ## Yükleme
 
-- **Üst çubuk:** sayfanın en üstünde 8 piksellik indigo çubuk. Uygulama tam
+- **Üst çubuk:** sayfanın en üstünde 3 piksellik cyan çubuk. Uygulama tam
   sayfa gezinmesi yapıyor; çubuk bağlantıya tıklandığı an başlar, yeni
   sayfanın İLK veri isteği bitince tamamlanır. Arka plan yoklamaları (koşu
   sürerken 3 saniyede bir tazeleme) çubuğu yakmaz — bunu yalnızca sayfa
