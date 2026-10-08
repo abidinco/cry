@@ -488,7 +488,9 @@ input:focus, select:focus { border-color: var(--vurgu); }
 
 /* --- takip sayfası: tek ekran --- */
 
-.ana.ana-genis { max-width: none; }
+/* Geniş sayfalar (takip) tek ekrana sığmak zorunda: alt boşluk dar tutulur,
+   yoksa gövde 30 px taşıp diyagramı kaydırmalı hâle getiriyor (ölçüldü). */
+.ana.ana-genis { max-width: none; padding-bottom: 12px; }
 
 .takip-serit {
   display: flex; align-items: center; gap: 16px; flex-wrap: wrap;

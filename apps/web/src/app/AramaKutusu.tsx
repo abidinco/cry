@@ -128,8 +128,10 @@ export default function AramaKutusu() {
 
       {!sonuc && !hata && (
         <Bos>
-          Ağ, yapıştırılan metnin biçiminden çözülür — hiçbir ağ çağrısı yapılmadan.
-          Biçim tek bir zinciri göstermiyorsa adaylar yoklanır.
+          Adres yapıştırırsan geçmişi ve takip düğmesi; işlem hash&apos;i yapıştırırsan o işlemin
+          hareketleri ve &laquo;bu işlemden takip&raquo; çıkar. Hash hangi zincire ait belli
+          değilse adaylar yoklanır ve <b>hangisine bakıldığı yazılır</b> — bakılmayan zincir
+          &laquo;temiz&raquo; sayılmaz.
         </Bos>
       )}
 

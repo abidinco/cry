@@ -367,23 +367,9 @@ export default function AdresGorunumu({ chain, address }: { chain: string; addre
               </span>
             )}
           </Satir>
-          <Satir ad="ilk hareket" koken={tk.koken} not={tk.not}>
-            <Tarih deger={ozet.firstSeen} metin={tarih(ozet.firstSeen)} />
-          </Satir>
-          <Satir ad="son hareket" koken={tk.koken} not={tk.not}>
-            <Tarih deger={ozet.lastSeen} metin={tarih(ozet.lastSeen)} />
-            {bekleme !== null && (
-              <span className="koken-notu">{sayi(bekleme)} gündür hareketsiz</span>
-            )}
-          </Satir>
-          <Satir ad="bakiye">
-            {ozet.balanceRaw ? <Tutar ham={ozet.balanceRaw} ondalik={6} sembol="TRX" /> : "—"}
-          </Satir>
-          <Satir ad="hareket">
-            <span className="veri">
-              {sayi(ozet.hareketSayisi.gelen)} gelen · {sayi(ozet.hareketSayisi.giden)} giden
-            </span>
-          </Satir>
+          {/* Bakiye, ilk/son hareket ve sayılar yukarıdaki KARTLARDA; aynı olguyu iki kez
+              yazmak, okuyanı hangisinin taze olduğunu aramaya zorlar. Burada yalnızca
+              kartın taşıyamadığı şeyler kalır: taramanın kendisi ve kaynağın söyledikleri. */}
           {ozet.activatedByAddress && (
             <Satir ad="aktive eden" koken="kaynak" not="zincirde yazılı">
               <Adres deger={ozet.activatedByAddress} zincir={ozet.chain} />

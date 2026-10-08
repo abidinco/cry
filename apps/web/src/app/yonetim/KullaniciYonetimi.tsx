@@ -74,7 +74,9 @@ export default function KullaniciYonetimi() {
   }
 
   const aktif = kullanicilar.filter((k) => k.active);
-  const yonetici = aktif.filter((k) => k.role.key === "yonetici");
+  // Rolün ANAHTARI "admin"; ekranda "Yönetici" yazıyor. Görünen adı ölçüt yapmak,
+  // adı değişince sayıyı sessizce sıfırlardı (ölçüldü: kart "0 yönetici" diyordu).
+  const yonetici = aktif.filter((k) => k.role.key === "admin");
   const degistirmeyen = aktif.filter((k) => k.mustChangePassword);
 
   return (
