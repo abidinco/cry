@@ -43,56 +43,47 @@ export default async function RaporSayfasi({ params }: { params: Promise<{ id: s
 
   return (
     <Kabuk username={oturum.username} admin={adminMi(oturum)} genis>
+      <div className="tepe">
+        <h1>{rapor.title}</h1>
+        <span className="cip">{rapor.case.title}</span>
+        <span className="cip">rapor {rapor.id.toString()}</span>
+        <span className="cip">
+          <Tarih deger={rapor.createdAt} metin={tarih(rapor.createdAt)} />
+        </span>
+        <span className="tepe-sag">
+          <a className="dugme" href={`/api/rapor/${rapor.id}/kanit`}>
+            kanıt paketi ▾
+          </a>
+          <a className="dugme birincil" href={`/api/rapor/${rapor.id}/pdf`}>
+            PDF indir ▾
+          </a>
+        </span>
+      </div>
 
-      <Kayit
-        koken="indeks"
-        baslik={<h2 className="etiket">{rapor.title}</h2>}
-        sag={
-          <span className="veri m3">
-            {rapor.case.title} · rapor {rapor.id.toString()} ·{" "}
-            <Tarih deger={rapor.createdAt} metin={tarih(rapor.createdAt)} />
+      {/*
+        Mühür en üstte ve TEK başına durur: bu sayfanın cevapladığı ilk soru "bu rapor
+        değişmiş mi". Paket her açılışta yeniden kanonikleştirilip kayıtlı hash ile
+        karşılaştırılıyor; cümle koda değil ÖLÇÜME bağlı.
+      */}
+      <div className="uyari" data-ton={tutuyor ? "iyi" : "hata"} style={{ marginBottom: 14 }}>
+        <span aria-hidden>{tutuyor ? "✓" : "⚠"}</span>
+        <span style={{ minWidth: 0 }}>
+          <b>{tutuyor ? "Mühür tutuyor." : "MÜHÜR TUTMUYOR."}</b>{" "}
+          {tutuyor
+            ? "Saklanan paket yeniden hash'lendi ve kayıtlı hash ile birebir çıktı."
+            : `Yeniden hesaplanan: ${yeniden}`}
+          <code className="veri" style={{ display: "block", wordBreak: "break-all", marginTop: 4 }}>
+            {rapor.sha256}
+          </code>
+          <span className="koken-notu" style={{ display: "block", margin: "4px 0 0" }}>
+            kanonik hash KANIT PAKETİNİN (JSON) hash&apos;idir, PDF&apos;in değil · doğrulama:
+            sha256sum cry-kanit-{rapor.id.toString()}.json
           </span>
-        }
-      >
-        <Satir ad="mühür (kanıt paketi SHA-256)" not={tutuyor ? undefined : "paket değişmiş"}>
-          <code className="veri">{rapor.sha256}</code>{" "}
-          <Rozet
-            ton={tutuyor ? "gelen" : "hata"}
-            baslik={
-              tutuyor
-                ? "saklanan paket yeniden hash'lendi ve kayıtlı hash ile birebir çıktı"
-                : `yeniden hesaplanan: ${yeniden}`
-            }
-          >
-            {tutuyor ? "mühür tutuyor" : "MÜHÜR TUTMUYOR"}
-          </Rozet>
-        </Satir>
-        <Satir ad="PDF SHA-256">
-          {rapor.pdfSha256 ? (
-            <code className="veri">{rapor.pdfSha256}</code>
-          ) : (
-            <span className="m2">
-              PDF henüz üretilmedi; ilk indirmede üretilir ve hash'i bu satıra YAZILIR. Kanonik
-              olan kanıt paketidir.
-            </span>
-          )}
-        </Satir>
-        <Satir ad="PDF">
-          <a className="veri" href={`/api/rapor/${rapor.id}/pdf`}>
-            indir (okunur hâli) ▾
-          </a>
-          <span className="m3">
-            {" "}
-            · aynı rapordan her zaman aynı baytlar; üretilen hash kayıttakiyle karşılaştırılır
-          </span>
-        </Satir>
-        <Satir ad="kanıt paketi">
-          <a className="veri" href={`/api/rapor/${rapor.id}/kanit`}>
-            indir (mühürlenen baytlar) ▾
-          </a>
-          <span className="m3"> · doğrulama: sha256sum cry-kanit-{rapor.id.toString()}.json</span>
-        </Satir>
-      </Kayit>
+        </span>
+      </div>
+
+      <div className="ikili">
+        <div className="sutun">
 
       <Kayit koken="indeks" baslik="Koşu">
         <Satir ad="kök adres">
@@ -154,11 +145,59 @@ export default async function RaporSayfasi({ params }: { params: Promise<{ id: s
                 {/* Tek bir fiyat yoksa hücre "0 ₺" DEĞİL, yokluktur. */}
                 <td className="sag veri">{v.islemGunuTry ?? <span className="m2">—</span>}</td>
                 <td className="sag veri">{v.raporGunuTry ?? <span className="m2">—</span>}</td>
-                <td className="sag">{v.fiyatsizKenar > 0 ? `${sayi(v.fiyatsizKenar)}/${sayi(v.kenar)}` : "0"}</td>
+                <td className="sag">
+                  {v.fiyatsizKenar > 0 ? (
+                    <>
+                      {sayi(v.fiyatsizKenar)}/{sayi(v.kenar)}{" "}
+                      {/* Fiyatsız kenar varsa o satırın TL'si bir ALT SINIRdır — ve bu
+                          satırın KENDİSİNDE yazar. Varlıklar arası toplam ALINMAZ. */}
+                      <Rozet ton="dikkat" baslik="fiyatı olmayan kenar var: bu satırın TL toplamı bir alt sınırdır">
+                        alt sınır
+                      </Rozet>
+                    </>
+                  ) : (
+                    "0"
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
+        <p className="koken-notu" style={{ display: "block", marginBottom: 0 }}>
+          Varlıklar karışmaz ve varlıklar arası toplam alınmaz — &laquo;1 TRX + 1 USDT = 2&raquo;
+          diye bir büyüklük yok. Fiyatı bulunamayan kenar varsa o satırın TL&apos;si alt sınırdır;
+          sebepleri aşağıda sayılı.
+        </p>
+      </Kayit>
+        </div>
+
+        <div className="sutun">
+
+      <Kayit koken="indeks" baslik="Mühür ve dosyalar">
+        <div className="panel satirlar">
+          <Satir ad="PDF SHA-256">
+            {rapor.pdfSha256 ? (
+              <code className="veri" style={{ wordBreak: "break-all" }}>
+                {rapor.pdfSha256}
+              </code>
+            ) : (
+              <span className="m2">
+                PDF henüz üretilmedi; ilk indirmede üretilir ve hash&apos;i bu satıra YAZILIR.
+                Kanonik olan kanıt paketidir.
+              </span>
+            )}
+          </Satir>
+          <Satir ad="PDF" not="aynı rapordan her zaman aynı baytlar">
+            <a className="veri" href={`/api/rapor/${rapor.id}/pdf`}>
+              indir (okunur hâli) ▾
+            </a>
+          </Satir>
+          <Satir ad="kanıt paketi" not="mühürlenen baytlar">
+            <a className="veri" href={`/api/rapor/${rapor.id}/kanit`}>
+              indir ▾
+            </a>
+          </Satir>
+        </div>
       </Kayit>
 
       <Kayit koken="supheli" baslik="Metodoloji ve sınırlar">
@@ -202,6 +241,16 @@ export default async function RaporSayfasi({ params }: { params: Promise<{ id: s
           </table>
         </Kayit>
       )}
+
+      <div className="uyari" data-ton="iyi">
+        <span aria-hidden>✓</span>
+        <span>
+          Bu rapor bir <b>ANIN</b> tutanağıdır: üretim zamanı pakete girer, yani aynı koşudan
+          alınan iki rapor farklı hash taşır.
+        </span>
+      </div>
+        </div>
+      </div>
     </Kabuk>
   );
 }

@@ -73,38 +73,84 @@ export default function KullaniciYonetimi() {
     void yukle();
   }
 
+  const aktif = kullanicilar.filter((k) => k.active);
+  const yonetici = aktif.filter((k) => k.role.key === "yonetici");
+  const degistirmeyen = aktif.filter((k) => k.mustChangePassword);
+
   return (
     <section>
-      {hata && <p style={{ color: "var(--hata)" }}>{hata}</p>}
+      <div className="tepe">
+        <h1>Yönetim</h1>
+        <span className="cip">kullanıcılar ve roller</span>
+      </div>
 
-      {sifre && (
-        <div className="panel" style={{ borderColor: "var(--dikkat)", marginBottom: 14 }}>
-          <strong>{sifre.kim}</strong> için şifre — <em>bu değer bir daha gösterilmez:</em>
-          <div className="veri" style={{ fontSize: 16, margin: "8px 0" }}>{sifre.deger}</div>
-          <button onClick={() => setSifre(null)} style={{ fontSize: 13, padding: "6px 10px" }}>
-            Kapat
-          </button>
+      {hata && (
+        <div className="uyari" data-ton="hata" style={{ marginBottom: 12 }}>
+          <span aria-hidden>⚠</span>
+          <span>{hata}</span>
         </div>
       )}
 
-      <Kayit koken="kaynak" baslik="yeni kullanıcı">
-      <form className="panel" onSubmit={ekle} style={{ display: "flex", gap: 8 }}>
-        <input
-          value={yeniAd}
-          onChange={(e) => setYeniAd(e.target.value)}
-          placeholder="kullanıcı adı"
-          className="veri"
-          style={{ flex: 1 }}
-        />
-        <select value={yeniRol} onChange={(e) => setYeniRol(e.target.value)}>
-          {roller.map((r) => (
-            <option key={r.key} value={r.key}>{r.name}</option>
-          ))}
-        </select>
-        <button className="birincil" disabled={yeniAd.trim().length < 3}>kullanıcı aç</button>
-      </form>
-      </Kayit>
+      {/*
+        Kartlar YALNIZCA listeden sayılır. Yığın sağlığı (okuyucunun geriliği, disk, yedek)
+        buraya konmadı: `/saglik` yalnızca "süreç yaşıyor mu" diyor ve ölçmediğimiz bir sayıyı
+        kart yapmak, bakılmamış bir yeri yeşil gösterirdi.
+      */}
+      <div className="kartlar">
+        <div className="kart">
+          <div className="etiket">aktif kullanıcı</div>
+          <div className="kart-deger">
+            {aktif.length}
+            <small> / {kullanicilar.length}</small>
+          </div>
+          <div className="kart-alt">pasifler kayıtta kalır, silinmez</div>
+        </div>
+        <div className="kart">
+          <div className="etiket">yönetici</div>
+          <div className="kart-deger">{yonetici.length}</div>
+          <div className="kart-alt">son aktif yönetici kapatılamaz</div>
+        </div>
+        <div className="kart">
+          <div className="etiket">şifre değiştirmedi</div>
+          <div className="kart-deger" data-ton={degistirmeyen.length > 0 ? "dikkat" : undefined}>
+            {degistirmeyen.length}
+          </div>
+          <div className="kart-alt">ilk girişte değiştirmek zorunlu</div>
+        </div>
+      </div>
 
+      {sifre && (
+        <div className="uyari" style={{ marginBottom: 12 }}>
+          <span aria-hidden>⚿</span>
+          <span>
+            <b>{sifre.kim}</b> için şifre — <em>bu değer bir daha gösterilmez:</em>
+            <div
+              className="veri"
+              style={{
+                fontSize: 16,
+                letterSpacing: "0.06em",
+                margin: "8px 0",
+                background: "#0b1220",
+                border: "1px dashed var(--vurgu)",
+                borderRadius: "var(--kose-2)",
+                padding: "9px 12px",
+                display: "inline-block",
+                color: "var(--m1)",
+              }}
+            >
+              {sifre.deger}
+            </div>
+            <div>
+              <button className="kucuk" onClick={() => setSifre(null)}>
+                kapat
+              </button>
+            </div>
+          </span>
+        </div>
+      )}
+
+      <div className="ikili">
+        <div className="sutun">
       <Kayit koken="kaynak" baslik="kullanıcılar">
       <div className="tablo-sar">
       <table className="tablo">
@@ -122,7 +168,11 @@ export default function KullaniciYonetimi() {
             <tr key={k.id} >
               <td className="veri">
                 {k.username}
-                {k.mustChangePassword && <span className="etiket"> · şifre değiştirmedi</span>}
+                {k.mustChangePassword && (
+                  <span className="koken-notu" data-koken="supheli">
+                    şifre değiştirmedi
+                  </span>
+                )}
               </td>
               <td>
                 <select
@@ -134,22 +184,19 @@ export default function KullaniciYonetimi() {
                   ))}
                 </select>
               </td>
-              <td style={{ color: k.active ? "var(--gelen)" : "var(--m3)" }}>
-                {k.active ? "aktif" : "pasif"}
+              <td>
+                <span className="rozet" data-ton={k.active ? "gelen" : undefined}>
+                  {k.active ? "aktif" : "pasif"}
+                </span>
               </td>
-              <td className="soluk mono" style={{ fontSize: 12 }}>
-                {k.lastLoginAt ? tarih(k.lastLoginAt) : "—"}
-              </td>
+              <td className="veri m3">{k.lastLoginAt ? tarih(k.lastLoginAt) : "—"}</td>
               <td style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                <button
-                  onClick={() => guncelle(k.id, { sifreSifirla: true }, k.username)}
-                  style={{ fontSize: 12, padding: "5px 8px" }}
-                >
+                <button className="kucuk" onClick={() => guncelle(k.id, { sifreSifirla: true }, k.username)}>
                   şifre sıfırla
                 </button>
                 <button
+                  className={k.active ? "kucuk tehlike" : "kucuk"}
                   onClick={() => guncelle(k.id, { active: !k.active }, k.username)}
-                  style={{ fontSize: 12, padding: "5px 8px" }}
                 >
                   {k.active ? "kapat" : "aç"}
                 </button>
@@ -160,6 +207,50 @@ export default function KullaniciYonetimi() {
       </table>
       </div>
       </Kayit>
+        </div>
+
+        <div className="sutun">
+          <Kayit koken="kaynak" baslik="yeni kullanıcı">
+            <form className="panel" onSubmit={ekle} style={{ display: "grid", gap: 9 }}>
+              <label style={{ display: "grid", gap: 5 }}>
+                <span className="etiket">kullanıcı adı</span>
+                <input
+                  value={yeniAd}
+                  onChange={(e) => setYeniAd(e.target.value)}
+                  placeholder="kucukad"
+                  className="veri"
+                />
+              </label>
+              <label style={{ display: "grid", gap: 5 }}>
+                <span className="etiket">rol</span>
+                <select value={yeniRol} onChange={(e) => setYeniRol(e.target.value)}>
+                  {roller.map((r) => (
+                    <option key={r.key} value={r.key}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button className="birincil" disabled={yeniAd.trim().length < 3}>
+                kullanıcı aç
+              </button>
+              <p className="koken-notu" style={{ display: "block", margin: 0 }}>
+                Üretilen şifre yalnızca YANITTA bir kez döner; hiçbir yere yazılmaz. İlk girişte
+                değiştirmek zorunludur.
+              </p>
+            </form>
+          </Kayit>
+
+          <div className="uyari">
+            <span aria-hidden>⚠</span>
+            <span>
+              Kullanıcı <b>silinmez</b>, pasife çekilir — denetim kaydı ona atıf yapıyor. Son
+              aktif yönetici kapatılamaz ve kimse kendi rolünü düşüremez; kapı bunu kayıttan
+              sorar, jetondan değil.
+            </span>
+          </div>
+        </div>
+      </div>
     </section>
   );
 }

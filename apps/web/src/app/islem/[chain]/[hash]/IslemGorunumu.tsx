@@ -159,38 +159,50 @@ export default function IslemGorunumu({ chain, hash }: { chain: string; hash: st
 
   return (
     <>
-      <Kayit
-        koken="kaynak"
-        baslik="işlem"
-        sag={
-          gezgin ? (
-            <a href={gezgin} target="_blank" rel="noopener noreferrer">
-              gezginde aç
+      <div className="tepe">
+        <div style={{ minWidth: 0 }}>
+          <div className="etiket">işlem · {islem.chain}</div>
+          <h1 className="veri" style={{ fontSize: 15, wordBreak: "break-all", marginTop: 3 }}>
+            {islem.hash}
+          </h1>
+        </div>
+        <span className="tepe-sag">
+          <span className="cip" data-ton={islem.success ? "iyi" : "dikkat"}>
+            {islem.success ? "✓ başarılı" : "başarısız — para hareket etmedi"}
+          </span>
+          {gezgin && (
+            <a className="dugme" href={gezgin} target="_blank" rel="noopener noreferrer">
+              gezginde aç ↗
             </a>
-          ) : null
-        }
-      >
+          )}
+        </span>
+      </div>
+
+      <div className="ikili">
+        <div className="sutun">
+
+      <Kayit koken="kaynak" baslik="işlem">
         <div className="panel satirlar">
-          <Satir ad="hash">
-            <span className="veri" style={{ wordBreak: "break-all" }}>{islem.hash}</span>
-          </Satir>
-          <Satir ad="zincir">
-            <span className="veri">{islem.chain}</span>
-          </Satir>
-          <Satir ad="zaman">
-            <Tarih deger={islem.ts ?? null} metin={tarih(islem.ts ?? null)} />
-          </Satir>
           <Satir ad="blok">
             <span className="veri">{islem.blockNumber ?? "—"}</span>
           </Satir>
+          <Satir ad="zaman" not="ipucunda UTC — gün sınırı UTC'dir">
+            <Tarih deger={islem.ts ?? null} metin={tarih(islem.ts ?? null)} />
+          </Satir>
           <Satir ad="sonuç">
             {islem.success ? (
-              <span className="veri">başarılı</span>
+              <Rozet ton="gelen">başarılı</Rozet>
             ) : (
               <Rozet ton="dikkat" baslik="Başarısız işlemde para hareket etmedi.">
                 başarısız
               </Rozet>
             )}
+          </Satir>
+          <Satir ad="hareket">
+            <span className="veri">{hareketler.length}</span>
+            <span className="koken-notu">
+              TRC20 transferi bir OLAYdır; log dizisinden okunur
+            </span>
           </Satir>
         </div>
       </Kayit>
@@ -205,53 +217,88 @@ export default function IslemGorunumu({ chain, hash }: { chain: string; hash: st
               ` Ayrıca ${islem.cozulemeyenLog} olay günlüğü çözülemedi.`}
           </Bos>
         ) : (
-          <div className="panel satirlar">
+          <div className="panel" style={{ padding: 0 }}>
             {hareketler.map((h, i) => (
-              <Satir key={i} ad={h.asset.symbol}>
-                <span className="veri">
-                  <Adres deger={h.from ?? "—"} zincir={chain} />
-                  {" → "}
-                  <Adres deger={h.to ?? "—"} zincir={chain} />
-                </span>
-                {h.ondalikBilinmiyor ? (
-                  // Ondalığı bilinmeyen tutar ÇEVRİLMEZ: 0 ondalıkla basmak yanlış bir büyüklük
-                  // gösterir. Ham sayı, ham olduğu söylenerek basılır; kimlik sözleşmede durur.
-                  <span className="veri" title={`sözleşme: ${h.asset.contract ?? "?"}`}>
-                    {h.amountRaw} <span className="koken-notu">ham · ondalık bilinmiyor</span>
-                  </span>
-                ) : (
-                  <Tutar ham={h.amountRaw} ondalik={h.asset.decimals} sembol={h.asset.symbol} />
-                )}
-                {!h.success && <Rozet ton="dikkat">başarısız</Rozet>}
-                <FiyatSatiri fiyat={fiyatlar?.[i]} />
-              </Satir>
+              <div
+                key={i}
+                className="islem-hareket"
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "minmax(0, 1fr) auto",
+                  gap: 12,
+                  padding: "11px 14px",
+                  borderTop: i === 0 ? undefined : "1px solid var(--cizgi-2)",
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <div
+                    style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}
+                  >
+                    <span className="veri">
+                      <Adres deger={h.from ?? "—"} zincir={chain} />
+                      <span className="m3"> → </span>
+                      <Adres deger={h.to ?? "—"} zincir={chain} />
+                    </span>
+                    <Rozet baslik={h.asset.contract ?? "native varlık"}>
+                      {h.asset.symbol}
+                      {h.asset.contract ? " · token" : ""}
+                    </Rozet>
+                    {!h.success && <Rozet ton="dikkat">başarısız</Rozet>}
+                  </div>
+                  <FiyatSatiri fiyat={fiyatlar?.[i]} />
+                </div>
+                <div style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                  {h.ondalikBilinmiyor ? (
+                    // Ondalığı bilinmeyen tutar ÇEVRİLMEZ: 0 ondalıkla basmak yanlış bir büyüklük
+                    // gösterir. Ham sayı, ham olduğu söylenerek basılır; kimlik sözleşmede durur.
+                    <span
+                      className="veri"
+                      style={{ fontSize: 15, wordBreak: "break-all", whiteSpace: "normal" }}
+                      title={`sözleşme: ${h.asset.contract ?? "?"}`}
+                    >
+                      {h.amountRaw}{" "}
+                      <span className="koken-notu" data-koken="supheli">
+                        ham · ondalık bilinmiyor
+                      </span>
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: 15 }}>
+                      <Tutar ham={h.amountRaw} ondalik={h.asset.decimals} sembol={h.asset.symbol} />
+                    </span>
+                  )}
+                </div>
+              </div>
             ))}
           </div>
         )}
-        <p className="koken-notu">
-          TL karşılıkları işlemin <strong>UTC</strong> gününe göre hesaplanır; yukarıdaki saat
-          TSİ'dir, yani gece yarısına yakın bir işlem bir önceki günün kuruyla çevrilmiş olabilir.
-          Kur TCMB döviz alışıdır ve kullanılan bültenin tarihi satırda yazar.
-        </p>
-        <p className="koken-notu">
-          Bu liste bir EKSİKSİZLİK iddiası değildir: kaynağın işlem uçlarının döndürdüğü
-          hareketlerdir. Sözleşme çağrısının taşıdığı TRX ve sözleşme içi (internal) transferler
-          görünmez.
+      </Kayit>
+
+      <div className="uyari">
+        <span aria-hidden>⚠</span>
+        <span>
+          <b>Bu liste bir EKSİKSİZLİK iddiası değildir:</b> kaynağın işlem uçlarının döndürdüğü
+          hareketlerdir. Sözleşme çağrısının taşıdığı TRX (<span className="veri">call_value</span>)
+          ve sözleşme içi (internal) transferler görünmez.
           {(islem.cozulemeyenLog ?? 0) > 0 &&
             ` Şekli tanınmayan ${islem.cozulemeyenLog} olay günlüğü atlandı.`}
-        </p>
-      </Kayit>
+        </span>
+      </div>
+
+        </div>
+
+        <div className="sutun">
 
       {alicilar.length > 0 && (
         <Kayit koken="yok" baslik="bu işlemden takip">
-          <p className="koken-notu">
-            Takip köke GİREN paradan başlar. Aşağıdaki adresler bu işlemin alıcılarıdır; birini
-            seçtiğinizde koşu yalnızca <strong>bu işlemin getirdiği parayı</strong> izler — adresin
-            bütün geçmişini değil.
-          </p>
           <div className="panel satirlar">
+            <p className="koken-notu" style={{ display: "block", margin: 0 }}>
+              Takip köke GİREN paradan başlar; kök adresi <b>insan seçer</b>. Aşağıdakiler bu
+              işlemin alıcılarıdır — birini seçince koşu yalnızca{" "}
+              <strong>bu işlemin getirdiği parayı</strong> izler, adresin bütün geçmişini değil.
+              Gönderene düğme konmaz: o adresin bu işlemde girişi yoktur.
+            </p>
             {alicilar.map((a) => (
-              <Satir key={a} ad="alıcı">
+              <div key={a} style={{ display: "grid", gap: 6 }}>
                 <Adres deger={a} zincir={chain} />
                 <button
                   className="birincil"
@@ -259,13 +306,29 @@ export default function IslemGorunumu({ chain, hash }: { chain: string; hash: st
                   disabled={baslatilan !== null}
                   title="Bu adrese, bu işlemle gelen parayı takip eder"
                 >
-                  {baslatilan === a ? "başlatılıyor…" : "bu işlemden takip"}
+                  {baslatilan === a ? "başlatılıyor…" : "bu işlemden takip ▸"}
                 </button>
-              </Satir>
+              </div>
             ))}
           </div>
         </Kayit>
       )}
+
+      <Kayit koken="indeks" baslik="fiyat ve kur">
+        <div className="panel">
+          <p className="koken-notu" style={{ display: "block", margin: 0 }}>
+            TL karşılıkları işlemin <strong>UTC</strong> gününe göre hesaplanır; yukarıdaki saat
+            TSİ&apos;dir, yani gece yarısına yakın bir işlem bir ÖNCEKİ günün kuruyla çevrilmiş
+            olabilir. Kur TCMB <span className="veri">döviz alış</span>, ve kullanılan bültenin
+            tarihi satırda yazar. Fiyat bulunamadıysa sebebi yazılır — boş bir alan
+            &laquo;TL karşılığı yok&raquo; diye okunurdu, oysa cevap &laquo;bakılamadı&raquo;
+            olabilir.
+          </p>
+        </div>
+      </Kayit>
+
+        </div>
+      </div>
 
       {hata && <Bos>{hata}</Bos>}
     </>
@@ -286,7 +349,12 @@ export default function IslemGorunumu({ chain, hash }: { chain: string; hash: st
 function FiyatSatiri({ fiyat }: { fiyat: Fiyat | undefined }) {
   if (!fiyat) return null;
   return (
-    <span className="koken-notu" title={fiyat.gerekce.join(" · ") || undefined}>
+    <span
+      className="koken-notu"
+      data-koken={fiyat.islemGunu ? undefined : "supheli"}
+      style={{ display: "block", margin: "5px 0 0", whiteSpace: "normal" }}
+      title={fiyat.gerekce.join(" · ") || undefined}
+    >
       {kurCumlesi(fiyat)}
     </span>
   );
