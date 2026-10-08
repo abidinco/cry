@@ -26,6 +26,11 @@ Karara bağlanan madde bekleyenlerden **silinir**, kuralı buraya yazılır.
 - Commit mesajları Conventional Commits, **İngilizce**, gövdeli.
 - Ortam dosyası depoda DEĞİL: **`C:\srv\cry\.env`** (PC), `/srv/cry/.env`
   (sunucu). Depo public; sır commit'e girmez.
+- **ÖNÜMÜZDEKİ HER ŞEY masaya yazılır** (kullanıcı kuralı 2026-10-08): karar
+  beklemeyen işler de (`isler` koleksiyonu: sıra · kim bekliyor · açıklama ·
+  nerede). Sebep: sohbet temizlendikten sonra önümüzü **masadan okuyarak**
+  görüyoruz. **Masada olmayan iş, konuşulmamış sayılır** — oturum sonunda açık
+  işler masaya yazılmadan iş bitmiş olmaz, oturum başında ilk bakılacak yer orası.
 - **Bekleyen kararlar KARAR MASASINDA sorulur** (kullanıcı kuralı 2026-10-04):
   artifact **cry karar masası** — https://claude.ai/artifact/MKQ4Zj2X4grwjb2KiCYHwS
   Yeni bir tercih çıkınca madde `kararlar` koleksiyonuna yazılır (altı başlık:
