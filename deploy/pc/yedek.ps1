@@ -22,7 +22,11 @@
 param(
   [string]$Hedef = "",
   [int]$Saklanan = 14,
-  [string]$Gunluk = "C:\srv\cry\yedek.log"
+  [string]$Gunluk = "C:\srv\cry\yedek.log",
+  [string]$Nabiz = "C:\srv\cry\yedek-nabiz.txt",
+  [string]$EnvDosyasi = "C:\srv\cry\.env",
+  # Alarm GONDERME (deneme kosusu): nabiz yine yazilir, mesaj gitmez.
+  [switch]$AlarmYok
 )
 
 $ErrorActionPreference = "Stop"
@@ -42,6 +46,58 @@ function Yaz([string]$Metin) {
   try { Add-Content -Path $Gunluk -Value $satir -Encoding UTF8 } catch { }
 }
 
+# Gonderici tek kopyada (deploy\pc	elegram.ps1).
+. (Join-Path $PSScriptRoot "telegram.ps1")
+
+# Kosunun SONUCU: nabiz ve alarm bunlari okur.
+$sonuc = "baslamadi"
+$hedefTuru = "bilinmiyor"
+$boyutMB = 0
+
+<#
+  NABIZ: "kostu ve basarisiz oldu" ile "hic kosmadi" ayri cevaplardir.
+  Yedek 2026-09-28'den beri 13 turda 13 kez "harici disk takili degil" yazdi ve
+  kimse gormedi; gunluge yazmak bir nabiz DEGILDIR, cunku gunlugu kimse okumuyor.
+  Dosya tek satir: <epoch_ms> <sonuc> <boyutMB> <hedefTuru> <enYeniDumpYasiSaat>
+  Bicim doldurucunun nabziyla ayni mantikta (CLAUDE.md): okuyan taraf hem
+  damganin tazeligine hem ILERLEMEYE (en yeni dump'in yasina) bakabilsin.
+#>
+function NabizYaz([double]$DumpYasiSaat) {
+  try {
+    $ms = [int64]([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())
+    $satir = "{0} {1} {2} {3} {4}" -f $ms, $sonuc, $boyutMB, $hedefTuru, [math]::Round($DumpYasiSaat, 1)
+    Set-Content -Path $Nabiz -Value $satir -Encoding ASCII
+  } catch {
+    Yaz "not: nabiz yazilamadi: $($_.Exception.Message)"
+  }
+}
+
+# En yeni dump'in yasi (saat). Hic dump yoksa cok buyuk bir sayi doner: "yok"
+# ile "taze" ayni kovaya girmemeli.
+function EnYeniDumpYasiSaat([string]$Klasor) {
+  try {
+    $en = Get-ChildItem $Klasor -Filter "cry-*.dump" -ErrorAction Stop |
+      Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if (-not $en) { return 99999 }
+    return ((Get-Date) - $en.LastWriteTime).TotalHours
+  } catch { return 99999 }
+}
+
+<#
+  ALARM: Telegram'a YALNIZCA bir seyi bilmek gerektiginde gider.
+   1. Kosu basarisiz (her turda) - basarisiz bir yedek her gun soylenmeli.
+   2. En yeni dump 48 SAATTEN eski - "bugun calisti" demek yetmez, ILERLEME olculur.
+   3. Hedef GECICI ise haftada BIR (pazartesi) - 13 gun ust uste ayni uyariyi
+      yazmak, uyariyi gurultuye cevirip gormeyecek hale getirmisti.
+#>
+function AlarmGonder([string]$Mesaj) {
+  if ($AlarmYok) { Yaz "alarm atlandi (-AlarmYok): $Mesaj"; return }
+  $g = TelegramGonder -Mesaj $Mesaj -EnvDosyasi $EnvDosyasi
+  if ($g -eq "gonderildi") { Yaz "alarm Telegram'a gonderildi" }
+  elseif ($g -eq "yapilandirilmamis") { Yaz "ALARM GONDERILEMEDI: Telegram yapilandirilmamis - $Mesaj" }
+  else { Yaz "ALARM GONDERILEMEDI: $g - $Mesaj" }
+}
+
 $cikis = 0
 try {
   New-Item -ItemType Directory -Force -Path (Split-Path $Gunluk) | Out-Null
@@ -50,15 +106,24 @@ try {
     $secim = YedekHedefi
     if (-not $secim) {
       Yaz "HATA: yedek hedefi yok - ne '04_Yedek\cry' klasorlu bir harici disk var, ne de C: D:'den ayri bir fiziksel disk."
+      # Alarm TEK yerden gider (finally): iki ayri gonderim, bir olay icin iki
+      # mesaj demekti ve olculdu - "alinamadi" + "ilerlemiyor" birlikte gitti.
+      $sonuc = "hedef_yok"
+      $hataMetni = "yedek hedefi yok (ne harici disk, ne ayri fiziksel disk)"
       exit 2
     }
     $Hedef = $secim.Yol
+    $hedefTuru = $secim.Tur
     if ($secim.Tur -eq "gecici") {
       Yaz "UYARI: harici yedek diski takili degil - GECICI hedef $Hedef (C:, D:'den ayri fiziksel disk). Disk arizasina karsi korur, makine kaybina karsi KORUMAZ."
     }
   } elseif (-not (Test-Path (Split-Path $Hedef -Qualifier))) {
     Yaz "HATA: hedef surucu yok ($Hedef). Harici disk takili mi?"
+    $sonuc = "hedef_yok"
+    $hataMetni = "hedef surucu yok ($Hedef) - harici disk takili mi?"
     exit 2
+  } else {
+    $hedefTuru = "elle"
   }
   $klasor = Join-Path $Hedef "postgres"
   New-Item -ItemType Directory -Force -Path $klasor | Out-Null
@@ -93,6 +158,8 @@ try {
 
   $sure.Stop()
   $boyut = [math]::Round((Get-Item $yol).Length / 1MB, 1)
+  $boyutMB = $boyut
+  $sonuc = "tamam"
   Yaz ("tamam: {0} MB, {1} tablo verisi, {2} sn" -f $boyut, ($tablolar -replace '\s',''), [math]::Round($sure.Elapsed.TotalSeconds, 1))
 
   # Eskileri sil - ama once YENI dosyanin yazildigini gordukten sonra.
@@ -138,6 +205,35 @@ try {
 }
 catch {
   Yaz "HATA: $($_.Exception.Message)"
+  $sonuc = "hata"
+  $hataMetni = $_.Exception.Message
   $cikis = 1
+}
+finally {
+  # Nabiz HER kosuda yazilir - basarisiz kosu da bir olcumdur.
+  #
+  # Burada `Join-Path` KULLANILMAZ ve her sey try icinde: olculdu (2026-10-09)
+  # - olmayan bir surucude `Join-Path Z:\yok postgres` $ErrorActionPreference
+  # "Stop" ile HATA atiyor, finally yarida kaliyor ve `exit 2` ile cikan betik
+  # 1 donuyordu. Yani nabzi yazacak blok, nabzi yazdiran hatanin kendisine
+  # takiliyordu.
+  $yas = 99999
+  try {
+    if ($Hedef) { $yas = EnYeniDumpYasiSaat ($Hedef.TrimEnd("\") + "\postgres") }
+  } catch { $yas = 99999 }
+  NabizYaz $yas
+
+  # Alarm da yutulur: gonderilemeyen bir mesaj, yedegin cikis kodunu
+  # DEGISTIRMEMELI (yedek alindi mi sorusu Telegram'a bagli olamaz).
+  try {
+  if ($sonuc -eq "hata" -or $sonuc -eq "hedef_yok") {
+    AlarmGonder "cry YEDEK ALINAMADI: $hataMetni (en yeni dump $([math]::Round($yas,1)) saat once)"
+  } elseif ($yas -gt 48) {
+    # Kosu "tamam" dese bile en yeni dump eskiyse ILERLEME yok demektir.
+    AlarmGonder "cry YEDEK UYARI: en yeni dump $([math]::Round($yas,1)) saat once - gunluk yedek ilerlemiyor."
+  } elseif ($hedefTuru -eq "gecici" -and (Get-Date).DayOfWeek -eq "Monday") {
+    AlarmGonder "cry yedek haftalik hatirlatma: harici disk hala takili degil, yedek ayni makinede ($Hedef). Makine kaybina karsi KORUMUYOR."
+  }
+  } catch { Yaz "not: alarm blogu hata verdi (yedegi etkilemez): $($_.Exception.Message)" }
 }
 exit $cikis

@@ -557,6 +557,36 @@ kapatmak bilerek kaynağa gitmektir. Saf katman testli (`tests/yalniz-yerel.test
   `deploy/pc/yedek-geri-yukleme-denemesi.ps1` her pazar 03:45. Ölçüt canlı değil,
   dump'ın yanındaki `.sayim` dosyası — canlıyla kıyas, EKSİK bir dump'ı "canlı
   büyümüştür" diye normal görürdü.
+- **Yedeğin NABZI ve ALARMI var; günlüğe yazmak nabız DEĞİLDİR.** Ölçüldü:
+  2026-09-28'den beri 13 turun 13'ü "harici disk takili degil" yazdı ve 13 gün
+  kimse okumadı. `yedek.ps1` her turda `C:\srv\cry\yedek-nabiz.txt` yazar
+  (`<epoch_ms> <sonuç> <boyutMB> <hedefTürü> <enYeniDumpYaşıSaat>`) — "koştu ve
+  başarısız oldu" ile "hiç koşmadı" ayrı cevaplardır. Telegram'a YALNIZCA üç
+  durumda gider: tur başarısız · en yeni dump 48 saatten eski (ilerleme yok) ·
+  hedef GEÇİCİ ise haftada bir (pazartesi). **Alarm tek yerden gider** (betiğin
+  `finally`si): erken çıkış da alarm atınca bir olay için iki mesaj gidiyordu
+  (ölçüldü).
+- **Bir sürecin koştuğu, kendi günlüğünden değil DIŞARDAN ölçülür.** Yedek hiç
+  koşmazsa kendi alarmını da atamaz; o yüzden nabzı 15 dakikada bir koşan
+  `doldurucu-bekci.ps1` okur ve 36 saatten bayatsa UYARI + Telegram (günde en çok
+  bir; aynı cümleyi 96 kez atan kanal okunmayan kanaldır). Dört yol da ölçüldü
+  (2026-10-09): bayat → alarm gitti · taze+tamam → tek bilgi satırı · nabız
+  dosyası yok → alarm YOK, "henüz koşmamış" · ikinci tur → "bugün zaten
+  gönderildi". Yedek denetimi bekçiyi DÜŞÜRMEZ (ayrı try) ve el freninden ÖNCE
+  koşar: fren doldurucu içindir.
+- **`finally` içinde `Join-Path` KULLANILMAZ.** Olmayan sürücüde (`Z:\yok`)
+  `$ErrorActionPreference="Stop"` ile hata atıyor, nabız yazılmıyor ve `exit 2`
+  ile çıkan betik **1** dönüyordu (ölçüldü) — yani nabzı yazacak blok, nabzı
+  gerektiren hatanın kendisine takılıyordu. Metin birleştirme + kendi try'ı.
+- **Telegram göndericisi TEK kopyada** (`deploy/pc/telegram.ps1`, üç betik onu
+  nokta-kaynaklıyor). Fonksiyon log yazmaz, SONUÇ döndürür
+  (`gonderildi|yapilandirilmamis|hata: …`); çağıranın kendi damga biçimi var.
+  Jeton yokluğu HATA değil "yapılandırılmamış"tır ve günlüğe öyle geçer.
+- **PC'nin zamanlanmış görevleri ÇALIŞMA KOPYASINI koşturuyor**
+  (`C:\Users\abidin\Documents\GitHub\cry\deploy\pc\*.ps1` — `Get-ScheduledTask`
+  ile ölçüldü), yani bu betiklerde yapılan bir değişiklik PUSH'tan BAĞIMSIZ olarak
+  anında canlıdır. Depoya girmemiş bir düzeltme makinede çalışıyor olabilir; bu
+  bir kolaylık ve aynı zamanda bir tuzaktır.
 - **PowerShell'de üç tuzak:** `docker exec … > dosya` ikili çıktıyı bozar (dump
   konteynerde alınıp `docker cp` ile taşınır) · PS 5.1 yerli exe'ye geçerken
   gömülü çift tırnakları bozuyor (argümanlar ayrı verilir) · yerli exe'de `2>&1`

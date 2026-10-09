@@ -31,7 +31,13 @@ param(
   # Doldurucu 50 GiB'de durur; bekci 55'in altinda hic denemez ki durup durup baslamasin.
   [int]$DiskEsigiGiB = 55,
   [int]$EnAzAralikDk = 10,
-  [int]$GunlukSatirSiniri = 3000
+  [int]$GunlukSatirSiniri = 3000,
+  # YEDEGIN nabzi: bekci her 15 dakikada bir kosan tek sey oldugu icin,
+  # yedegin HIC KOSMADIGINI gorebilecek tek yer de burasi.
+  [string]$YedekNabzi = "C:\srv\cry\yedek-nabiz.txt",
+  [string]$YedekAlarmDamgasi = "C:\srv\cry\yedek-alarm-damgasi",
+  [int]$YedekEnFazlaSaat = 36,
+  [string]$EnvDosyasi = "C:\srv\cry\.env"
 )
 
 $ErrorActionPreference = "Continue"
@@ -51,6 +57,66 @@ function Yaz([string]$m) {
   $satir = "$(Damga) $m"
   Write-Output $satir
   try { Add-Content -Path $KendiGunluk -Value $satir -Encoding UTF8 } catch { }
+}
+
+. (Join-Path $(if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Definition }) "telegram.ps1")
+
+<#
+  YEDEGIN nabzini DENETLE - bekcinin ikinci isi.
+
+  Neden burada: yedek gorevi gunde bir kosuyor ve BASARISIZ olursa kendi
+  alarmini atabiliyor; ama HIC KOSMAZSA (gorev silinmis, makine o saatte kapali,
+  zamanlayici bozulmus) kimse bunu soylemez. Olculdu: yedek 2026-09-28'den beri
+  her turda "harici disk takili degil" yazdi ve 13 gun boyunca kimse okumadi.
+  Bir surecin kostugu, kendi gunlugunden DEGIL disardan olculur.
+
+  Alarm gunde EN COK BIR: ayni cumleyi 96 kez atan bir kanal, okunmayan bir
+  kanaldir.
+#>
+function YedekNabziniDenetle {
+  try {
+    if (-not (Test-Path $YedekNabzi)) {
+      # Nabiz dosyasi YOK: yedek bu surumden beri hic kosmamis olabilir. Bu bir
+      # ALARM degil, bir BILGI satiri - yeni kurulumda da boyle gorunur.
+      Yaz "yedek nabzi yok ($YedekNabzi) - yedek bu surumle henuz kosmamis"
+      return
+    }
+    $satir = (Get-Content $YedekNabzi -First 1 -ErrorAction Stop).Trim()
+    $parca = $satir -split "\s+"
+    $ms = [int64]$parca[0]
+    $sonuc = $parca[1]
+    $yasSaat = [math]::Round(((([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()) - $ms) / 3600000.0), 1)
+    if ($yasSaat -le $YedekEnFazlaSaat -and $sonuc -eq "tamam") {
+      Yaz ("yedek nabzi: {0}, {1} saat once" -f $sonuc, $yasSaat)
+      return
+    }
+    $mesaj = if ($yasSaat -gt $YedekEnFazlaSaat) {
+      "cry YEDEK NABZI BAYAT: son yedek turu {0} saat once ({1}). Gunluk yedek gorevi kosmuyor olabilir." -f $yasSaat, $sonuc
+    } else {
+      "cry YEDEK SONUCU: {0} ({1} saat once) - son tur basarili degil." -f $sonuc, $yasSaat
+    }
+    Yaz "UYARI: $mesaj"
+    # Gunde bir: damga dosyasi son gonderimi tasir.
+    $gonder = $true
+    if (Test-Path $YedekAlarmDamgasi) {
+      try {
+        $son = [int64](Get-Content $YedekAlarmDamgasi -First 1).Trim()
+        if (((([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()) - $son) / 3600000.0) -lt 24) { $gonder = $false }
+      } catch { }
+    }
+    if ($gonder) {
+      $g = TelegramGonder -Mesaj $mesaj -EnvDosyasi $EnvDosyasi
+      Yaz "yedek alarmi: $g"
+      if ($g -eq "gonderildi") {
+        Set-Content -Path $YedekAlarmDamgasi -Value ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()) -Encoding ASCII
+      }
+    } else {
+      Yaz "yedek alarmi bugun zaten gonderildi, tekrarlanmadi"
+    }
+  } catch {
+    # Yedek denetimi bekciyi DUSURMEZ: bekcinin asil isi doldurucu.
+    Yaz "not: yedek nabzi denetlenemedi (bekciyi etkilemez): $($_.Exception.Message)"
+  }
 }
 
 function SurecleriBul {
@@ -108,6 +174,9 @@ if (-not $kilit.WaitOne(0)) { Write-Output "$(Damga) baska bir bekci kosuyor, ci
 
 try {
   New-Item -ItemType Directory -Force -Path (Split-Path $KendiGunluk) | Out-Null
+
+  # Yedek denetimi EL FRENINDEN once: fren doldurucu icindir, yedek bagimsizdir.
+  YedekNabziniDenetle
 
   if (Test-Path $FrenDosyasi) { Yaz "EL FRENI cekili ($FrenDosyasi), hicbir sey yapilmadi"; exit 0 }
 

@@ -554,10 +554,13 @@ kendiliğinden çalışır. Ölçüldü (2026-10-09): `yedek.log` 2026-09-28'den
 13 dump + sayım dosyası var ve son tur 32,1 MB / 3,2 sn. Yani **yedek alınıyor, yanlış
 yerde alınıyor.**
 
-**Asıl ders bunun ötesinde:** sessiz kalan bir görev "çalışıyor" ile "hiç koşmadı"yı ayırt
-edilemez kılıyor. Doldurucunun bekçisi her turda NABIZ yazıyor (CLAUDE.md); yedeğin böyle bir
-nabzı yok — bir hafta üst üste başarısız olsa yine kimse görmez. Yedek de bir nabız yazmalı
-(ya da başarısızlığı Telegram'a düşmeli, kanal zaten hazır).
+**Asıl ders bunun ötesindeydi ve YAPILDI (2026-10-09):** sessiz kalan bir görev "çalışıyor" ile
+"hiç koşmadı"yı ayırt edilemez kılıyordu. Yedek artık her turda `C:\srv\cry\yedek-nabiz.txt`
+yazıyor ve üç durumda Telegram'a alarm gidiyor (tur başarısız · en yeni dump 48 saatten eski ·
+hedef geçiciyse pazartesi hatırlatması). Yedek HİÇ koşmazsa kendi alarmını atamayacağı için
+nabzı 15 dakikada bir koşan `doldurucu-bekci.ps1` okuyor (36 saat eşiği, günde en çok bir
+mesaj). Dört yol da ölçüldü ve gerçek mesaj Telegram'a gitti; kurallar CLAUDE.md → *Yedek*.
+**Geriye yalnızca donanım kaldı:** harici disk.
 
 ---
 

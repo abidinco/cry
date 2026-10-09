@@ -67,13 +67,6 @@ function SonBittiSatiri {
   return $null
 }
 
-function EnvDegeriOku([string]$anahtar) {
-  if (-not (Test-Path $EnvDosyasi)) { return $null }
-  $satir = Get-Content $EnvDosyasi -Encoding UTF8 | Where-Object { $_ -match "^$anahtar=" } | Select-Object -First 1
-  if (-not $satir) { return $null }
-  return $satir.Substring($anahtar.Length + 1).Trim()
-}
-
 function WindowsBildirGonder([string]$baslik, [string]$mesaj) {
   try {
     Add-Type -AssemblyName System.Windows.Forms
@@ -90,22 +83,15 @@ function WindowsBildirGonder([string]$baslik, [string]$mesaj) {
   }
 }
 
-function TelegramGonder([string]$mesaj) {
-  $jeton = EnvDegeriOku "TELEGRAM_BOT_TOKEN"
-  $hedef = EnvDegeriOku "TELEGRAM_CHAT_ID"
-  if (-not $jeton -or -not $hedef) {
-    Yaz "Telegram yapilandirilmamis, atlandi"
-    return
-  }
-  try {
-    $govde = @{ chat_id = $hedef; text = $mesaj } | ConvertTo-Json
-    Invoke-RestMethod -Method Post -Uri "https://api.telegram.org/bot$jeton/sendMessage" `
-      -ContentType "application/json; charset=utf-8" `
-      -Body ([System.Text.Encoding]::UTF8.GetBytes($govde)) | Out-Null
-    Yaz "Telegram bildirimi gonderildi"
-  } catch {
-    Yaz "Telegram bildirimi basarisiz: $($_.Exception.Message)"
-  }
+# Gonderici ve .env okuyucu TEK kopyada (deploy\pc	elegram.ps1); burada
+# yalnizca sonucu gunluge yazan ince bir sarmal var.
+. (Join-Path $PSScriptRoot "telegram.ps1")
+
+function TelegramBildir([string]$mesaj) {
+  $sonuc = TelegramGonder -Mesaj $mesaj -EnvDosyasi $EnvDosyasi
+  if ($sonuc -eq "gonderildi") { Yaz "Telegram bildirimi gonderildi" }
+  elseif ($sonuc -eq "yapilandirilmamis") { Yaz "Telegram yapilandirilmamis, atlandi" }
+  else { Yaz "Telegram bildirimi basarisiz: $sonuc" }
 }
 
 Yaz "--- devam denetimi (depo: $Depo) ---"
@@ -145,7 +131,7 @@ if ($bittiSatiri) {
 Yaz $mesaj
 
 WindowsBildirGonder "cry - B3 doldurma" $mesaj
-TelegramGonder $mesaj
+TelegramBildir $mesaj
 
 Yaz "--- devam denetimi bitti ---"
 exit 0
