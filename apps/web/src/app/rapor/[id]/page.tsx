@@ -172,6 +172,25 @@ export default async function RaporSayfasi({ params }: { params: Promise<{ id: s
           sebepleri aşağıda sayılı.
         </p>
       </Kayit>
+
+      {/* Diyagram SUNUCUDA, mühürlü paketten üretiliyor (öneri 11): rapora ekran
+          görüntüsü konulmaz, çünkü rapor yeniden üretilebilir olmalı. Resim bir
+          <img> olarak gelir — bu sayfada JavaScript çalışmıyor. */}
+      <Kayit koken="indeks" baslik="Akış diyagramı">
+        <img
+          src={`/api/rapor/${rapor.id}/diyagram`}
+          alt="Raporun akış diyagramı: sütunlar sıçrama, şerit kalınlığı aktarılan tutar"
+          style={{ width: "100%", height: "auto", background: "#fff", borderRadius: 6 }}
+        />
+        <p className="koken-notu" style={{ display: "block", marginBottom: 0 }}>
+          Mühürlü paketin kendi verisinden üretildi; aynı paket her zaman aynı resmi verir.
+          Diyagram TEK varlığı gösterir ve neyi göstermediğini kendi altlığına yazar —
+          çizilmeyen adres ve başka varlıktaki hareketler orada sayılı.{" "}
+          <a className="veri" href={`/api/rapor/${rapor.id}/diyagram`}>
+            SVG&apos;yi ayrı aç ▾
+          </a>
+        </p>
+      </Kayit>
         </div>
 
         <div className="sutun">

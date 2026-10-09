@@ -66,9 +66,15 @@ Para TRON'dan Ethereum'a köprüyle geçtiğinde iz bugün kesiliyor ("kontrat"
 terminali). Köprü sözleşmelerini tanımak ayrı bir korpus işi; Faz 2'den
 sonra.
 
-**11. Grafın kendisini rapora gömmek.**
-Cytoscape ekran görüntüsü yerine, dondurulmuş graftan sunucu tarafında SVG
-üretmek. Rapor yeniden üretilebilir olmalı ve ekran görüntüsü değildir.
+**11. ~~Grafın kendisini rapora gömmek.~~ — SVG YAPILDI (2026-10-09), PDF kaldı.**
+Diyagram mühürlü paketten sunucuda üretiliyor (`packages/rapor/src/diyagram.ts`,
+uç `GET /api/rapor/[id]/diyagram`, rapor ekranında görünüyor) ve aynı paket her
+zaman aynı baytları veriyor. Ekranla AYNI yerleşimi kullanabilmek için
+`lib/akis.ts` + `lib/graf-secim.ts` `packages/akis`e taşındı. Kurallar ve
+ölçümler CLAUDE.md → *Rapor ve mühür*.
+**Kalan:** PDF'e gömme. Bu makinede PDF'i resme çeviren araç yok, yani çizimin
+sayfada doğru yere düştüğü GÖRÜLEMİYOR; bakılamayan bir görseli basmaktansa
+beklemek doğru.
 
 ## Sonradan eklenenler (2026-09-09)
 

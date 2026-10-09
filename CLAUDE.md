@@ -426,6 +426,29 @@ uç `GET /api/rapor/[id]/pdf`.
   VERMEDİ. İki kural: sığmayan blok ÖNCE yeni sayfaya geçer, bölme ancak TAM SAYFAYA
   sığmadığında yapılır; ve döngünün bir İLERLEME BÜTÇESİ var (aşılırsa hata — takılı
   süreç, hata veren süreçten pahalıdır; testte 5 ms'de ateşliyor).
+- **Raporun DİYAGRAMI mühürlü paketten, sunucuda üretilir** (`packages/rapor/src/diyagram.ts`,
+  uç `GET /api/rapor/[id]/diyagram`, ekranda `<img>`): rapora ekran görüntüsü konulmaz, çünkü
+  rapor yeniden üretilebilir olmalı. Aynı paket AYNI baytları verir (ölçüldü: rapor 3 · 4 · 5,
+  iki üretim aynı; kenar sırası ters çevrilince de aynı).
+- **Yerleşim EKRANIN yerleşimidir.** `apps/web/src/lib/akis.ts` ve `graf-secim.ts`
+  `packages/akis`e TAŞINDI (web'de geçit dosyaları kaldı, 423 test değişmeden geçti): ikinci bir
+  yerleşim ya da ikinci bir kırpma sınırı, aynı paranın iki farklı resmi demekti ve karşı taraf
+  ikisini yan yana koyabilirdi.
+- **Resim NEYİ göstermediğini kendi altlığına yazar:** varlık, çizilen adres/şerit, çizilmeyen
+  adres (`cizilecekler`, 100 sınırı) ve başka varlıktaki hareket sayısı. Boş defterde resim yerine
+  SEBEP basılır. Ölçüldü: çizilen + kırpılan = paketin düğüm sayısı (rapor 3'te 86 ⟷ 86).
+- **Tuval yüksekliği EN KALABALIK SÜTUNA göre büyür** (satır başına 13 px, 360–4.000 px arası).
+  Sabit 560 px'te 86 düğümlü koşunun adres etiketleri üst üste biniyordu — ekranda yakınlaştırma
+  var, basılı raporda YOK; okunamayan bir etiket olmayan bir etikettir. Ölçüldü: rapor 3 → 872 px,
+  rapor 5 → 454 px, etiketler okunur (tarayıcıda gözle bakıldı).
+- **Renk tek başına konuşmaz:** şerit türü renkle (ileri gri · borsa yeşil · aday kehribar · geri
+  pembe), düğümün durumu DOKU ve İŞARETLE de söylenir (✓ doğrulanmış borsa, ? taralı aday,
+  ⊘ yakma, kesik çerçeve bizim sınırımız). Rapor siyah-beyaz basılabilir olmalı.
+- **Etiket metni XML'e kaçırılır ve TANINMAYAN etiket kaydı ATILIR** — uydurulmuş bir etiket,
+  diyagramda "doğrulanmış borsa" yeşili demekti.
+- **PDF'e diyagram HENÜZ GÖMÜLMEDİ ve sebebi söylenmeli:** bu makinede PDF'i resme çeviren bir
+  araç yok (`pdftoppm`/`pdftocairo` kurulu değil), yani gömülen bir çizimin doğru yere düştüğü
+  GÖRÜLEMİYOR. SVG tarayıcıda gözle doğrulandı; PDF'e gömme, bakılabildiğinde yapılır.
 - **PDF defterin TAMAMINI basar; "ve N hareket daha" demez.** Ölçüldü (rapor 3, metin
   geri çıkarılarak): 1.342 kayıt, 1'den 1.342'ye boşluksuz, 1.342 tekil tx, 49/49
   sayfada altlık, Türkçe ve `₺` sağlam. **PDF'in doğrulaması metin ÇIKARILARAK yapılır** —

@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@cry/akis": "*",
     "@cry/fiyat": "*",
     "@cry/motor": "*",
     "@pdf-lib/fontkit": "^1.1.1",
