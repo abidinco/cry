@@ -77,12 +77,17 @@ Binance adresi olduğu rapordan okunamaz. Bir üst düğüm (borsa) + altında
 adresler, sonradan eklemesi pahalı bir yapı — etiket tohumlamasından ÖNCE
 kararlaştırmak ucuz. (§8'in yapısal hâli.)
 
-**13. Rapora "bakılmayan yerler" bölümü koy.**
-Arşivin dürüstlüğü "yok ≠ bakılamadı" ayrımına dayanıyor ve bu ayrım şu an
-yalnızca veritabanında yaşıyor. Rapor, izlenen yolun yanında **izlenmeyeni**
-de saymalı: hangi düğümler indekssiz kaldı, hangi zincir yoklanamadı, hangi
-etiket doğrulanmamış. Karşı tarafın ilk soracağı şey budur; cevabı raporun
-kendisinde durmalı.
+**13. ~~Rapora "bakılmayan yerler" bölümü koy.~~ — YAPILDI (2026-10-09).**
+Kanıt paketi artık `kapsam.bakilmayanlar` taşıyor, ekran ve PDF «Bakılmayan
+yerler» bölümünü basıyor, düğüm tablosunda `indeks` kolonu var. Kurallar ve
+ölçümler CLAUDE.md → *Rapor ve mühür*. Ölçüldü (koşu 37): 25 düğümün 24'ü kısmi
+ve rapor bunu cümleyle söylüyor — daha önce aynı rapor yalnızca izlenen yolu
+sayıyordu. Paket sürümü `cry-kanit-2`; eski raporların baytları değişmedi
+(rapor 3: 49 sayfa / 421.562 bayt, aynı sha256).
+**Kalan parça:** "hangi zincir yoklanamadı" hâlâ yalnızca o zincirin körlük
+cümlesinde (`kapsam.gorulemeyenler`) — çok zincirli bir koşuda zincir başına
+yoklama sonucu (`probe_cache`) rapora girmiyor. Bugün koşular tek zincirli,
+o yüzden bedeli ödenmedi.
 
 **14. Her koşuya sürüm damgası.**
 Bir taramanın sonucu, o gün çalışan kodun atıf kuralına ve eşiklerine

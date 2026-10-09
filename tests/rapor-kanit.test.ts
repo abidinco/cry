@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { toplaMetin } from "@cry/fiyat";
 import {
+  bakilmayanOzeti,
   eksikSayimi,
   kanitPaketi,
   kanonikJson,
@@ -9,9 +10,24 @@ import {
   paketiMuhurle,
   sebepOzu,
   varlikOzetleri,
+  type KanitDugumu,
   type KanitKenari,
   type PaketGirdisi,
 } from "@cry/rapor";
+
+function dugum(ek: Partial<KanitDugumu> = {}): KanitDugumu {
+  return {
+    adres: "T1",
+    hop: 1,
+    hamTutar: null,
+    terminalMi: false,
+    terminalSebebi: null,
+    indeksDurumu: "tam",
+    indeksNotu: null,
+    etiketler: [],
+    ...ek,
+  };
+}
 
 const fiyatli = (tl: string, raporTl: string) => ({
   tutar: "1.000000",
@@ -66,8 +82,8 @@ function girdi(ek: Partial<PaketGirdisi> = {}): PaketGirdisi {
     },
     gorulemeyenler: ["sözleşme içi TRX transferleri"],
     dugumler: [
-      { adres: "T2", hop: 1, hamTutar: "1000000", terminalMi: false, terminalSebebi: null, etiketler: [] },
-      { adres: "T0", hop: 0, hamTutar: null, terminalMi: false, terminalSebebi: null, etiketler: [] },
+      { adres: "T2", hop: 1, hamTutar: "1000000", terminalMi: false, terminalSebebi: null, indeksDurumu: "tam", indeksNotu: null, etiketler: [] },
+      { adres: "T0", hop: 0, hamTutar: null, terminalMi: false, terminalSebebi: null, indeksDurumu: "tam", indeksNotu: null, etiketler: [] },
     ],
     kenarlar: [kenar()],
     ...ek,
@@ -219,5 +235,76 @@ describe("ondalık toplama", () => {
     expect(toplaMetin(["1.005", "1.005"], 2)).toBe("2.02");
     expect(toplaMetin(["99999999999999999999.99", "0.01"], 2)).toBe("100000000000000000000.00");
     expect(toplaMetin(["abc"], 2)).toBeNull();
+  });
+});
+
+describe("bakılmayan yerler — grafın kendi kapsamı", () => {
+  it("hepsi tam taranmışsa sınırın EŞİKTEN geldiğini söyler", () => {
+    const o = bakilmayanOzeti([dugum({ adres: "T1" }), dugum({ adres: "T2" })]);
+    expect([o.taranan, o.kismi, o.bakilmayan]).toEqual([2, 0, 0]);
+    expect(o.taramaNotlari).toEqual([]);
+    expect(o.cumle).toContain("tamamı tarandı");
+    expect(o.cumle).toContain("eşiklerinden gelir");
+  });
+
+  it("taranmamış düğümü SAYAR ve «hareket yok» demeyi reddeder", () => {
+    const o = bakilmayanOzeti([
+      dugum({ adres: "T1" }),
+      dugum({ adres: "T2", indeksDurumu: "kismi", indeksNotu: "hiz_siniri" }),
+      dugum({ adres: "T3", indeksDurumu: "bilinmiyor" }),
+    ]);
+    expect([o.dugum, o.taranan, o.kismi, o.bakilmayan]).toEqual([3, 1, 1, 1]);
+    expect(o.cumle).toContain("HİÇ bakılmadı");
+    expect(o.cumle).toContain('"hareket yok" değil, "bakılmadı"');
+  });
+
+  it("sebebi KAYITLI OLMAYAN taramayı da sayar: boş hücre «sebep yok» demek değil", () => {
+    const o = bakilmayanOzeti([
+      dugum({ adres: "T1", indeksDurumu: "kismi", indeksNotu: null }),
+      dugum({ adres: "T2", indeksDurumu: "bilinmiyor", indeksNotu: null }),
+      dugum({ adres: "T3", indeksDurumu: "kismi", indeksNotu: "sayfa_butcesi" }),
+    ]);
+    expect(o.taramaNotlari).toEqual([
+      { not: "sebep kayıtlı değil", dugum: 2 },
+      { not: "sayfa_butcesi", dugum: 1 },
+    ]);
+  });
+
+  it("sebep TARİHSİZ sayılır: aynı sebep yüzlerce satıra dağılmaz", () => {
+    const o = bakilmayanOzeti([
+      dugum({ adres: "T1", indeksDurumu: "kismi", indeksNotu: "kaynak_hatasi 2026-10-01" }),
+      dugum({ adres: "T2", indeksDurumu: "kismi", indeksNotu: "kaynak_hatasi 2026-10-08" }),
+    ]);
+    expect(o.taramaNotlari).toEqual([{ not: "kaynak_hatasi <gün>", dugum: 2 }]);
+  });
+
+  it("doğrulanmamış terminali ve sınır düğümünü AYRI sayar", () => {
+    const o = bakilmayanOzeti([
+      dugum({ adres: "T1", terminalMi: true, terminalSebebi: "terminal" }),
+      dugum({ adres: "T2", terminalMi: true, terminalSebebi: "terminal_aday" }),
+      dugum({ adres: "T3", terminalMi: true, terminalSebebi: "dugum_siniri", indeksDurumu: "bilinmiyor" }),
+    ]);
+    expect(o.dogrulanmamisTerminal).toBe(1);
+    expect(o.sinirDugumu).toBe(1);
+    expect(o.cumle).toContain("DOĞRULANMAMIŞ bir borsa adayında durdu");
+    expect(o.cumle).toContain("SINIR olarak yazıldı ve taranmadı");
+  });
+
+  it("kapsam eksiği pakette UYARI olarak da durur", () => {
+    const temiz = kanitPaketi(girdi());
+    expect(temiz.kapsam.bakilmayanlar.bakilmayan).toBe(0);
+    expect(temiz.metodoloji.uyarilar.some((u) => u.includes("hiç bakılmadı"))).toBe(false);
+
+    const eksik = kanitPaketi(
+      girdi({
+        dugumler: [dugum({ adres: "T0", hop: 0 }), dugum({ adres: "T2", indeksDurumu: "bilinmiyor" })],
+      }),
+    );
+    expect(eksik.kapsam.bakilmayanlar.bakilmayan).toBe(1);
+    expect(eksik.metodoloji.uyarilar.some((u) => u.includes("hiç bakılmadı"))).toBe(true);
+  });
+
+  it("paket sürümü yükseldi: biçim değişti, eski paketin hash'i geri alınamaz", () => {
+    expect(kanitPaketi(girdi()).surum).toBe("cry-kanit-2");
   });
 });

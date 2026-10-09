@@ -8,7 +8,15 @@
  */
 
 import { GERIYE_GUN, KUR_KAYNAGI, toplaMetin, TRY_OLCEK, type Fiyatlandirma } from "@cry/fiyat";
-import { ATIF_CUMLELERI, KANIT_SURUMU, type KanitDugumu, type KanitKenari, type KanitPaketi, type VarlikOzeti } from "./tipler";
+import {
+  ATIF_CUMLELERI,
+  KANIT_SURUMU,
+  type BakilmayanOzeti,
+  type KanitDugumu,
+  type KanitKenari,
+  type KanitPaketi,
+  type VarlikOzeti,
+} from "./tipler";
 
 export type PaketGirdisi = {
   baslik: string;
@@ -124,6 +132,93 @@ function tekil(f: Fiyatlandirma): string[] {
 }
 
 /**
+ * İzlenmeyenin ÖZETİ: grafın kendi kapsamı.
+ *
+ * Arşivin dürüstlüğü "yok ≠ bakılamadı" ayrımına dayanıyor ve bu ayrım bugüne
+ * kadar yalnızca veritabanında yaşıyordu: rapor izlenen yolu sayıyor, izlenmeyeni
+ * saymıyordu. Taranmamış bir düğüm "oradan para çıkmadı" demek DEĞİLDİR.
+ *
+ * Sebep metni tarihsizleştirilir (`sebepOzu`): 300 düğümlük bir koşuda tarih
+ * taşıyan notlar yüzlerce ayrı satıra dağılır ve "tarama neden yarıda kaldı"
+ * sorusunun cevabı görünmez olur.
+ */
+export function bakilmayanOzeti(dugumler: KanitDugumu[]): BakilmayanOzeti {
+  let taranan = 0;
+  let kismi = 0;
+  let bakilmayan = 0;
+  let dogrulanmamisTerminal = 0;
+  let sinirDugumu = 0;
+  const notlar = new Map<string, number>();
+
+  for (const d of dugumler) {
+    if (d.indeksDurumu === "tam") taranan += 1;
+    else if (d.indeksDurumu === "kismi") kismi += 1;
+    else bakilmayan += 1;
+    if (d.terminalSebebi === "terminal_aday") dogrulanmamisTerminal += 1;
+    if (d.terminalSebebi === "dugum_siniri") sinirDugumu += 1;
+    if (d.indeksDurumu !== "tam") {
+      // Sebebi KAYITLI OLMAYAN kısmi tarama da bunu söyler: boş bir hücre,
+      // sebebin olmadığı anlamına gelmez.
+      const not = d.indeksNotu ? sebepOzu(d.indeksNotu) : "sebep kayıtlı değil";
+      notlar.set(not, (notlar.get(not) ?? 0) + 1);
+    }
+  }
+
+  const taramaNotlari = [...notlar.entries()]
+    .map(([not, dugum]) => ({ not, dugum }))
+    .sort((a, b) => b.dugum - a.dugum || a.not.localeCompare(b.not));
+
+  return {
+    dugum: dugumler.length,
+    taranan,
+    kismi,
+    bakilmayan,
+    taramaNotlari,
+    dogrulanmamisTerminal,
+    sinirDugumu,
+    cumle: kapsamCumlesi({ dugum: dugumler.length, taranan, kismi, bakilmayan, dogrulanmamisTerminal, sinirDugumu }),
+  };
+}
+
+/** Kapsamın İNSAN CÜMLESİ — sayıyı okuyan kişi hükmü de okuyabilmeli. */
+export function kapsamCumlesi(s: {
+  dugum: number;
+  taranan: number;
+  kismi: number;
+  bakilmayan: number;
+  dogrulanmamisTerminal: number;
+  sinirDugumu: number;
+}): string {
+  const parcalar: string[] = [];
+  if (s.dugum === 0) {
+    parcalar.push("Grafta düğüm yok: bu koşudan izlenecek bir yol çıkmadı.");
+  } else if (s.bakilmayan === 0 && s.kismi === 0) {
+    parcalar.push(
+      `${s.dugum} düğümün tamamı tarandı: grafın sınırı bu koşunun eşiklerinden gelir, tarama eksiğinden değil.`,
+    );
+  } else {
+    parcalar.push(
+      `${s.dugum} düğümden ${s.taranan} tanesi tam tarandı; ${s.bakilmayan} düğüme HİÇ bakılmadı, ` +
+        `${s.kismi} düğümde tarama yarıda kaldı. Bu düğümlerden çıkan para izin DIŞINDA kalmış olabilir: ` +
+        `"hareket yok" değil, "bakılmadı".`,
+    );
+  }
+  if (s.sinirDugumu > 0) {
+    parcalar.push(
+      `${s.sinirDugumu} düğüm, düğüm bütçesi dolduğu için SINIR olarak yazıldı ve taranmadı — kenarın ucu ` +
+        `boşta kalmasın diye grafa girdi.`,
+    );
+  }
+  if (s.dogrulanmamisTerminal > 0) {
+    parcalar.push(
+      `${s.dogrulanmamisTerminal} düğümde iz, DOĞRULANMAMIŞ bir borsa adayında durdu: etiket yapısal bir ` +
+        `iddiadır, kimliği teyit edilmedi.`,
+    );
+  }
+  return parcalar.join(" ");
+}
+
+/**
  * Körlüğün CÜMLESİ. Adaptör yoksa cevap "yok" değil BİLİNMİYOR'dur — bakılmamış
  * bir yeri temiz göstermemek bu projenin en çok tekrarlanan kuralı.
  */
@@ -157,6 +252,7 @@ export function kanitPaketi(girdi: PaketGirdisi): KanitPaketi {
   const dugumler = [...girdi.dugumler].sort((a, b) => a.hop - b.hop || a.adres.localeCompare(b.adres));
   const varliklar = varlikOzetleri(kenarlar);
   const eksikler = eksikSayimi(kenarlar);
+  const bakilmayanlar = bakilmayanOzeti(dugumler);
 
   const uyarilar: string[] = [];
   const altSinir = varliklar.filter((v) => v.fiyatsizKenar > 0);
@@ -165,6 +261,14 @@ export function kanitPaketi(girdi: PaketGirdisi): KanitPaketi {
       `TL toplamları bir ALT SINIRdır: ${altSinir
         .map((v) => `${v.sembol} ${v.fiyatsizKenar}/${v.kenar} kenar fiyatsız`)
         .join(" · ")}.`,
+    );
+  }
+  if (bakilmayanlar.bakilmayan > 0 || bakilmayanlar.kismi > 0) {
+    // Kapsam eksiği metodolojinin uyarı listesine de girer: rapor sayfası ve
+    // PDF uyarıları ayrı basıyor, kapsam bölümünü atlayan okur bunu görmeli.
+    uyarilar.push(
+      `Graf bir ALT SINIRdır: ${bakilmayanlar.bakilmayan} düğüme hiç bakılmadı, ` +
+        `${bakilmayanlar.kismi} düğümde tarama yarıda kaldı.`,
     );
   }
   if (girdi.kosu.durum === "durduruldu") {
@@ -187,6 +291,7 @@ export function kanitPaketi(girdi: PaketGirdisi): KanitPaketi {
     kapsam: {
       gorulemeyenler: girdi.gorulemeyenler,
       korlukCumlesi: korlukCumlesi(girdi.gorulemeyenler),
+      bakilmayanlar,
     },
     ozet: {
       dugum: dugumler.length,

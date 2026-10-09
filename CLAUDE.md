@@ -378,6 +378,24 @@ uçlar `POST /api/rapor` · `GET /api/rapor/[id]` · `/api/rapor/[id]/kanit`, ek
 - **Eksik sebepleri TARİHSİZ sayılır** (`sebepOzu`, `<gün>`): yoksa 1.342 kenar yüzlerce ayrı
   satır olur ve "fiyat neden yok" sorusunun cevabı görünmezdi.
 - **Toplam `Number`'a UĞRAMAZ** (`toplaMetin`, BigInt): 1.342 kenarda kuruş hatası birikirdi.
+- **Rapor İZLENMEYENİ de sayar** (`bakilmayanOzeti`, saf ve testli; pakette
+  `kapsam.bakilmayanlar`, ekranda ve PDF'te «Bakılmayan yerler»): düğüm başına
+  indeks durumu + yarıda kalan taramanın SEBEBİ + sınır düğümü + doğrulanmamış
+  terminal. Sebep `sebepOzu`yla tarihsizleşir, sebebi kayıtlı olmayan tarama
+  «sebep kayıtlı değil» diye SAYILIR. Ölçüldü (2026-10-09): koşu 37 → 25 düğümün
+  1'i tam, 24'ü kısmi (23 `pencere_oncesi`, 1 `sayfa_butcesi`), 12 sınır düğümü;
+  koşu 9 → 86 düğümün 65'i tam, 21'i kısmi (20'si sebepsiz, 1 `hiz_siniri`),
+  1 doğrulanmamış terminal. Düğüm tablosu artık `indeks` kolonu taşıyor
+  (PDF'ten metin çıkarıldı: 23 + 1 kısmi satır, 25 adres).
+- **Kapsam eksiği metodoloji UYARISINA da girer**: «Graf bir ALT SINIRdır: N
+  düğüme hiç bakılmadı, M düğümde tarama yarıda kaldı». Kapsam bölümünü atlayan
+  okur bunu uyarılarda görür — bir ölçüt tek yerde yazılıysa okunmayabilir.
+- **Mühürlenmiş pakete sonradan bilgi EKLENMEZ.** Biçim `cry-kanit-2`ye çıktı;
+  `cry-kanit-1` paketlerinde kapsam bölümü YOK ve ekran bunu açıkça yazar
+  («o biçim düğüm kapsamını ölçmüyordu»), PDF de bölümü atlar. Ölçüldü: rapor 3
+  (v1) yeniden üretildi → 49 sayfa, 421.562 bayt, iki üretim AYNI sha256, yani
+  eski raporun baytları DEĞİŞMEDİ; rapor 4 (v2) → 5 sayfa, 76.873 bayt,
+  basılamayan karakter 0.
 
 PDF: saf yerleşim `packages/rapor/src/pdf-duzen.ts`, çizici `pdf.ts` (pdf-lib),
 uç `GET /api/rapor/[id]/pdf`.

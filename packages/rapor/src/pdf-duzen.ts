@@ -13,7 +13,7 @@
  * karakter tamdır; PDF'in söylemesi gereken şey "bu metni ben tam basamadım".
  */
 
-import type { KanitPaketi } from "./tipler";
+import type { BakilmayanOzeti, KanitPaketi } from "./tipler";
 
 export type Stil = "baslik" | "bolum" | "ad" | "govde" | "kucuk" | "mono" | "monoKucuk";
 export type Ton = "normal" | "soluk" | "vurgu";
@@ -461,7 +461,43 @@ export function pdfDuzeni(girdi: PdfGirdisi, olc: Olcer, kapsar: Kapsayici): Duz
   for (const u of p.metodoloji.uyarilar) govde.push(satir("uyarı", u, "govde", "vurgu"));
   govde.push({ tur: "bosluk", yukseklik: 8 });
 
-  // 5. Bakılamayanlar
+  // 5. Kapsam — izlenmeyen.
+  //
+  // `cry-kanit-1` paketlerinde bu bölüm YOK: o paketler kapsamı ölçmemişti ve
+  // mühürlenmiş bir pakete sonradan bilgi EKLENMEZ. Bölümün atlanması, eski bir
+  // raporun PDF'ini bayt bayt aynı tutar (`reports.pdf_sha256` bir taahhüttür).
+  const bak = p.kapsam.bakilmayanlar as BakilmayanOzeti | undefined;
+  if (bak) {
+    govde.push({ tur: "bolum", metin: t("Bakılmayan yerler") });
+    govde.push(paragraf(bak.cumle, "govde", bak.bakilmayan > 0 || bak.kismi > 0 ? "vurgu" : "normal"));
+    govde.push({ tur: "bosluk", yukseklik: 4 });
+    govde.push(
+      satir(
+        "düğüm kapsamı",
+        `${sayiTr(bak.dugum)} düğüm · tam tarandı ${sayiTr(bak.taranan)} · yarıda kaldı ` +
+          `${sayiTr(bak.kismi)} · hiç bakılmadı ${sayiTr(bak.bakilmayan)}`,
+      ),
+    );
+    if (bak.sinirDugumu > 0) {
+      govde.push(satir("sınır düğümü", `${sayiTr(bak.sinirDugumu)} (bütçe dolduğu için yazıldı, taranmadı)`));
+    }
+    if (bak.dogrulanmamisTerminal > 0) {
+      govde.push(satir("doğrulanmamış terminal", `${sayiTr(bak.dogrulanmamisTerminal)} düğüm`));
+    }
+    if (bak.taramaNotlari.length) {
+      govde.push({ tur: "bosluk", yukseklik: 4 });
+      govde.push({
+        tur: "tablo",
+        basliklar: ["tarama neden tamamlanmadı", "düğüm"].map(t),
+        sag: [false, true],
+        genislikler: [ICERIK - 70, 70],
+        satirlar: bak.taramaNotlari.map((n) => [t(n.not), sayiTr(n.dugum)]),
+      });
+    }
+    govde.push({ tur: "bosluk", yukseklik: 8 });
+  }
+
+  // 6. Bakılamayanlar — fiyat ve kur
   if (p.ozet.eksikler.length) {
     govde.push({ tur: "bolum", metin: t("Bakılamayanlar") });
     govde.push({
@@ -474,22 +510,35 @@ export function pdfDuzeni(girdi: PdfGirdisi, olc: Olcer, kapsar: Kapsayici): Duz
     govde.push({ tur: "bosluk", yukseklik: 8 });
   }
 
-  // 6. Düğümler
+  // 7. Düğümler — her satır, o adrese BAKILIP bakılmadığını da söyler.
   govde.push({ tur: "bolum", metin: t("Düğümler") });
-  govde.push({
-    tur: "tablo",
-    basliklar: ["sıç", "adres", "durum"].map(t),
-    sag: [false, false, false],
-    genislikler: [28, 268, ICERIK - 296],
-    satirlar: p.dugumler.map((d) => [
-      sayiTr(d.hop),
-      t(d.adres),
-      d.terminalMi ? t(`terminal${d.terminalSebebi ? ` · ${d.terminalSebebi}` : ""}`) : "—",
-    ]),
-  });
+  const durumMetni = (d: (typeof p.dugumler)[number]) =>
+    d.terminalMi ? t(`terminal${d.terminalSebebi ? ` · ${d.terminalSebebi}` : ""}`) : "—";
+  govde.push(
+    bak
+      ? {
+          tur: "tablo",
+          basliklar: ["sıç", "adres", "durum", "indeks"].map(t),
+          sag: [false, false, false, false],
+          genislikler: [24, 250, ICERIK - 24 - 250 - 104, 104],
+          satirlar: p.dugumler.map((d) => [
+            sayiTr(d.hop),
+            t(d.adres),
+            durumMetni(d),
+            t(d.indeksDurumu + (d.indeksNotu ? ` · ${d.indeksNotu}` : "")),
+          ]),
+        }
+      : {
+          tur: "tablo",
+          basliklar: ["sıç", "adres", "durum"].map(t),
+          sag: [false, false, false],
+          genislikler: [28, 268, ICERIK - 296],
+          satirlar: p.dugumler.map((d) => [sayiTr(d.hop), t(d.adres), durumMetni(d)]),
+        },
+  );
   govde.push({ tur: "bosluk", yukseklik: 8 });
 
-  // 7. Defter — hareketlerin TAMAMI, üç satırlık kayıtlar hâlinde.
+  // 8. Defter — hareketlerin TAMAMI, üç satırlık kayıtlar hâlinde.
   govde.push({ tur: "bolum", metin: t("Defter") });
   govde.push(
     paragraf(

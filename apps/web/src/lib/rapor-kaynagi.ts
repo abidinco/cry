@@ -81,6 +81,25 @@ export async function kanitKaynagi(
 
   const bugun = new Date().toISOString().slice(0, 10);
 
+  // Düğümlerin TARANMA durumu `addresses`te yaşıyor, `trace_nodes`ta değil:
+  // rapor izlenen yolu sayıyordu, izlenmeyeni saymıyordu. Arşivde kaydı
+  // OLMAYAN adres de "bilinmiyor"dur — yokluk, bakılmışlık değildir.
+  const indeksler = new Map<string, { durum: string; not: string | null }>();
+  if (kosu.nodes.length) {
+    const satirlar = await prisma.address.findMany({
+      where: {
+        OR: [...new Set(kosu.nodes.map((d) => d.chain))].map((zincir) => ({
+          chain: zincir,
+          address: { in: kosu.nodes.filter((d) => d.chain === zincir).map((d) => d.address) },
+        })),
+      },
+      select: { chain: true, address: true, indexState: true, indexNote: true },
+    });
+    for (const a of satirlar) {
+      indeksler.set(`${a.chain}|${a.address}`, { durum: a.indexState, not: a.indexNote });
+    }
+  }
+
   // İstek boyunca yaşayan bellek. 1.342 kenarlık bir koşunun kenarlarının
   // çoğu AYNI varlık ve çoğu zaman aynı gündür; "rapor günü" hepsinde aynı.
   const varlikBellegi = new Map<string, number | null>();
@@ -170,6 +189,8 @@ export async function kanitKaynagi(
       hamTutar: d.amountRaw,
       terminalMi: d.isTerminal,
       terminalSebebi: d.terminalReason,
+      indeksDurumu: indeksler.get(`${d.chain}|${d.address}`)?.durum ?? "bilinmiyor",
+      indeksNotu: indeksler.get(`${d.chain}|${d.address}`)?.not ?? null,
       etiketler: ((d.labelSnapshot as { etiketler?: unknown[] } | null)?.etiketler ?? []) as unknown[],
     })),
     kenarlar,

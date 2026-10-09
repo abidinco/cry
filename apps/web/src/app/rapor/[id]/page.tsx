@@ -13,7 +13,7 @@
  */
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@cry/db";
-import { kanonikJson, sha256, type KanitPaketi } from "@cry/rapor";
+import { kanonikJson, sha256, type BakilmayanOzeti, type KanitPaketi } from "@cry/rapor";
 import { adminMi, oturumOku } from "@/lib/yetki";
 import Kabuk from "@/components/Kabuk";
 import { Adres, Kayit, Rozet, Satir, Tarih } from "@/components/ui";
@@ -38,6 +38,9 @@ export default async function RaporSayfasi({ params }: { params: Promise<{ id: s
   if (!rapor) notFound();
 
   const paket = rapor.snapshot as unknown as KanitPaketi;
+  // Mühürlenmiş eski paketlerde (cry-kanit-1) kapsam bölümü YOK; tip bunu
+  // söylemiyor çünkü alan jsonb'den okunuyor.
+  const bakilmayanlar = paket.kapsam.bakilmayanlar as BakilmayanOzeti | undefined;
   const yeniden = sha256(kanonikJson(rapor.snapshot));
   const tutuyor = yeniden === rapor.sha256;
 
@@ -220,6 +223,64 @@ export default async function RaporSayfasi({ params }: { params: Promise<{ id: s
           </Satir>
         )}
       </Kayit>
+
+      {/* Kapsamın DÜĞÜM tarafı. `cry-kanit-1` paketlerinde bu bölüm yoktur:
+          mühürlenmiş bir pakete sonradan bilgi eklenmez, o rapor kapsamı
+          ölçmemiştir ve bunu söylemek sessiz kalmaktan iyidir. */}
+      {bakilmayanlar ? (
+        <Kayit koken="supheli" baslik="Bakılmayan yerler">
+          <p className="koken-notu" style={{ display: "block", marginTop: 0 }}>
+            {bakilmayanlar.cumle}
+          </p>
+          <div className="panel satirlar">
+            <Satir ad="düğüm kapsamı" not="izlenen yolun yanında izlenmeyen">
+              {sayi(bakilmayanlar.dugum)} düğüm · tam tarandı {sayi(bakilmayanlar.taranan)} · yarıda
+              kaldı {sayi(bakilmayanlar.kismi)} · hiç bakılmadı {sayi(bakilmayanlar.bakilmayan)}{" "}
+              {bakilmayanlar.bakilmayan + bakilmayanlar.kismi > 0 && (
+                <Rozet ton="dikkat" baslik="taranmamış düğümden çıkan para izin dışında kalmış olabilir">
+                  alt sınır
+                </Rozet>
+              )}
+            </Satir>
+            {bakilmayanlar.sinirDugumu > 0 && (
+              <Satir ad="sınır düğümü" not="bütçe dolduğu için yazıldı, taranmadı">
+                {sayi(bakilmayanlar.sinirDugumu)} düğüm
+              </Satir>
+            )}
+            {bakilmayanlar.dogrulanmamisTerminal > 0 && (
+              <Satir ad="doğrulanmamış terminal" not="etiket yapısal bir iddia; kimlik teyit edilmedi">
+                {sayi(bakilmayanlar.dogrulanmamisTerminal)} düğüm
+              </Satir>
+            )}
+          </div>
+          {bakilmayanlar.taramaNotlari.length > 0 && (
+            <table className="tablo">
+              <thead>
+                <tr>
+                  <th>tarama neden tamamlanmadı</th>
+                  <th className="sag">düğüm</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bakilmayanlar.taramaNotlari.map((n) => (
+                  <tr key={n.not}>
+                    <td>{n.not}</td>
+                    <td className="sag">{sayi(n.dugum)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </Kayit>
+      ) : (
+        <Kayit koken="supheli" baslik="Bakılmayan yerler">
+          <p className="koken-notu" style={{ display: "block", margin: 0 }}>
+            Bu rapor <code className="veri">{paket.surum}</code> biçiminde mühürlendi ve o biçim
+            düğüm kapsamını ÖLÇMÜYORDU: hangi düğüme bakılmadığı bu rapordan okunamaz. Mühürlenmiş
+            bir pakete sonradan bilgi eklenmez — kapsam ölçümü yeni bir raporda görünür.
+          </p>
+        </Kayit>
+      )}
 
       {paket.ozet.eksikler.length > 0 && (
         <Kayit koken="supheli" baslik="Bakılamayanlar">

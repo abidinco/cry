@@ -82,8 +82,17 @@ function girdi(kenarlar: KanitKenari[]): PdfGirdisi {
     },
     gorulemeyenler: ["sözleşme içi TRX transferleri"],
     dugumler: [
-      { adres: "T".repeat(34), hop: 0, hamTutar: null, terminalMi: false, terminalSebebi: null, etiketler: [] },
-      { adres: "U".repeat(34), hop: 1, hamTutar: "4500000", terminalMi: true, terminalSebebi: "terminal", etiketler: [] },
+      { adres: "T".repeat(34), hop: 0, hamTutar: null, terminalMi: false, terminalSebebi: null, indeksDurumu: "tam", indeksNotu: null, etiketler: [] },
+      {
+        adres: "U".repeat(34),
+        hop: 1,
+        hamTutar: "4500000",
+        terminalMi: true,
+        terminalSebebi: "terminal",
+        indeksDurumu: "kismi",
+        indeksNotu: "sayfa_butcesi",
+        etiketler: [],
+      },
     ],
     kenarlar,
   };
@@ -135,7 +144,7 @@ describe("basılamayan karakter", () => {
       .map((o) => (o.tur === "metin" ? o.metin : ""))
       .join(" ");
     // Etiketin kendisi de aynı yazı tipinden geçiyor: `ı` de `?` oluyor.
-    expect(ilkSayfa).toContain("122 karakter bu PDF'in yaz? tipiyle bas?lamad?");
+    expect(ilkSayfa).toContain("158 karakter bu PDF'in yaz? tipiyle bas?lamad?");
   });
 });
 
@@ -186,6 +195,8 @@ describe("sayfa düzeni", () => {
       hamTutar: null,
       terminalMi: false,
       terminalSebebi: null,
+      indeksDurumu: "tam",
+      indeksNotu: null,
       etiketler: [],
     }));
     const g = girdi([kenar(), kenar({ txIndex: 1 })]);
