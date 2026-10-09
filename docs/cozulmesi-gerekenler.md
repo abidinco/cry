@@ -7,21 +7,29 @@ yapılmamış. Karar bekleyenler ayrı ([bekleyen-kararlar.md](bekleyen-kararlar
 Her madde: **ne bozuk · nasıl görülür · ölçüm · nerede.** Ölçümü olmayan
 madde yazılmaz; "sanırım şu eksik" bir sonraki turda kanıya dönüşür.
 
-Ölçüm tarihi: **2026-09-28**, yerel yığın.
+Ölçüm tarihi: **2026-10-09**, yerel yığın. (Önceki ölçüm 2026-09-28'di; bayat bir
+sayı sıralamayı yanlış kurar, o yüzden dosyanın başı ölçülerek tazelenir.)
 
 ```
 # Postgres — docker exec cry-db psql -U cry -d cry
-etiket: 1.117  adres: 90.843     hareket: 268.182    koşu: 5     vaka: 2
-izleme: 0      fiyat: 0          rapor: 0
+etiket: 1.117   adres: 176.045   hareket: 522.058   koşu: 15   vaka: 12   rapor: 3
+taranmış adres: 193 (176.045'in %0,1'i)   izleme: 0   uyarı: 0
+fiyat: 695      kur: 1.963
 
 # Blok indeksi — docker exec cry-clickhouse clickhouse-client --database cry
-satır: 1,15 Mr        disk: 87,8 GiB        okunan aralık: 81.826.048 – 86.646.047
-pencere (boşluksuz):  81.834.230 – 86.646.047  (~167 gün)
-doldurucu: 10,9 blok/sn, geriye doğru · taban ~87 gün uzakta · D:'de 1.776 GiB boş
+satır: 2,52 Mr        disk: 191,8 GiB
+pencere (boşluksuz):  76.771.287 – 86.945.243  (10,17 Mn blok)
+doldurucu: 6,43 blok/sn, geriye doğru · cephe 76.414.686 · BOŞLUK 141
+            kendi tahmini: aşağısı ~137,6 gün · D:'de 1.656 GiB boş
 ```
 
-Disk artık bağlayıcı kısıt DEĞİL (2 TB takıldı, 2026-09-28). Sırayı belirleyen
-şey bundan sonra ZAMAN: tam geçmiş bu hızla ~87 gün.
+Disk bağlayıcı kısıt DEĞİL (2 TB, 1.656 GiB boş). Sırayı belirleyen şey ZAMAN:
+tam geçmiş doldurucunun KENDİ tahminiyle ~137,6 gün (uçtaki hızla değil, günlüğün
+son satırından okunur). 11 günde pencere 167 günden 10,17 Mn bloğa çıktı; satır
+sayısı 1,15 Mr → 2,52 Mr.
+
+**Taranmış adres oranı hâlâ %0,1** (193/176.045) ve bu madde 7'nin konusu: arşiv
+büyüdükçe oran DÜŞÜYOR, çünkü her hareket karşı tarafını da açıyor.
 
 ---
 
@@ -253,10 +261,12 @@ kadar bekler (yoklama adresler arasında).
 
 ---
 
-## 7. İndeks kapsamı çok sığ: 90.843 adresin 105'i taranmış
+## 7. İndeks kapsamı çok sığ: 176.045 adresin 110'u taranmış
 
-**Ne bozuk:** kayıtlı adreslerin **%0,12'si** tam indeksli (2026-09-28: tam 105 · kısmi 33 ·
-bilinmiyor 90.705). Blok indeksi bu tabloyu DOLDURMUYOR — adres taraması ayrı bir iş.
+**Ne bozuk:** kayıtlı adreslerin **%0,06'sı** tam indeksli (ölçüldü 2026-10-09: tam 110 ·
+kısmi 83 · bilinmiyor 175.852). Oran 11 günde %0,12'den YARIYA düştü — arşiv büyüdükçe
+pay küçülüyor, çünkü her yeni hareket karşı tarafını da bir satır olarak açıyor. Blok
+indeksi bu tabloyu DOLDURMUYOR — adres taraması ayrı bir iş.
 Geri kalanı
 hareketlerin karşı tarafı olarak açılmış boş düğümler. Takip motoru
 taranmamış düğümü kendisi indeksliyor, ama düğüm sınırına gelince kalanlar
@@ -273,7 +283,7 @@ kapsam dar.
 
 ---
 
-## 8. İzleme: eşik ve arayüz YAZILDI (2026-10-04); kalan tek şey DEPLOY
+## 8. İzleme: YAZILDI (2026-10-04) ve DAĞITILDI (2026-10-09); liste boş
 
 **Ne yapıldı:** karar (15 dakikada bir · eşik üstü mesaj · küçükler günlük
 özet · eşik varlık ve adres bazında) koda ve ekrana geçti. Saf katman
@@ -300,11 +310,16 @@ node --env-file=.env --env-file=apps/web/.env.local --import tsx scripts/izleme-
 | 3 dakikalık pencere | 17 hareket → 6 mesaj / 11 özet (aynı eşikle) |
 | nabız | uyarısız tur **1 adresi** işaretledi, listede olmayanı SAYMADI, damga ilerledi |
 
-**Kalan 1 — deploy:** `deploy-watcher.yml` yalnızca `apps/watcher/**`
-değişince tetikleniyor; bu iş o yolu değiştirdiği için ilk push'ta kendiliğinden
-koşacak. Sunucuda bir kerelik `/srv/cry/.env` gerekiyor ve orada
-`WATCHER_POLL_SECONDS` **900** olmalı (PC kopyası güncellendi; eski değer 60'tı
-ve koddaki 900 varsayılanını ezerdi).
+**Kalan 1 — deploy: TAMAM (ölçüldü 2026-10-09).** Servis Hetzner'da bir Docker
+konteyneri olarak koşuyor (`cry-watcher`, 2 gündür ayakta; systemd birimi YOK —
+oraya bakan bir denetim "inactive" der ve ayakta olanı ölü sanar). Günlüğü
+"↻ liste tazelendi: 0 adres · takip listesi boş" diyor, yani PC'nin liste ucuna
+ULAŞIYOR; `WATCHER_POLL_SECONDS=900` ve `TELEGRAM_BOT_TOKEN` dolu.
+```bash
+ssh hetzner 'docker logs --tail 12 cry-watcher'
+```
+**Kalan iş kodda değil kullanıcıda:** liste BOŞ, yani şu an hiçbir şey
+izlenmiyor — ilk adresi `/izleme` ekranından insan ekler.
 
 **Kalan 2 — ekranı AJAN GÖRMEDİ.** `/izleme` oturum istiyor, ajan parola
 girmiyor (CLAUDE.md → yerel ortam). Ölçülen şey sayfadan önce gelen her şey:
@@ -313,17 +328,19 @@ uçlar yukarıdaki tabloyla, eşik katmanı 42 testle. Gözle bakılacak yer:
 
 ---
 
-## 9. Telegram `chat_id` container'a henüz ulaşmadı
+## 9. ~~Telegram `chat_id` container'a henüz ulaşmadı~~ — ULAŞTI (ölçüldü 2026-10-09)
 
-**Ne bozuk:** değer `C:\srv\cry\.env` dosyasına yazıldı; çalışan
-container'lar ortamı **açılışta** okuyor. Bir sonraki deploy'a kadar
-uygulama içinden Telegram'a mesaj gitmez (elle test edilen yol gitti).
-
-**Nerede:** ilk deploy'da kendiliğinden düzelir; buraya "bozuk mu?" diye
-ikinci kez bakılmasın diye yazıldı. İlk gerçek mesaj §8'in deploy'undan sonra
-gelir; gelmezse bakılacak yer servisin günlüğündeki
-"⊘ Telegram yapılandırılmamış" satırıdır — o satır varsa sorun ortamda, yoksa
-kaynakta.
+Değer `C:\srv\cry\.env`e yazılmıştı ve konteynerler ortamı AÇILIŞTA okuyor;
+aradan geçen deploy'lar bunu kendiliğinden düzeltti. Ölçüm (değer basılmadan,
+yalnızca dolu/boş):
+```bash
+docker exec cry-worker sh -c 'test -n "$TELEGRAM_BOT_TOKEN" && echo dolu'
+ssh hetzner 'docker exec cry-watcher sh -c "test -n \$TELEGRAM_BOT_TOKEN && echo dolu"'
+```
+→ `cry-web`, `cry-worker` ve sunucudaki `cry-watcher`: **üçünde de dolu**. İlk
+gerçek mesaj, izleme listesine bir adres eklenince gidecek (§8). Gelmezse
+bakılacak yer servisin günlüğündeki "⊘ Telegram yapılandırılmamış" satırıdır —
+o satır varsa sorun ortamda, yoksa kaynakta.
 
 ---
 
@@ -529,9 +546,13 @@ Görev koştu, günlüğe "HATA: hedef surucu yok" yazdı ve kimse bakmadı; ger
 aranır, bulunamazsa `C:\srv\cry\yedek`e düşülür ve günlüğe UYARI yazılır. Ölçüldü: 17,3 MB dump,
 11 tablo / 363.166 satır geri yüklendi.
 
-**Kalan — bu bir DONANIM işi:** bugünkü hedef C:, yani veriyle **aynı makinede**. Disk arızasına
-karşı korur, makine kaybına (hırsızlık, yangın, anakart) KORUMAZ. Harici diski geri tak ya da
-yenisini ayır; üstünde `04_Yedek\cry` klasörü olsun, gerisi kendiliğinden çalışır.
+**Kalan — bu bir DONANIM işi ve 12 gündür açık:** bugünkü hedef C:, yani veriyle **aynı
+makinede**. Disk arızasına karşı korur, makine kaybına (hırsızlık, yangın, anakart) KORUMAZ.
+Harici diski geri tak ya da yenisini ayır; üstünde `04_Yedek\cry` klasörü olsun, gerisi
+kendiliğinden çalışır. Ölçüldü (2026-10-09): `yedek.log` 2026-09-28'den bu yana **13 turda
+13 kez** "harici yedek diski takili degil" yazdı; `C:\srv\cry\yedek\postgres` altında
+13 dump + sayım dosyası var ve son tur 32,1 MB / 3,2 sn. Yani **yedek alınıyor, yanlış
+yerde alınıyor.**
 
 **Asıl ders bunun ötesinde:** sessiz kalan bir görev "çalışıyor" ile "hiç koşmadı"yı ayırt
 edilemez kılıyor. Doldurucunun bekçisi her turda NABIZ yazıyor (CLAUDE.md); yedeğin böyle bir

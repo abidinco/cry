@@ -7,15 +7,14 @@ burası benim önerilerim — sıralaması fayda/maliyet.
 
 ## Yakın vadede değerli
 
-**1. Postgres yedeği — otomatik değil ama HATIRLATMALI.**
-Otomatik yedek almama kararı bilinçliydi, ama artık gerçek veri var (2.131
-hareket, indekslenmiş adresler). Tek satırlık elle yedek:
-```powershell
-docker exec cry-db pg_dump -U cry -d cry --format=custom > "cry-yedek-$(Get-Date -Format yyyyMMdd).dump"
-```
-Öneri: bunu bir vaka kapanışında ve rapor üretiminden önce çalıştırmayı
-alışkanlık yap. Rapor kanıt dondurma iddiasında; altındaki veritabanı
-yedeksizse iddia yarım kalır.
+**1. ~~Postgres yedeği — otomatik değil ama HATIRLATMALI.~~ — OTOMATİKLEŞTİ, öneri KAPANDI.**
+`deploy/pc/yedek.ps1` her gün 03:15 koşuyor, 14 kopya tutuyor ve her pazar
+03:45'te geri yükleme DENEMESİ yapılıyor (kurallar CLAUDE.md → *Yedek*).
+Ölçüldü (2026-10-09, `C:\srv\cry\yedek.log`): son üç tur 25,8 / 32,1 / 32,1 MB,
+2,4–4,0 sn, 25 tablo. **Ama günlük her turda UYARI yazıyor:** harici yedek diski
+takılı değil, hedef GEÇİCİ olarak `C:\srv\cry\yedek` — disk arızasına karşı
+korur, makine kaybına karşı KORUMAZ. O iş hâlâ açık ve kullanıcıda:
+[çözülmesi gerekenler §16](cozulmesi-gerekenler.md).
 
 **2. ~~TronScan etiketlerini tohum olarak çek.~~ — YAPILDI (2026-09-14).**
 Anahtarsız `401` dönüyordu; kullanıcı anahtar aldı. Kaynak
@@ -35,10 +34,13 @@ adaptörün kapısı 10/sn. Gerçek darboğazın nerede olduğu ÖLÇÜLMEDİ. �
 
 ## Orta vadede
 
-**5. Hız sınırı ve kota göstergesi.**
-Bir tarama yarıda kalırsa sebebinin hız sınırı mı, kaynağın hatası mı olduğu
-şu an yalnızca log'da. Adres sayfasında "kaynak sınırına takıldı, N dakika
-sonra devam" demek, kullanıcıyı boşuna beklemekten kurtarır.
+**5. Hız sınırı ve kota göstergesi — YARISI YAPILDI (2026-09-29), kalanı bilerek yazılmadı.**
+Yarıda kalan taramanın SEBEBİ artık kayıtta ve ekranda (`addresses.index_note`:
+`sayfa_butcesi` · `hiz_siniri` · `kaynak_hatasi` · `adaptor_yok` · `iptal` —
+[§12](cozulmesi-gerekenler.md)). Yazılmayan parça "N dakika sonra devam"dır ve
+sebebi şu: kimse kendiliğinden devam etmiyor; ekranda bir süre vaat etmek,
+doğrulanmamış bir söz olurdu. Kota göstergesi (kalan istek) hâlâ yok — TronGrid
+kotası canlı yığınla paylaşıldığı için tek bir sayı yanıltıcı olur.
 
 **6. Vaka içi arama geçmişi (history rail).**
 Şema hazır (`CaseQuery`), arayüz yok. Analiz sırasında "az önce nereye
