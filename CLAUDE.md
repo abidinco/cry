@@ -744,7 +744,10 @@ kapatmak bilerek kaynağa gitmektir. Saf katman testli (`tests/yalniz-yerel.test
   yazar. Ölçüldü (2026-10-09, `scripts/kosu-surum-olcum.mts`): koşu 40 →
   `stats.surum` = `8ecdd6d97aad` / `git`, rapor 5'in PDF'inde aynı cümle;
   `CRY_SURUM` verilerek koşulan tur `kaynak: ortam` yazdı; damgası olmayan koşunun
-  raporu (rapor 4) "BİLİNMİYOR" bastı.
+  raporu (rapor 4) "BİLİNMİYOR" bastı. **Canlı yol da ölçüldü** (push 78da66a'dan
+  sonra, kuyruktan koşu 41): `docker exec cry-worker printenv CRY_SURUM` tam
+  commit'i verdi ve worker koşuya `kaynak: ortam` ile aynı sha'yı yazdı — yani
+  damga imajdan geliyor, betiğin git'inden değil.
 - **Damga İMAJA build arg ile girer** (`apps/worker/Dockerfile` → `ARG/ENV
   CRY_SURUM`, compose `args`, deploy akışında `${{ github.sha }}`): konteynerde
   `.git` YOKTUR, o yüzden canlı yolda tek kaynak imajdır. Elle `docker compose
