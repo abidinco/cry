@@ -123,6 +123,10 @@ export type KanitPaketi = {
   metodoloji: {
     atifKurali: string;
     atifCumlesi: string;
+    /** Grafı üreten kodun sürümü — kısa hâli; bilinmiyorsa `null`. */
+    kodSurumu: string | null;
+    /** Sürümün İNSAN CÜMLESİ; damga yoksa bunun ne anlama geldiğini de söyler. */
+    kodSurumuCumlesi: string;
     kurKaynagi: string;
     gunSiniri: string;
     fiyatGeriyeYurume: string;

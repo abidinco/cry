@@ -144,7 +144,7 @@ describe("basılamayan karakter", () => {
       .map((o) => (o.tur === "metin" ? o.metin : ""))
       .join(" ");
     // Etiketin kendisi de aynı yazı tipinden geçiyor: `ı` de `?` oluyor.
-    expect(ilkSayfa).toContain("158 karakter bu PDF'in yaz? tipiyle bas?lamad?");
+    expect(ilkSayfa).toContain("172 karakter bu PDF'in yaz? tipiyle bas?lamad?");
   });
 });
 

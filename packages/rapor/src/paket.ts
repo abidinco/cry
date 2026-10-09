@@ -8,6 +8,7 @@
  */
 
 import { GERIYE_GUN, KUR_KAYNAGI, toplaMetin, TRY_OLCEK, type Fiyatlandirma } from "@cry/fiyat";
+import { surumCumlesi, type SurumDamgasi } from "@cry/motor";
 import {
   ATIF_CUMLELERI,
   KANIT_SURUMU,
@@ -232,11 +233,30 @@ export function korlukCumlesi(gorulemeyenler: string[] | null): string {
   return `Bu zincirde VAR OLUP okuyamadığımız hareket türleri: ${gorulemeyenler.join(" · ")}.`;
 }
 
+/**
+ * Koşu kaydındaki sürüm damgası.
+ *
+ * `stats.surum`u WORKER yazıyor (grafı üreten kod odur). Damgayı yazmayan bir
+ * sürümde koşan eski koşularda alan YOKTUR ve rapor bunu "bilinmiyor" diye
+ * söyler — uydurulmuş bir sürüm, hiç olmamasından kötüdür.
+ */
+export function kosununSurumu(istatistik: unknown): SurumDamgasi | null {
+  const s = (istatistik as { surum?: unknown } | null)?.surum as SurumDamgasi | undefined;
+  if (!s || typeof s !== "object" || typeof s.kisa !== "string") return null;
+  return s;
+}
+
 /** Paketin metodoloji bölümü — bir yüzdeyi savunulabilir kılan tek bölüm. */
-export function metodoloji(atifKurali: string, uyarilar: string[]): KanitPaketi["metodoloji"] {
+export function metodoloji(
+  atifKurali: string,
+  uyarilar: string[],
+  damga?: SurumDamgasi | null,
+): KanitPaketi["metodoloji"] {
   return {
     atifKurali,
     atifCumlesi: ATIF_CUMLELERI[atifKurali] ?? `Tanınmayan atıf kuralı: ${atifKurali}`,
+    kodSurumu: damga && damga.kaynak !== "bilinmiyor" ? damga.kisa : null,
+    kodSurumuCumlesi: surumCumlesi(damga),
     kurKaynagi: `${KUR_KAYNAGI} (TCMB), token→USD CoinGecko`,
     gunSiniri:
       "Gün sınırı baştan sona UTC'dir. Ekran saatleri TSİ gösterir: 03:00 TSİ'deki bir hareket bir ÖNCEKİ UTC gününün kuruyla çevrilir.",
@@ -287,7 +307,7 @@ export function kanitPaketi(girdi: PaketGirdisi): KanitPaketi {
     raporGunu: girdi.raporGunu,
     vaka: girdi.vaka,
     kosu: girdi.kosu,
-    metodoloji: metodoloji(girdi.kosu.atifKurali, uyarilar),
+    metodoloji: metodoloji(girdi.kosu.atifKurali, uyarilar, kosununSurumu(girdi.kosu.istatistik)),
     kapsam: {
       gorulemeyenler: girdi.gorulemeyenler,
       korlukCumlesi: korlukCumlesi(girdi.gorulemeyenler),

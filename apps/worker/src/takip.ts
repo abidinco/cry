@@ -25,6 +25,7 @@ import {
   yerelYenidenTara,
 } from "@cry/motor";
 import { adresIndeksle } from "./indeksle";
+import { surumuOku } from "./surum";
 import { yakmaAdresiMi, type ChainId } from "@cry/chain";
 import { ayarOku, pencereOku } from "@cry/blok-indeks";
 
@@ -170,6 +171,10 @@ export async function takipKos(traceRunId: bigint): Promise<Ozet> {
   });
 
   await durumuTemizle(traceRunId);
+  // Grafı ÜRETEN kodun sürümü, grafın yanında durur (öneri 14). Damgayı web
+  // değil WORKER yazar: koşuyu koşturan kod burasıdır ve kuyrukta bekleyen bir
+  // iş, araya giren bir deploy'dan SONRA işlenebilir.
+  await durumYaz(traceRunId, "surum", surumuOku());
   // Tohum, kökE GİREN paradır ve Postgres'ten okunur. Kök hiç taranmamışsa orada satır yoktur:
   // tohum boş çıkar, yürüyüş ilk düğümde biter ve koşu "bitti" görünür. Ölçüldü (M4, 2026-09-22):
   // taze bir adreste koşu 10,9 sn sürdü ve 0 kenar verdi — hata vermeden, boş bir graf olarak.
@@ -302,6 +307,9 @@ export async function takipDevam(
     ekHop: esikler.maxHop - dugum.hop,
     kullaniciId,
     zaman: new Date().toISOString(),
+    // Devam HAFTALAR sonra gelebilir ve o günün kodu başka olabilir: tek bir
+    // koşu kaydı birden çok sürümün ürünü olur. Damga devamın kendi satırında.
+    surum: surumuOku(),
   };
 
   await prisma.$transaction([

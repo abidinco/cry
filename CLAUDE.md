@@ -732,6 +732,23 @@ kapatmak bilerek kaynağa gitmektir. Saf katman testli (`tests/yalniz-yerel.test
   **Eski koşular donmuş kayıttır**; yeni etiketin etkisi yeni koşuda görünür.
 - **Etiket görüntüsü kayıt anında DONDURULUR** (`labelSnapshot`); rapor bir anın
   tutanağıdır.
+- **Koşuyu ÜRETEN kodun sürümü koşu kaydında durur** (`stats.surum`, saf katman
+  `packages/motor/src/surum.ts`, 9 test): eşikler (`params`) ve atıf kuralı zaten
+  kayıtlıydı, eksik olan KODUN kendisiydi — iki ay sonra aynı kökten gelen farklı
+  bir grafın kurallardan mı koddan mı geldiği söylenemiyordu. Damgayı **worker**
+  yazar (grafı koşturan kod odur; kuyruktaki iş araya giren bir deploy'dan SONRA
+  işlenebilir) ve **devam kendi damgasını** taşır — bir koşu birden çok sürümün
+  ürünü olabilir. Sıra: imaja yazılan `CRY_SURUM` → çalışma kopyasının `.git` başı
+  → `bilinmiyor`. **Sürüm UYDURULMAZ**: çözülmemiş şablon (`${…}`, `$CRY_SURUM`)
+  ve boş değer damga sayılmaz, rapor "BİLİNMİYOR" der ve bunun ne anlama geldiğini
+  yazar. Ölçüldü (2026-10-09, `scripts/kosu-surum-olcum.mts`): koşu 40 →
+  `stats.surum` = `8ecdd6d97aad` / `git`, rapor 5'in PDF'inde aynı cümle;
+  `CRY_SURUM` verilerek koşulan tur `kaynak: ortam` yazdı; damgası olmayan koşunun
+  raporu (rapor 4) "BİLİNMİYOR" bastı.
+- **Damga İMAJA build arg ile girer** (`apps/worker/Dockerfile` → `ARG/ENV
+  CRY_SURUM`, compose `args`, deploy akışında `${{ github.sha }}`): konteynerde
+  `.git` YOKTUR, o yüzden canlı yolda tek kaynak imajdır. Elle `docker compose
+  build` yapılırsa damga boş kalır ve koşu bunu "bilinmiyor" diye söyler.
 - **Yetenek bayrağı bir İDDİADIR ve ÖLÇÜLDÜ.** TRON'da `internalTransfers` **false'a çekildi**:
   iç transfer zincirde VAR (üç blokta 1.275 işlemin 7'si, `gettransactioninfobyblocknum` →
   `internal_transactions` + `callValueInfo`) ama `listTransfers`in okuduğu HESAP ucu vermiyor —

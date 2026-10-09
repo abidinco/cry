@@ -205,6 +205,18 @@ export default async function RaporSayfasi({ params }: { params: Promise<{ id: s
 
       <Kayit koken="supheli" baslik="Metodoloji ve sınırlar">
         <Satir ad="atıf kuralı">{paket.metodoloji.atifCumlesi}</Satir>
+        {/* Eşikler ve atıf kuralı koşu kaydında zaten vardı; eksik olan KODUN
+            sürümüydü. Alanı taşımayan eski paketler bunu açıkça söyler. */}
+        <Satir ad="kod sürümü" not="aynı kökten farklı bir graf: kural mı değişti, kod mu?">
+          {paket.metodoloji.kodSurumu ? (
+            <code className="veri">{paket.metodoloji.kodSurumu}</code>
+          ) : (
+            <span className="m2">
+              {paket.metodoloji.kodSurumuCumlesi ??
+                "Bu rapor sürüm damgasını taşımayan bir biçimde mühürlendi: koşuyu üreten kod sürümü BİLİNMİYOR."}
+            </span>
+          )}
+        </Satir>
         <Satir ad="kur kaynağı">{paket.metodoloji.kurKaynagi}</Satir>
         <Satir ad="gün sınırı">{paket.metodoloji.gunSiniri}</Satir>
         <Satir ad="fiyatta geriye yürüme">{paket.metodoloji.fiyatGeriyeYurume}</Satir>

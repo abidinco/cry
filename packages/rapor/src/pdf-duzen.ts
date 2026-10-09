@@ -448,6 +448,17 @@ export function pdfDuzeni(girdi: PdfGirdisi, olc: Olcer, kapsar: Kapsayici): Duz
   // 4. Metodoloji
   govde.push({ tur: "bolum", metin: t("Metodoloji ve sınırlar") });
   govde.push(satir("atıf kuralı", p.metodoloji.atifCumlesi));
+  // Kod sürümü: "bu rakam neden değişti" sorusunun tek cevabı. Alanı taşımayan
+  // eski paketlerde cümle de yoktur; o zaman damga BİLİNMİYOR diye basılır.
+  govde.push(
+    satir(
+      "kod sürümü",
+      p.metodoloji.kodSurumuCumlesi ??
+        "Koşuyu üreten kod sürümü BİLİNMİYOR: bu rapor sürüm damgasını taşımayan bir biçimde mühürlendi.",
+      "govde",
+      p.metodoloji.kodSurumu ? "normal" : "vurgu",
+    ),
+  );
   govde.push(satir("kur kaynağı", p.metodoloji.kurKaynagi));
   govde.push(satir("gün sınırı", p.metodoloji.gunSiniri));
   govde.push(satir("fiyatta geriye yürüme", p.metodoloji.fiyatGeriyeYurume));

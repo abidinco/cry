@@ -73,6 +73,10 @@ services:
     build:
       context: .
       dockerfile: apps/worker/Dockerfile
+      args:
+        # Deploy akışı bunu commit sha'sı olarak verir; elle `docker compose
+        # build` yapıldığında BOŞ kalır ve koşu damgası "bilinmiyor" olur.
+        CRY_SURUM: ${CRY_SURUM:-}
     container_name: cry-worker
     restart: unless-stopped
     env_file: .env

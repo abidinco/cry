@@ -89,11 +89,13 @@ cümlesinde (`kapsam.gorulemeyenler`) — çok zincirli bir koşuda zincir baş�
 yoklama sonucu (`probe_cache`) rapora girmiyor. Bugün koşular tek zincirli,
 o yüzden bedeli ödenmedi.
 
-**14. Her koşuya sürüm damgası.**
-Bir taramanın sonucu, o gün çalışan kodun atıf kuralına ve eşiklerine
-bağlı. Koşuya kod sürümü (git SHA) + eşikler + atıf kuralı yazılmazsa iki
-ay sonra "bu rakam neden değişti" sorusunun cevabı yok. Alan zaten var
-sayılır; yazılması bir satır.
+**14. ~~Her koşuya sürüm damgası.~~ — YAPILDI (2026-10-09).**
+`stats.surum` koşuyu üreten kodun sürümünü taşıyor (imaja yazılan `CRY_SURUM`
+→ `.git` başı → `bilinmiyor`), devam kendi damgasını yazıyor, rapor metodoloji
+satırında basıyor. Eşikler ve atıf kuralı kayıtta zaten vardı. Kurallar ve
+ölçümler CLAUDE.md → *Takip ve rapor*. "Yazılması bir satır" değildi:
+uydurulmuş bir sürüm hiç olmamasından kötü olduğu için damganın kaynağı da
+kayda giriyor ve çözülmemiş şablon damga sayılmıyor.
 
 **15. Zincir adaptörleri için ortak bir "canlı sözleşme testi".**
 Bugünkü testler saf mantığı sınıyor (43 test, hepsi yeşil) — ama bu projedeki

@@ -8,4 +8,9 @@ COPY apps/worker/package.json apps/worker/
 RUN npm install --no-audit --no-fund
 COPY . .
 RUN npx prisma generate --schema packages/db/prisma/schema.prisma
+# Grafı üreten kodun sürümü, koşu kaydına yazılabilmesi için İMAJA girer
+# (konteynerde `.git` yoktur). Verilmezse damga "bilinmiyor" olur ve rapor
+# bunu söyler — uydurulmuş bir sürüm hiç olmamasından kötüdür.
+ARG CRY_SURUM=
+ENV CRY_SURUM=$CRY_SURUM
 CMD ["npm", "run", "start", "--workspace", "@cry/worker"]

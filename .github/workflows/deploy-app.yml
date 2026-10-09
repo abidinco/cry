@@ -89,6 +89,9 @@ jobs:
           }
 
       - name: Derle
+        env:
+          # Imaja giren surum damgasi: kosu kaydina bu yazilir (oneri 14).
+          CRY_SURUM: ${{ github.sha }}
         run: |
           # B4 canli uc okuyucusu elle "cry-blok-okuyucu-deneme" adiyla denendi (2026-09-17); servis
           # gelince ikinci bir okuyucu kalmasin. Konteyner yoksa bir sey yapmaz (stderr'e yazan bir
