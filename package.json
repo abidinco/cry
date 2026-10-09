@@ -11,6 +11,7 @@
     "dev": "npm run dev --workspace @cry/web",
     "build": "npm run build --workspaces --if-present",
     "test": "vitest run",
+    "test:canli": "vitest run --config vitest.canli.config.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json && npm run typecheck --workspaces --if-present",
     "db:generate": "npm run generate --workspace @cry/db",
     "db:migrate": "npm run migrate --workspace @cry/db",

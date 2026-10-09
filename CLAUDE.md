@@ -71,6 +71,12 @@ Karara bağlanan madde bekleyenlerden **silinir**, kuralı buraya yazılır.
   Üst düzey `await` için `.mts`. `TRONSCAN_API_KEY` yalnızca depo kökündeki
   `.env`'de; `ETHERSCAN_API_KEY` kökte BOŞ, `.env.local` ve `C:\srv\cry\.env`'de
   dolu — yalnızca kökü yükleyen betik anahtarsız kalır. Değerler ekrana basılmaz.
+- **`process.loadEnvFile` ile `--env-file` AYNI DEĞİL** (ölçüldü 2026-10-09):
+  CLI'nin zincirinde sonraki dosya öncekini EZER, işlev ise zaten TANIMLI bir
+  değişkene DOKUNMAZ — kökteki boş `TRONGRID_API_KEY=` bir tanımdır ve
+  `.env.local`in gerçek anahtarını gölgeliyordu. Kod içinden iki dosya
+  yükleyen taraf kendi ayrıştırmasını yapar ve kural şudur: **boş değer dolu
+  bir değeri ezmez** (`tests-canli/ortam.ts`).
 - **Redis yalnızca `127.0.0.1:16379`** ve bu **CANLI kuyruktur**: 3005'ten
   başlatılan koşu canlı worker'da işlenir. Kuyruk çağrıları 5 sn süre sınırlı.
 - **Canlı yığında betik:** worker konteynerine kopyala ve orada koş
@@ -876,6 +882,18 @@ Tasarım dili: [docs/arayuz.md](docs/arayuz.md). İmza öğesi **köken oluğu**
   ya da runner'ın gördüğüne bakılır.
 - **Bir görev, kendinden öncekinin ürettiği veriyi EKRANDA gösterebiliyorsa
   bitmiştir.** "Yazıldı ama hiçbir sayfa sormuyor" bitmiş sayılmaz.
+- **Kaynakların CANLI sözleşmesi ayrı bir takımdadır: `npm run test:canli`**
+  (`tests-canli/`, 13 denetim, 31,4 sn — ağ, kota ve anahtar ister; `npm test`
+  ve CI bunu KOŞMAZ). Sorduğu soru tek: kaynağın bugün döndürdüğü gövde, bizim
+  okuduğumuz gövde mi? Her denetim yaşanmış bir tuzağın nöbetçisi (TRC20
+  transferi ayrı uçtaki bir OLAYdır · Etherscan hatayı HTTP 200 ile döndürür ·
+  BSC kapsam dışı · TCMB 404'ü "yayınlanmadı"dır · CoinGecko 401'i "aralık
+  dışı"dır · 1 USDT ≈ 1 USD ölçülür). **Anahtarsız koşu YEŞİL DÖNMEZ**: anahtar
+  yoksa denetim başarısız olur ve "ölçülemedi" der — yarısını sessizce atlayıp
+  yeşil basan bir takım, bu projenin kaçındığı kusurun ta kendisidir.
+  **Kanarya ateşlendi** (ölçüldü 2026-10-09): `fetch` HTTP 200 + `{"data":[]}`
+  döndürecek şekilde değiştirilince takım kırmızı yandı (`expected null not to
+  be null`) — oysa üretim kodu aynı cevapla sessizce "0 hareket" yazardı.
 - **Ölçümü olmayan madde yazılmaz.** Her sayı yanında yeniden üretim komutuyla durur.
 
 ## Güvenlik

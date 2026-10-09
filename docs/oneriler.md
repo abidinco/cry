@@ -97,12 +97,14 @@ satırında basıyor. Eşikler ve atıf kuralı kayıtta zaten vardı. Kurallar 
 uydurulmuş bir sürüm hiç olmamasından kötü olduğu için damganın kaynağı da
 kayda giriyor ve çözülmemiş şablon damga sayılmıyor.
 
-**15. Zincir adaptörleri için ortak bir "canlı sözleşme testi".**
-Bugünkü testler saf mantığı sınıyor (43 test, hepsi yeşil) — ama bu projedeki
-ciddi kusurların hepsi CANLI veriyle çıktı. Elle seçilmiş birkaç gerçek
-adres/işlem üzerinde, ağa çıkan ve normalde atlanan bir test dosyası
-(`npm run test:canli`) bu sınıfı yakalar: kaynağın alan adı değişince
-sessizce boş dönmek yerine kırmızı yanar.
+**15. ~~Zincir adaptörleri için ortak bir "canlı sözleşme testi".~~ — YAPILDI (2026-10-09).**
+`npm run test:canli` → `tests-canli/` (13 denetim, 31,4 sn): TRON tek işlem +
+liste + özet, Etherscan liste + tek işlem + BSC'nin 200'lü hatası, TCMB bülteni
+ve 404'ü, CoinGecko'nun 401'i ve USDT'nin ölçülen dolar fiyatı. `npm test` ve CI
+koşmaz (ağ/kota/anahtar). Kanarya ateşlendi: kaynak HTTP 200 + boş gövde
+dönünce takım kırmızı yanıyor — kurallar ve ölçüm CLAUDE.md → *Ölçme ve görev
+disiplini*. **Kalan:** Bitcoin/Solana adaptörleri boş olduğu için takımda yok;
+yazıldıklarında buraya birer denetim eklenir.
 
 **16. Adres sayfasında "bu adres neden burada" satırı.**
 14.798 adresin çoğu bir hareketin karşı tarafı olarak açıldı. Bir adresi
