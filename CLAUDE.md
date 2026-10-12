@@ -45,6 +45,12 @@ Karara bağlanan madde bekleyenlerden **silinir**, kuralı buraya yazılır.
   2026-10-06; günde bire çıkarmak masayı günün ~20 saatinde bayat gösterirdi) —
   masa 8 saatten eskisini BAYAT diye işaretler, çünkü bayat bir ölçüm ölçüm değildir. **Kalan
   süre günlüğün son satırından okunur**, masada yeniden hesaplanmaz.
+- **B3 kartı AYNI ölçümden iki yere yazılır** (kullanıcı isteği 2026-10-12): karar masası
+  ve ana sayfa (`apps/web/src/app/B3Karti.tsx`). Rutin ölçer, masaya `durum/b3`ü,
+  siteye `POST /api/durum/b3`ü (jeton, `durum_olcumleri` tablosu) AYNI `ts` ile
+  yazar; kart tek kaynaktan beslenmeyen iki sayı olmasın diye. Kapı alanları
+  doğrular ve bozuk sayıyı 0'a çekmez REDDEDER; eski ölçüm yeninin üstüne
+  yazılmaz; 8 saatten eski ölçüm sitede de BAYAT yazar.
 - **Dokümanlar KISA tutulur** (kullanıcı isteği 2026-09-29): CLAUDE.md her
   oturumda yükleniyor. Bir kural = bir madde + ölçümü; anlatı yok. Yeni kural
   eklerken eskisini uzatma, değiştir.

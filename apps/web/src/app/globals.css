@@ -689,3 +689,30 @@ input:focus, select:focus { border-color: var(--vurgu); }
 .takip-hareket { display: inline-flex; flex-direction: column; line-height: 1.25; vertical-align: middle; min-width: 0; }
 .takip-hash { font-size: 10.5px; color: var(--vurgu); border: 0; }
 .takip-hash:hover { text-decoration: underline; }
+
+/* --- ana sayfa: B3 geçmiş doldurma kartı (karar masasındakinin aynısı) --- */
+.b3-karti { margin-top: 18px; padding-left: 20px; }
+.b3-karti[data-surec="durdu"]::before { background: var(--hata); }
+.b3-karti[data-surec="bilinmiyor"]::before { background: var(--dikkat); }
+.b3-baslik { margin: 0 0 10px; font-size: 13px; font-weight: 500; color: var(--m2); }
+.b3-ust { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+.b3-yuzde { font-family: var(--yazi-veri), monospace; font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.b3-kalan { color: var(--m2); font-size: 13px; min-width: 0; }
+.b3-rozet {
+  margin-left: auto; flex: 0 0 auto; font-family: var(--yazi-veri), monospace; font-size: 10px;
+  letter-spacing: .08em; text-transform: uppercase; border: 1px solid var(--cizgi);
+  border-radius: 999px; padding: 2px 9px; color: var(--m2);
+}
+.b3-rozet[data-surec="calisiyor"] { color: var(--gelen-yazi); border-color: #15463a; }
+.b3-rozet[data-surec="durdu"] { color: var(--hata-yazi); border-color: #5c2420; }
+.b3-rozet[data-surec="bilinmiyor"] { color: var(--dikkat-yazi); border-color: #4a3a12; }
+.b3-cubuk { margin-top: 12px; height: 8px; background: var(--yuzey-2); border: 1px solid var(--cizgi); border-radius: 999px; overflow: hidden; }
+.b3-cubuk i { display: block; height: 100%; background: var(--vurgu); }
+.b3-cubuk-alt { display: flex; justify-content: space-between; gap: 10px; margin-top: 5px; font-family: var(--yazi-veri), monospace; font-size: 10.5px; color: var(--m3); }
+.b3-olculer { margin: 14px 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 12px 16px; }
+.b3-olculer dt { color: var(--m3); font-family: var(--yazi-veri), monospace; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+.b3-olculer dd { margin: 2px 0 0; font-family: var(--yazi-veri), monospace; font-size: 14px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.b3-olculer dd small { display: block; font-family: inherit; font-size: 11px; color: var(--m3); }
+.b3-not { margin: 14px 0 0; color: var(--m2); font-size: 12.5px; }
+.b3-olculdu { margin: 8px 0 0; color: var(--m3); font-size: 12px; }
+.b3-bayat { margin: 10px 0 0; color: var(--dikkat-yazi); font-size: 12.5px; }

@@ -11,7 +11,8 @@ import { OTURUM_CEREZI, oturumCoz } from "@/lib/oturum";
 // Bu yollar oturum kapısının DIŞINDA; her biri kendi korumasını taşıyor:
 // /giris ile /api/oturum/giris kapının kendisi, /saglik veri döndürmüyor,
 // /api/izleme/liste ile /api/izleme/bildirim paylaşılan jetonla korunuyor
-// (izleme servisi bir tarayıcı değil, çerez taşımıyor).
+// (izleme servisi bir tarayıcı değil, çerez taşımıyor). /api/durum/b3 de aynı
+// jetonla: B3 ölçümünü yazan rutin bir tarayıcı değil.
 //
 // Kapıyı açmak YETMEZ, uç kendi jetonunu sormak zorundadır: ikisi ayrı yerde
 // olduğu için biri eklenip öteki unutulabilir. `tests/kapilar.test.ts` bu
@@ -22,6 +23,7 @@ export const ACIK_YOLLAR = [
   "/saglik",
   "/api/izleme/liste",
   "/api/izleme/bildirim",
+  "/api/durum/b3",
 ];
 
 // Şifre değiştirme zorunluluğu sürerken AÇIK kalan yollar. Kapının kendisi

@@ -590,3 +590,16 @@ model BlockCursor {
 
   @@map("block_cursors")
 }
+
+/// Dışarıdan itilen ÖLÇÜMLER (şimdilik yalnızca `b3`: geçmiş doldurma durumu).
+/// Karar masasındaki kartla ana sayfadaki kart AYNI kayıttan beslenir: rutin ölçer,
+/// ikisine de yazar. Satır bir ölçümdür, talimat değil; `olculdu` ölçümün anıdır
+/// (yazıldığı an değil) ve bayatlık buradan hesaplanır.
+model DurumOlcumu {
+  anahtar     String   @id
+  veri        Json
+  olculdu     DateTime
+  guncellendi DateTime @updatedAt @map("guncellendi")
+
+  @@map("durum_olcumleri")
+}
