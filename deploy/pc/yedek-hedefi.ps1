@@ -54,7 +54,11 @@ function EnYeniYedek {
 }
 
 function YedekHedefi {
-  $a = @(YedekHedefleri)
-  if ($a.Count -eq 0) { return $null }
-  return $a[0]
+  # YedekHedefleri `,$adaylar` ile BIR KAT SARILI doner. `@(YedekHedefleri)` bu sarmali acmaz:
+  # 2 aday (harici + gecici) varken $a[0] tek aday degil BUTUN dizi olurdu ve `.Yol` iki yolun
+  # birlesimi ("E:\04_Yedek\cry C:\srv\cry\yedek") cikip "path format not supported" ile 17 Ekim'den
+  # beri her tur dusuyordu. Atama sarmali acar.
+  $a = YedekHedefleri
+  if ($null -eq $a -or @($a).Count -eq 0) { return $null }
+  return @($a)[0]
 }
