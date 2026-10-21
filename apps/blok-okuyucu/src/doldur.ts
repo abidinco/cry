@@ -32,7 +32,7 @@ import { Queue } from "bullmq";
 import IORedis from "ioredis";
 import {
   ayarOku, sorgu, bloktanSatirlar, aralikBoyu, eksikAraliklar, eksikleriGuncelle, eksikListesiOku,
-  geriyeParcalar, kaynakUygunMu, satirIzi, SEMALAR, KAPSAM_TABLO, type Aralik, type AyristirmaSonucu, type KaynakSiniri,
+  geriyeParcalar, kaynakUygunMu, satirIzi, bloktanSatirlarLogla, loglariBloklaraBol, logsuzAraliksupheli, type RpcLog, SEMALAR, KAPSAM_TABLO, type Aralik, type AyristirmaSonucu, type KaynakSiniri,
 } from "@cry/blok-indeks";
 import { prisma } from "@cry/db";
 import { KUYRUK, KUYRUK_ONEKI } from "@cry/kuyruk";
@@ -53,7 +53,23 @@ const PARCA = sayi("parca", 10_000);
 const MIN_BOS = sayi("minBosGB", 50) * 2 ** 30;
 const DISK = deger("disk") ?? "D:\\";
 const CAPRAZ = sayi("capraz", 500);
-const SECILEN = (deger("kaynaklar") ?? "publicnode,tronstack,trongrid").split(",").map((x) => x.trim()).filter(Boolean);
+/**
+ * Log yolu (yalnızca TronGrid): işlem bilgisi blok blok DEĞİL, blok aralığı için `eth_getLogs` ile tek istekte
+ * (packages/blok-indeks/src/log-yolu.ts). İstek/blok ~1,05 → ~0,03. Log yoluyla okunan blokların her
+ * `logCapraz`.sü aynı kaynaktan ESKİ yolla yeniden okunup satır satır karşılaştırılır.
+ */
+const LOG_YOLU = process.argv.includes("--logYolu");
+const LOG_CAPRAZ = sayi("logCapraz", 500);
+/**
+ * TronGrid'in ek anahtarları: `TRONGRID_API_KEY_2`, `_3`… doluysa her biri AYRI bir kaynak olur (`trongrid2`, `trongrid3`):
+ * kendi bütçesi, eşzamanı, 429 geri çekilmesi. Kota anahtar başınaysa hız katlanır; hesap başınaysa ek anahtar kazandırmaz
+ * (günlük istek sayacı kaynak başına günlükte görünür, orada ölçülür).
+ */
+const EK_ANAHTARLAR = [2, 3, 4, 5].filter((n) => (process.env[`TRONGRID_API_KEY_${n}`] ?? "").trim() !== "").map((n) => `trongrid${n}`);
+const SECILEN = (deger("kaynaklar") ?? ["publicnode", "tronstack", "trongrid", ...EK_ANAHTARLAR].join(",")).split(",").map((x) => x.trim()).filter(Boolean);
+/** "trongrid2" → "trongrid": komut satırı ayarları (`--trongridEs` …) ek anahtarlara da uygulanır, kaynağa özel olan ezer. */
+const tabanAd = (ad: string) => ad.replace(/\d+$/, "");
+const ayar = (ad: string, ek: string, vars: number) => sayi(`${ad}${ek}`, sayi(`${tabanAd(ad)}${ek}`, vars));
 /** Parçada okunamayan blok oranı bunu aşarsa kaynaklar okuyamıyor demektir: geçmişi boşlukla doldurmak yerine DUR. */
 const HATA_ORANI_SINIRI = 0.01;
 const uyu = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -73,6 +89,17 @@ type Aktif = {
   /** Bir işçinin tek seferde aldığı ardışık blok sayısı (toplu blok isteği). */
   toplu: number;
   oncelikli: boolean;
+  /** Bu kaynakta işlem bilgisi `eth_getLogs` aralığıyla alınır. */
+  logYolu: boolean;
+  /**
+   * UTC günü başına en çok bu kadar istek (0 = sınırsız). TronGrid anahtarının kotası günlük 100.000 ve
+   * worker'la PAYLAŞILIYOR; dolunca anahtar 24 saat boyunca saniyede 1 isteğe düşüyor (ölçüldü 2026-10-19:
+   * "Exceed the user daily usage (100000)"). Bütçe dolunca kaynak ertesi UTC gününe kadar bekler.
+   */
+  gunlukButce: number;
+  gun: string;
+  gunBasiIstek: number;
+  butceUyarisi?: boolean;
   basarili: number;
   hata: number;
   ardisikHata: number;
@@ -84,17 +111,24 @@ for (const ad of SECILEN) {
   let kaynak: TronBlokKaynagi;
   if (ad === "publicnode") kaynak = new TronBlokKaynagi(KAYNAKLAR.publicnode(sayi("publicnodeMs", 60)));
   else if (ad === "tronstack") kaynak = new TronBlokKaynagi(KAYNAKLAR.tronstack(sayi("tronstackMs", 200)));
-  else if (ad === "trongrid") kaynak = new TronBlokKaynagi(KAYNAKLAR.trongrid(process.env.TRONGRID_API_KEY, sayi("trongridMs", 120)));
+  else if (tabanAd(ad) === "trongrid") {
+    const no = ad.slice("trongrid".length);
+    const anahtar = (no === "" ? process.env.TRONGRID_API_KEY : process.env[`TRONGRID_API_KEY_${no}`])?.trim();
+    if (no !== "" && !anahtar) { console.error(`${ad}: TRONGRID_API_KEY_${no} boş, kullanılmıyor`); continue; }
+    kaynak = new TronBlokKaynagi(KAYNAKLAR.trongrid(anahtar, ayar(ad, "Ms", 120)));
+  }
   else { console.error(`bilinmeyen kaynak: ${ad}`); process.exit(2); }
   let enEski: number | null = null;
-  if (ad !== "trongrid") {
+  const trongridMi = tabanAd(ad) === "trongrid";
+  if (!trongridMi) {
     try {
       enEski = await kaynak.enEskiBlok(kesin);
       // Sınır zamanla İLERLİYOR (publicnode ~92 günü tutuyor): bir günlük pay.
       if (enEski !== null) enEski += 28_800;
     } catch (e) { console.error(`${ad} yoklanamadı, kullanılmıyor: ${(e as Error).message}`); continue; }
   }
-  aktifler.push({ kaynak, sinir: { ad, enEski }, eszaman: sayi(`${ad}Es`, ad === "trongrid" ? 2 : 4), toplu: Math.max(1, Math.min(100, sayi(`${ad}Toplu`, 20))), oncelikli: ad === "trongrid", basarili: 0, hata: 0, ardisikHata: 0, bekleyeKadar: 0 });
+  const logYolu = LOG_YOLU && trongridMi;
+  aktifler.push({ kaynak, sinir: { ad, enEski }, eszaman: ayar(ad, "Es", trongridMi ? 2 : 4), toplu: Math.max(1, Math.min(100, ayar(ad, "Toplu", logYolu ? 50 : 20))), oncelikli: trongridMi, logYolu, gunlukButce: trongridMi ? ayar(ad, "GunlukButce", 0) : 0, gun: "", gunBasiIstek: 0, basarili: 0, hata: 0, ardisikHata: 0, bekleyeKadar: 0 });
 }
 if (aktifler.length === 0) { console.error("kullanılabilir kaynak yok"); process.exit(2); }
 
@@ -131,7 +165,7 @@ console.log(
   `${UYGULA ? "YAZILIYOR" : "KURU (yazılmaz; --uygula)"} · disk ${DISK} en az ${MIN_BOS / 2 ** 30} GiB boş · çapraz her ${CAPRAZ || "—"}`,
 );
 for (const k of aktifler) {
-  console.log(`  kaynak ${k.sinir.ad}: ${k.sinir.enEski === null ? "tam geçmiş" : `en eski ${k.sinir.enEski}`} · ${k.eszaman} eşzaman · toplu ${k.toplu}${k.oncelikli ? " · worker kuyruğu boşken" : ""}`);
+  console.log(`  kaynak ${k.sinir.ad}: ${k.sinir.enEski === null ? "tam geçmiş" : `en eski ${k.sinir.enEski}`} · ${k.eszaman} eşzaman · toplu ${k.toplu}${k.oncelikli ? " · worker kuyruğu boşken" : ""}${k.logYolu ? " · LOG YOLU" : ""}`);
 }
 
 // ---- durdurma ----
@@ -149,7 +183,7 @@ if (UYGULA) for (const sql of SEMALAR) await sorgu(a, sql);
 const yazici = new Yazici(a, UYGULA, () => { durdur = true; });
 
 // ---- sayaçlar ----
-const s = { okunan: 0, atlanan: 0, satir: 0, hataliBlok: 0, caprazDenetim: 0, caprazUyusmaz: 0, caprazAtlanan: 0, parca: 0 };
+const s = { logYoluBlok: 0, logYedek: 0, logCapraz: 0, okunan: 0, atlanan: 0, satir: 0, hataliBlok: 0, caprazDenetim: 0, caprazUyusmaz: 0, caprazAtlanan: 0, parca: 0 };
 const hatalar: string[] = [];
 const t0 = Date.now();
 let simdikiParca: Aralik | null = null;
@@ -171,7 +205,8 @@ const ilerleme = setInterval(() => {
   const kalanBlok = simdikiParca ? simdikiParca.bas - TABAN : 0;
   const kaynakDurumu = aktifler.map((k) => {
     const not = k.bekleyeKadar > Date.now() ? " bekletiliyor" : k.oncelikli && mesgul ? " kuyruk" : "";
-    return `${k.sinir.ad} ${k.basarili}/${k.hata}h${not}`;
+    // `i` = kaynağa atılan mantıksal istek (günlük kota ölçümü için); 429 sonrası getJson yeniden denemeleri dahil DEĞİL.
+    return `${k.sinir.ad} ${k.basarili}/${k.hata}h ${k.kaynak.sayac.istek}i${not}`;
   }).join(" · ");
   console.log(
     `${ts()} parça ${simdikiParca ? `${simdikiParca.son}→${simdikiParca.bas}` : "-"} · okunan ${s.okunan.toLocaleString("tr")} · ` +
@@ -182,11 +217,30 @@ const ilerleme = setInterval(() => {
 }, sayi("ilerlemeSn", 10) * 1_000);
 
 // ---- bir parça ----
-type Is = { no: number; denenen: Set<string> };
-const musait = (k: Aktif) => k.bekleyeKadar <= Date.now() && !(k.oncelikli && mesgul);
+/** `tekrar`: kaynak başına geçici hata sayısı; `sonra`: bundan önce yeniden verilmez (geri çekilme). */
+type Is = { no: number; denenen: Set<string>; tekrar?: Map<string, number>; sonra?: number };
+/** Aynı kaynakta, geçici hatadan sonra bir bloğa en çok bu kadar kez daha bakılır; sonra başka kaynağa geçer. */
+const AYNI_KAYNAK_TEKRAR = sayi("ayniKaynakTekrar", 2);
+/** Toplu blok isteği (tek istek, `toplu` blok) geçici hatada yerinde bu kadar kez daha denenir. */
+const TOPLU_TEKRAR = sayi("topluTekrar", 3);
+/** Log aralığı sorgusu eski yola düşmeden önce bu kadar kez daha denenir. */
+const LOG_TEKRAR = sayi("logTekrar", 4);
+/** UTC gününün bütçesi dolduysa kaynak ertesi güne kadar kullanılamaz. */
+function butceVar(k: Aktif): boolean {
+  if (!k.gunlukButce) return true;
+  const gun = new Date().toISOString().slice(0, 10);
+  if (k.gun !== gun) { k.gun = gun; k.gunBasiIstek = k.kaynak.sayac.istek; }
+  const harcanan = k.kaynak.sayac.istek - k.gunBasiIstek;
+  if (harcanan < k.gunlukButce) { k.butceUyarisi = false; return true; }
+  if (!k.butceUyarisi) { k.butceUyarisi = true; console.log(`${ts()} ${k.sinir.ad} günlük bütçe doldu (${harcanan}/${k.gunlukButce} istek) — 00:00 UTC'ye kadar bekletiliyor`); }
+  return false;
+}
+const musait = (k: Aktif) => k.bekleyeKadar <= Date.now() && !(k.oncelikli && mesgul) && butceVar(k);
 
-async function caprazDenetle(k: Aktif, no: number, r: AyristirmaSonucu): Promise<void> {
-  const diger = aktifler.find((x) => x !== k && musait(x) && kaynakUygunMu(x.sinir, no));
+async function caprazDenetle(k: Aktif, no: number, r: AyristirmaSonucu, kendisiyle = false): Promise<void> {
+  // Log yolu satırı, AYNI kaynağın eski yoluyla karşılaştırılır (tronstack kapanıyor ve hız sınırlı; ayrıca
+  // iki yolun idx'i birebir aynı olmak zorunda).
+  const diger = kendisiyle ? k : aktifler.find((x) => x !== k && musait(x) && kaynakUygunMu(x.sinir, no));
   if (!diger) { s.caprazAtlanan++; return; }
   let r2: AyristirmaSonucu;
   try {
@@ -196,7 +250,7 @@ async function caprazDenetle(k: Aktif, no: number, r: AyristirmaSonucu): Promise
   s.caprazDenetim++;
   if (satirIzi(r2) !== satirIzi(r)) {
     s.caprazUyusmaz++;
-    throw Object.assign(new Error(`çapraz denetim uyuşmadı: ${k.sinir.ad} ${r.satirlar.length} satır, ${diger.sinir.ad} ${r2.satirlar.length} satır`), { kesin: true });
+    throw Object.assign(new Error(`çapraz denetim uyuşmadı: ${k.sinir.ad}${kendisiyle ? " (log yolu)" : ""} ${r.satirlar.length} satır, ${diger.sinir.ad}${kendisiyle ? " (eski yol)" : ""} ${r2.satirlar.length} satır`), { kesin: true });
   }
 }
 
@@ -207,11 +261,21 @@ async function parcaOku(bekleyen: number[]): Promise<number> {
   let ucusta = 0;
   let hatali = 0;
   let caprazSayac = 0;
+  /** Bu parçada hata sebepleri (kaynak: sebep → kaç kez) ve yeniden deneme sayaçları; parça sonunda yazılır. */
+  const sebepler = new Map<string, number>();
+  let topluYeniden = 0, ayniKaynakYeniden = 0, baskaKaynagaGecen = 0, logYeniden = 0;
+  const logYedek0 = s.logYedek;
+  const sebepSay = (ad: string, e: unknown) => {
+    const m = (e as Error).message.replace(/\d{5,}/g, "N").replace(/https?:\/\/\S+/g, (u) => { try { return new URL(u).pathname; } catch { return u; } }).slice(0, 110);
+    const key = `${ad}: ${m}`;
+    sebepler.set(key, (sebepler.get(key) ?? 0) + 1);
+  };
 
 
   /** Geri dönen iş varsa tek başına o; yoksa ana kuyruktan ARDIŞIK (azalan) en çok `k.toplu` blok. */
   const alDizi = (k: Aktif): Is[] => {
-    const gi = geri.findIndex((i) => !i.denenen.has(k.sinir.ad) && kaynakUygunMu(k.sinir, i.no));
+    const simdi = Date.now();
+    const gi = geri.findIndex((i) => !i.denenen.has(k.sinir.ad) && (i.sonra ?? 0) <= simdi && kaynakUygunMu(k.sinir, i.no));
     if (gi >= 0) return [geri.splice(gi, 1)[0]!];
     const dizi: Is[] = [];
     while (dizi.length < k.toplu) {
@@ -235,7 +299,21 @@ async function parcaOku(bekleyen: number[]): Promise<number> {
         console.log(`${ts()} ${k.sinir.ad} 20 ardışık hata — 60 sn bekletiliyor. Son: ${mesaj}`);
       }
     }
+    if (say) sebepSay(k.sinir.ad, e);
+    const gecici = !(e as { kesin?: boolean }).kesin;
+    // Geçici hatada (429, ağ) aynı kaynağa geri çekilmeyle yeniden bakılır: tek çıkış olarak ölmekte olan bir
+    // kaynağa (tronstack) bırakılan blok 25 dk'lık kuyruk yaratıyordu.
+    const tekrar = (is.tekrar ??= new Map());
+    const n = tekrar.get(k.sinir.ad) ?? 0;
+    if (gecici && n < AYNI_KAYNAK_TEKRAR) {
+      tekrar.set(k.sinir.ad, n + 1);
+      is.sonra = Date.now() + 3_000 * 2 ** n + Math.floor(Math.random() * 1_000);
+      ayniKaynakYeniden++;
+      geri.push(is);
+      return;
+    }
     is.denenen.add(k.sinir.ad);
+    baskaKaynagaGecen++;
     const baskaKaynak = !(e as { kesin?: boolean }).kesin && aktifler.some((x) => !is.denenen.has(x.sinir.ad) && kaynakUygunMu(x.sinir, is.no));
     if (baskaKaynak) geri.push(is);
     else { hatali++; if (hatalar.length < 50) hatalar.push(`${is.no}: ${mesaj}`); }
@@ -254,19 +332,61 @@ async function parcaOku(bekleyen: number[]): Promise<number> {
       // Dizi azalan: blokları tek istekte [en küçük, en büyük].
       let hazir = new Map<number, unknown>();
       if (dizi.length > 1) {
-        try {
-          hazir = await k.kaynak.bloklar(dizi[dizi.length - 1]!.no, dizi[0]!.no);
-        } catch (e) {
-          dizi.forEach((is, i) => hataIsle(k, is, e, i === 0));
+        let sonHata: unknown = null;
+        for (let d = 0; d <= TOPLU_TEKRAR && !durdur; d++) {
+          try {
+            hazir = await k.kaynak.bloklar(dizi[dizi.length - 1]!.no, dizi[0]!.no);
+            sonHata = null;
+            break;
+          } catch (e) {
+            sonHata = e;
+            sebepSay(k.sinir.ad, e);
+            if ((e as { kesin?: boolean }).kesin || d === TOPLU_TEKRAR) break;
+            topluYeniden++;
+            await uyu(2_000 * 2 ** d + Math.floor(Math.random() * 1_000));
+          }
+        }
+        if (sonHata) {
+          dizi.forEach((is, i) => hataIsle(k, is, sonHata, i === 0));
           ucusta -= dizi.length;
           continue;
+        }
+      }
+      // Log yolu: aralığın olayları TEK istekte. Şüpheli ya da okunamayan aralık eski yola düşer (blok başına bilgi).
+      let loglar: Map<number, RpcLog[]> | null = null;
+      if (k.logYolu && dizi.length > 1 && hazir.size === dizi.length) {
+        try {
+          const lo = dizi[dizi.length - 1]!.no, hi = dizi[0]!.no;
+          // 429/ağ hatasında eski yola (blok başına bir istek) DÜŞMEDEN önce aralık sorgusu geri çekilmeyle yeniden denenir:
+          // düşen her aralık ~100 tekil işlem-bilgisi isteği demekti (parça sonu özetinde 129 hata).
+          let tum: RpcLog[] | null = null;
+          for (let d = 0; tum === null; d++) {
+            try { tum = await k.kaynak.loglar(lo, hi); }
+            catch (e) {
+              if (d >= LOG_TEKRAR || durdur) throw e;
+              logYeniden++;
+              await uyu(2_000 * 2 ** d + Math.floor(Math.random() * 1_000));
+            }
+          }
+          if (logsuzAraliksupheli([...hazir.values()] as never[], tum.length)) throw new Error(`şüpheli aralık [${lo}, ${hi}]: sözleşme çağrısı var, olay yok`);
+          loglar = loglariBloklaraBol(tum, lo, hi);
+        } catch (e) {
+          s.logYedek += dizi.length;
+          if (hatalar.length < 50) hatalar.push(`log yolu → eski yol: ${(e as Error).message.slice(0, 160)}`);
         }
       }
       for (const is of dizi) {
         try {
           const onceden = hazir.get(is.no);
-          const { blok, bilgi } = onceden !== undefined ? { blok: onceden, bilgi: await k.kaynak.bilgi(is.no) } : await k.kaynak.blok(is.no);
-          const r = bloktanSatirlar(blok as never, bilgi as never);
+          const logluMu = loglar !== null && onceden !== undefined;
+          const r = logluMu
+            ? bloktanSatirlarLogla(onceden as never, loglar!.get(is.no) ?? [])
+            : (({ blok, bilgi }) => bloktanSatirlar(blok as never, bilgi as never))(
+                onceden !== undefined ? { blok: onceden, bilgi: await k.kaynak.bilgi(is.no) } : await k.kaynak.blok(is.no));
+          if (logluMu) {
+            s.logYoluBlok++;
+            if (LOG_CAPRAZ > 0 && ++s.logCapraz % LOG_CAPRAZ === 0) await caprazDenetle(k, is.no, r, true);
+          }
           if (CAPRAZ > 0 && ++caprazSayac % CAPRAZ === 0) await caprazDenetle(k, is.no, r);
           k.basarili++;
           k.ardisikHata = 0;
@@ -286,6 +406,10 @@ async function parcaOku(bekleyen: number[]): Promise<number> {
   // Bitişte kaynağı bekletildiği için geri kalanlar da boşluktur (bir sonraki koşu kapsamdan yeniden okur).
   hatali += geri.length;
   for (const i of geri) if (hatalar.length < 50) hatalar.push(`${i.no}: denenen ${[...i.denenen].join(",")}; kalan kaynak şu an kullanılamıyor`);
+  if (sebepler.size || topluYeniden || ayniKaynakYeniden || logYeniden || s.logYedek > logYedek0) {
+    const ilk = [...sebepler].sort((x, y) => y[1] - x[1]).slice(0, 5).map(([m, n]) => `${n}× ${m}`).join(" | ");
+    console.log(`${ts()} parça hata özeti: toplu yeniden ${topluYeniden} · log yeniden ${logYeniden} · eski yola düşen ${s.logYedek - logYedek0} · aynı kaynakta yeniden ${ayniKaynakYeniden} · başka kaynağa geçen ${baskaKaynagaGecen} · boşluk ${hatali}${ilk ? ` · ${ilk}` : ""}`);
+  }
   return hatali;
 }
 
@@ -342,6 +466,7 @@ console.log(
   `\n${ts()} bitti: ${durmaSebebi} · ${sure.toFixed(0)} sn · okunan ${s.okunan.toLocaleString("tr")} blok (${(s.okunan / Math.max(sure, 0.001)).toFixed(2)} blok/sn) · ` +
   `önceden okunmuş ${s.atlanan.toLocaleString("tr")} · ${s.satir.toLocaleString("tr")} satır · boşluk ${s.hataliBlok}`,
 );
+if (LOG_YOLU) console.log(`log yolu: ${s.logYoluBlok} blok · ${s.logYedek} blok eski yola düştü`);
 console.log(`çapraz denetim: ${s.caprazDenetim} karşılaştırıldı · ${s.caprazUyusmaz} UYUŞMAZ · ${s.caprazAtlanan} atlandı (ikinci kaynak yoktu ya da okuyamadı)`);
 for (const k of aktifler) console.log(`  ${k.sinir.ad}: ${k.basarili} blok · ${k.hata} hata · ${k.kaynak.sayac.istek} istek${k.sonHata ? ` · son hata: ${k.sonHata}` : ""}`);
 if (hatalar.length) console.log(`boşluk örnekleri:\n  ${hatalar.slice(0, 20).join("\n  ")}`);

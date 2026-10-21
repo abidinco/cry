@@ -17,6 +17,7 @@
  * geçmiş, 200 ms'de hatasız), publicnode (anahtarsız, yalnızca son ~92 gün; kısa patlamada 24,6 blok/sn ama SÜREKLİ yükte 60 ms × 4 eşzaman 5,9 blok/sn hatasız, 25 ms × 8 ise 7,7 blok/sn ve 800 blokta 3 hata).
  */
 import { getJson, RateGate } from "@cry/chain";
+import type { RpcLog } from "@cry/blok-indeks";
 
 const TRONGRID = "https://api.trongrid.io";
 const SEKIL_DENEME = 6;
@@ -133,6 +134,34 @@ export class TronBlokKaynagi {
       if (n >= bas && n <= son) m.set(n, b);
     }
     return m;
+  }
+
+  /**
+   * [bas, son] aralığının TÜM olaylarını (adressiz) `eth_getLogs` ile getirir — log yolu, `@cry/blok-indeks` log-yolu.ts.
+   * Sonuç 10.000 olayı aşarsa kaynak -32005 verir: aralık ikiye bölünüp ayrı sorulur, tek blokta da aşarsa HATA.
+   * Hata gövdesi HTTP 200 gelir; ayrım `result`ın TİPİ (dizi = cevap). Bozuk yanıt sessizce "olay yok" olmaz.
+   */
+  async loglar(bas: number, son: number): Promise<RpcLog[]> {
+    const hex = (n: number) => "0x" + n.toString(16);
+    let son_: unknown;
+    for (let d = 0; d < this.sekilDeneme; d++) {
+      await this.kapi.gec();
+      this.sayac.istek++;
+      const j = await getJson<{ result?: unknown; error?: { code?: number; message?: string } }>(`${this.url}/jsonrpc`, {
+        chain: "tron", method: "POST", headers: this.basliklar,
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getLogs", params: [{ fromBlock: hex(bas), toBlock: hex(son) }] }),
+      });
+      if (Array.isArray(j.result)) return j.result as RpcLog[];
+      if (j.error?.code === -32005) {
+        if (bas === son) throw new Error(`${this.ad} blok ${bas}: tek blokta 10.000'den çok olay`);
+        const orta = Math.floor((bas + son) / 2);
+        return [...(await this.loglar(bas, orta)), ...(await this.loglar(orta + 1, son))];
+      }
+      this.sayac.sekilHatasi++;
+      son_ = j;
+      if (d < this.sekilDeneme - 1) await uyu(500 * 2 ** d);
+    }
+    throw new Error(`${this.ad} eth_getLogs [${bas}, ${son}]: ${this.sekilDeneme} denemede şekli bozuk yanıt — ${JSON.stringify(son_).slice(0, 200)}`);
   }
 
   /** Tek bloğun işlem bilgisi. Toplu blok isteğinin yanında blok başına kalan tek istek budur. */
