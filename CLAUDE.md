@@ -164,6 +164,29 @@ Plan ve ölçümler: [docs/yol-haritasi-blok-indeks.md](docs/yol-haritasi-blok-i
 - **Doldurucu kuyruk işi DEĞİL, tek bir ayrık süreçtir**
   (`apps/blok-okuyucu/src/doldur.ts`); kaldığı yeri kapsam tablosu bilir, süreci
   öldürmek zararsız, aynı komut kaldığı yerden devam eder.
+- **TronGrid kotası HESAP başına, günde 100.000 istek**; aynı hesabın anahtarları
+  paylaşır, ek anahtar kota EKLEMEZ. Aşılınca 1 istek/sn («Exceed the user daily
+  usage»), 03:00 TSİ'de sıfırlanır. 3 anahtar × 6 işçi kotayı tüketip «20 ardışık
+  hata, 60 sn bekletme» dalgaları üretti (parça başına 619+ «alınamadı»). Kural:
+  **tek anahtar**, `--logYolu --kaynaklar=publicnode,tronstack,trongrid
+  --trongridEs=6 --trongridToplu=100 --trongridGunlukButce=95000` (bekçi ve
+  `doldur-devam.ps1` aynı komutu koşar). Ölçüldü (20 Ekim, tek anahtar): Es=2 ~10,
+  Es=4 22,3, Es=6 25,9 blok/sn, 0 TronGrid hatası, ~73k istek/gün (Es=8 ~95k,
+  denenmedi); derinde ~30 blok/sn, günlüğün tahmini ~28 gün. **Tek istekte 100
+  blok TronGrid'in tavanı:** 200/400 HTTP 200 + `{}` döner. Günlükte `<N>i` kaynağa
+  atılan mantıksal istektir (429 yeniden denemeleri hariç).
+- **Ölçüm düzeneği ölçtüğünü yavaşlatabilir:** yanıtı `clone().arrayBuffer()` ile
+  kopyalayan sarmalayıcı doldurucuyu ~%35 yavaşlattı (13,4 → 20,9 blok/sn); sayaç
+  gövdeyi okumaz. Bu yüzden «işçiler %45 boşta» ölçümü güvenilmez.
+- **Ücretsiz TRON kaynağı kalmadı** (20 Ekim): dRPC `eth_getLogs` indeksle birebir
+  eşit ama adressiz sorguyu reddediyor (log yolunun `idx` kuralı adressiz ister)
+  ve isteklerin ~yarısı 500; Pocket `getblockbylimitnext` zaman aşımı; Ankr
+  anahtar, publicnode ~92 gün, Tatum dakikada 5, Bitquery S3 yalnızca örnek.
+  tronstack 31 Aralık'ta kapanıyor ve hızın bir kısmı ona dayanıyor.
+- **`doldur-devam.ps1` yalnızca `bitti: taban`ı «bitti» sayar** ve damganın iki
+  biçimini (boşluklu · ISO `T`) tanır: yalnızca eskisini tanıyan arama ESKİ bir
+  başlangıç satırına takılıp her açılışta «zaten bitmiş» diyordu (gerçek günlükte
+  ölçüldü, düzeltme sahte günlüklerle sınandı).
 
 ## Canlı uç
 
