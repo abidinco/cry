@@ -248,7 +248,10 @@ try {
   # Start-Process'in yonlendirmesi dosyayi EZER; gunluk kaybi kapsam kadar degerlidir.
   $psi = New-Object System.Diagnostics.ProcessStartInfo
   $psi.FileName = "cmd.exe"
-  $psi.Arguments = "/c node --env-file=.env --env-file=apps/web/.env.local --import tsx apps/blok-okuyucu/src/doldur.ts --uygula --ilerlemeSn=60 >> `"$Gunluk`" 2>&1"
+  # 2026-10-20: tek anahtar + --trongridEs=6. Ek anahtarlar ayni hesabin 100k/gun kotasini paylasiyor;
+  # 3 anahtar x 6 isci tur basina 600+ "alinamadi" ve 60 sn bekletme uretti. Tek anahtar olculdu:
+  # Es=2 ~10, Es=4 ~22, Es=6 ~26 blok/sn (1 saat, 0 TronGrid hatasi, kota ~73k/gun). Es=8 ~95k/gun, denenmedi.
+  $psi.Arguments = "/c node --env-file=.env --env-file=apps/web/.env.local --import tsx apps/blok-okuyucu/src/doldur.ts --uygula --ilerlemeSn=60 --logYolu --kaynaklar=publicnode,tronstack,trongrid --trongridEs=6 --trongridToplu=100 --trongridMs=120 --trongridGunlukButce=95000 >> `"$Gunluk`" 2>&1"
   $psi.WorkingDirectory = $Depo
   $psi.UseShellExecute = $false
   $psi.CreateNoWindow = $true

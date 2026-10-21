@@ -46,14 +46,17 @@ function SonKosuBittiMi {
   $satirlar = Get-Content $Gunluk -Encoding UTF8
   $sonBaslangic = -1
   for ($i = $satirlar.Count - 1; $i -ge 0; $i--) {
-    if ($satirlar[$i] -match "^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} doldurma ") {
+    # Damga bicimi: eski "2026-10-03 22:43:47" VE yeni ISO "2026-10-20T08:35:54+03:00" (ts()). Yalnizca eskisini
+    # taniyan arama, ISO'ya gecildikten sonra son kosuyu bulamayip ESKI bir baslangic satirina takiliyordu.
+    if ($satirlar[$i] -match "^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}\S* doldurma ") {
       $sonBaslangic = $i
       break
     }
   }
   if ($sonBaslangic -lt 0) { return $false }
   for ($i = $sonBaslangic; $i -lt $satirlar.Count; $i++) {
-    if ($satirlar[$i] -match "bitti:") { return $true }
+    # Yalnizca "bitti: taban" (blok 1'e inildi) isi bitirir. sinyal/kaynak/disk/yazma = durdu, bitmedi.
+    if ($satirlar[$i] -match "bitti:\s*taban") { return $true }
   }
   return $false
 }
@@ -110,7 +113,7 @@ Yaz "yarim kalmis kosu tespit edildi, ayni komutla yeniden baslatiliyor"
 
 $psi = New-Object System.Diagnostics.ProcessStartInfo
 $psi.FileName = "cmd.exe"
-$psi.Arguments = "/c node --env-file=.env --env-file=apps/web/.env.local --import tsx apps/blok-okuyucu/src/doldur.ts --uygula --ilerlemeSn=60 >> `"$Gunluk`" 2>&1"
+$psi.Arguments = "/c node --env-file=.env --env-file=apps/web/.env.local --import tsx apps/blok-okuyucu/src/doldur.ts --uygula --ilerlemeSn=60 --logYolu --kaynaklar=publicnode,tronstack,trongrid --trongridEs=6 --trongridToplu=100 --trongridMs=120 --trongridGunlukButce=95000 >> `"$Gunluk`" 2>&1"
 $psi.WorkingDirectory = $Depo
 $psi.UseShellExecute = $false
 $psi.WindowStyle = "Hidden"
